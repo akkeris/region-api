@@ -74,10 +74,6 @@ Set the following environment variables, if this is first time running it see th
 * PUBLIC_SNI_VIP - The public IP address for the F5 on the public network
 * ALAMO_INTERNAL_URL_TEMPLATE - The template for internal/private urls https://{name}-{space}.internalapps.example.com/
 * ALAMO_URL_TEMPLATE - The template for external/public urls https://{name}-{space}.apps.example.com/
-* KAFKA_BROKERS - todo, fix logshuttle so this does not need to be here. It should contain the comma delimited list of ip:port for kafka.
-* LOGSHUTTLE_APP - todo, fix logshuttle so this does not need to be here. The name of the logshuttle app.
-* LOGSHUTTLE_RESTART - todo, fix logshuttle so this does not need to be here. Whether to restart the logshuttle on space creation.
-* LOGSHUTTLE_SPACE - todo, fix logshuttle so this does not need to be here. The space the logshuttle exists on.
 * REDIS_BROKER_URL - todo, get brokers to register with alamo-api, otherwise this is the host of the broker
 * POSTGRES_BROKER_URL - todo, get brokers to register with alamo-api, otherwise this is the host of the broker
 * MEMCACHED_BROKER_URL - todo, get brokers to register with alamo-api, otherwise this is the host of the broker
@@ -94,7 +90,8 @@ Set the following environment variables, if this is first time running it see th
 * DEFAULT_STACK=ds1 - the name of the default stack. If none is specified it assumes the name ds1.
 * CERT_VALIDITY_YEARS=2 - The length of time certificates issued will last (in years).
 * REVISION_HISTORY_LIMIT=10 - the amount of revisions to keep in replica sets
-
+* LOGSHUTTLE_SERVICE_HOST, LOGSHUTTLE_SERVICE_PORT - where to find the logshuttle
+* LOGSESSION_SERVICE_HOST, LOGSESSION_SERVICE_PORT - where to find the logsession
 
 **Debugging Environment Variables:**
 
