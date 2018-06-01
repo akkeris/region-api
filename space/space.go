@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"time"
 	runtime "../runtime"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/binding"
@@ -106,17 +105,6 @@ func Createspace(db *sql.DB, space structs.Spacespec, berr binding.Errors, r ren
 		utils.ReportError(err, r)
 		return
 	}
-	err = pushLogToNewSpace(space.Name)
-	if err != nil {
-		utils.ReportError(err, r)
-		return
-	}
-	_, err = restartLogShuttle(db, space.Name)
-	if err != nil {
-		utils.ReportError(err, r)
-		return
-	}
-
 	r.JSON(http.StatusCreated, structs.Messagespec{Status:http.StatusCreated, Message:"space created"})
 }
 
@@ -280,44 +268,6 @@ func Listspaces(db *sql.DB, params martini.Params, r render.Render) {
 		return
 	}
 	r.JSON(200, spaces)
-}
-
-func pushLogToNewSpace(space string) (e error) {
-	var logentry structs.Logspec
-	logentry.Log = "Created Topic"
-	logentry.Stream = "stdout"
-	logentry.Time = time.Now()
-	logentry.Kubernetes.NamespaceName = space
-	logentry.Kubernetes.PodID = "nopodid"
-	logentry.Kubernetes.PodName = "nopodname"
-	logentry.Kubernetes.ContainerName = "nocontainername"
-	logentry.Kubernetes.Labels.Name = "noappname"
-	logentry.Topic = space
-	logentry.Tag = "createtopic"
-	err := utils.SendToKafka(logentry)
-	if err != nil {
-		return err
-	} else {
-		return nil
-	}
-}
-
-func restartLogShuttle(db *sql.DB, space string) (m structs.Messagespec, e error) {
-	if os.Getenv("LOGSHUTTLE_RESTART") == "true" {
-		rt, err := runtime.GetRuntimeFor(db, space)
-		if err != nil {
-			return structs.Messagespec{Status:http.StatusInternalServerError, Message:"Unable to restart logshuttle"}, err
-		}
-		err = rt.RestartDeployment(os.Getenv("LOGSHUTTLE_SPACE"), os.Getenv("LOGSHUTTLE_APP"))
-		if err != nil {
-			utils.LogError("Not able to restart logshuttle", err)
-			return structs.Messagespec{Status:http.StatusInternalServerError, Message:"Unable to restart the logshuttle"}, nil
-		} else {
-			return structs.Messagespec{Status:http.StatusOK, Message:"OK"}, nil
-		}
-	} else {
-		return structs.Messagespec{Status:http.StatusOK, Message:"No restart required"}, nil
-	}
 }
 
 func IsInternalSpace(db *sql.DB, space string) (i bool, e error) {
