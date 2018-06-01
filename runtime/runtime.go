@@ -37,7 +37,9 @@ type Dataspec struct {
 }
 
 type Secretspec struct {
-	Metadata Metadataspec `json:"metadata"`
+	Metadata struct {
+		Name string `json:"name"`
+	} `json:"metadata"`
 	Data Dataspec `json:"data"`
 	Type string `json:"type"`
 }
