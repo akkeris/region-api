@@ -64,7 +64,7 @@ switch -glob [string tolower [HTTP::uri]]
    "{{$value.Path}}/*"
      {
            HTTP::header insert X-Forwarded-Path [HTTP::path]
-           HTTP::header insert X-Orig-Path "{{$value.Path}}/"
+           HTTP::header insert X-Orig-Path "{{$value.Path}}"
            HTTP::path [string map -nocase {"{{$value.Path}}/" "{{$value.ReplacePath}}/"} [HTTP::path]]
             if {[regsub -all "//" [HTTP::path] "/" newpath] > 0}{
             HTTP::path $newpath}
