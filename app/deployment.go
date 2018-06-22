@@ -136,7 +136,12 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 	for n, v := range configvars {
 		elist = append(elist, structs.EnvVar{Name:n, Value:v})
 	}
-	servicevars := service.GetServiceConfigVars(appbindings)
+	// add service vars
+	err, servicevars := service.GetServiceConfigVars(appbindings)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
 	for _, e := range servicevars {
 		elist = append(elist, e)
 	}

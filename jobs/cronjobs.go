@@ -286,7 +286,7 @@ func DeployCronJob(db *sql.DB, params martini.Params, req structs.JobDeploy, ber
 	}
 
 	// Get bindings
-	configset, bindings, err := config.GetBindings(db, space, jobName)
+	configset, appbindings, err := config.GetBindings(db, space, jobName)
 
 	// Get memory limits
 	memoryLimit, memoryRequest, err := app.GetMemoryLimits(db, plan)
@@ -302,7 +302,12 @@ func DeployCronJob(db *sql.DB, params martini.Params, req structs.JobDeploy, ber
 	for n, v := range configvars {
 		elist = append(elist, structs.EnvVar{Name:n, Value:v})
 	}
-	servicevars := service.GetServiceConfigVars(bindings)
+	// add service vars
+	err, servicevars := service.GetServiceConfigVars(appbindings)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
 	for _, e := range servicevars {
 		elist = append(elist, e)
 	}
@@ -377,7 +382,7 @@ func UpdatedDeployedCronJob(db *sql.DB, params martini.Params, req structs.JobDe
 	}
 
 	// Get bindings
-	configset, bindings, err := config.GetBindings(db, space, jobName)
+	configset, appbindings, err := config.GetBindings(db, space, jobName)
 
 	// Get memory limits
 	memoryLimit, memoryRequest, err := app.GetMemoryLimits(db, plan)
@@ -396,7 +401,12 @@ func UpdatedDeployedCronJob(db *sql.DB, params martini.Params, req structs.JobDe
 		e1.Value = v
 		elist = append(elist, e1)
 	}
-	servicevars := service.GetServiceConfigVars(bindings)
+	// add service vars
+	err, servicevars := service.GetServiceConfigVars(appbindings)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
 	for _, e := range servicevars {
 		elist = append(elist, e)
 	}
