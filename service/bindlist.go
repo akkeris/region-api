@@ -1,10 +1,10 @@
 package service
 
 import (
-	structs "../structs"
-	utils "../utils"
 	"database/sql"
 	"fmt"
+	structs "region-api/structs"
+	utils "region-api/utils"
 
 	"github.com/go-martini/martini"
 	_ "github.com/lib/pq"

@@ -1,13 +1,13 @@
 package app
 
 import (
-	structs "../structs"
-	utils "../utils"
 	"database/sql"
-	"net/http"
-	"strings"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/render"
+	"net/http"
+	structs "region-api/structs"
+	utils "region-api/utils"
+	"strings"
 )
 
 func Unbindapp(db *sql.DB, params martini.Params, r render.Render) {
@@ -22,5 +22,5 @@ func Unbindapp(db *sql.DB, params martini.Params, r render.Render) {
 		utils.ReportError(err, r)
 		return
 	}
-	r.JSON(http.StatusOK, structs.Messagespec{Status:http.StatusOK, Message:bindspec + " deleted from " + appname})
+	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: bindspec + " deleted from " + appname})
 }

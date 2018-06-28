@@ -1,16 +1,15 @@
 package app
 
-
 import (
-	"../config"
-	"../space"
-	"../structs"
-	"../utils"
-	"../maintenance"
 	"bytes"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"region-api/config"
+	"region-api/maintenance"
+	"region-api/space"
+	"region-api/structs"
+	"region-api/utils"
 	"testing"
 
 	"encoding/json"

@@ -1,14 +1,14 @@
 package config
 
 import (
-	structs "../structs"
-	utils "../utils"
 	"database/sql"
-	"net/http"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
 	"github.com/nu7hatch/gouuid"
+	"net/http"
+	structs "region-api/structs"
+	utils "region-api/utils"
 )
 
 func Includeset(db *sql.DB, params martini.Params, r render.Render) {
@@ -21,7 +21,7 @@ func Includeset(db *sql.DB, params martini.Params, r render.Render) {
 		utils.ReportError(err, r)
 		return
 	}
-	r.JSON(http.StatusCreated, structs.Messagespec{Status:http.StatusCreated, Message:parent + " now includes " + child})
+	r.JSON(http.StatusCreated, structs.Messagespec{Status: http.StatusCreated, Message: parent + " now includes " + child})
 }
 
 func Createset(db *sql.DB, spec structs.Setspec, berr binding.Errors, r render.Render) {
@@ -40,12 +40,12 @@ func Createset(db *sql.DB, spec structs.Setspec, berr binding.Errors, r render.R
 		utils.ReportError(err, r)
 		return
 	}
-	r.JSON(http.StatusCreated, structs.Messagespec{Status:http.StatusCreated, Message:"Set " + setname + " created"})
+	r.JSON(http.StatusCreated, structs.Messagespec{Status: http.StatusCreated, Message: "Set " + setname + " created"})
 }
 
 func Deleteset(db *sql.DB, params martini.Params, r render.Render) {
 	setname := params["setname"]
-	
+
 	_, err := db.Exec("DELETE from configvars where setname=$1", setname)
 	if err != nil {
 		utils.ReportError(err, r)
@@ -58,7 +58,7 @@ func Deleteset(db *sql.DB, params martini.Params, r render.Render) {
 		return
 	}
 
-	r.JSON(http.StatusOK, structs.Messagespec{Status:http.StatusOK, Message:setname + " deleted"})
+	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: setname + " deleted"})
 }
 
 func Deleteinclude(db *sql.DB, params martini.Params, r render.Render) {
@@ -71,7 +71,7 @@ func Deleteinclude(db *sql.DB, params martini.Params, r render.Render) {
 		return
 	}
 
-	r.JSON(http.StatusOK, structs.Messagespec{Status:http.StatusOK, Message:parent + "-" + child + " relationship deleted"})
+	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: parent + "-" + child + " relationship deleted"})
 }
 
 func Listsets(db *sql.DB, params martini.Params, r render.Render) {
@@ -92,7 +92,7 @@ func Listsets(db *sql.DB, params martini.Params, r render.Render) {
 			utils.ReportError(err, r)
 			return
 		}
-		sets = append(sets, structs.Setspec{Setname:setname, Settype:settype})
+		sets = append(sets, structs.Setspec{Setname: setname, Settype: settype})
 	}
 	err = rows.Err()
 	if err != nil {
@@ -121,7 +121,7 @@ func Dumpset(db *sql.DB, params martini.Params, r render.Render) {
 			utils.ReportError(err, r)
 			return
 		}
-		vars = append(vars, structs.Varspec{Setname:setname, Varname:varname, Varvalue:varvalue})
+		vars = append(vars, structs.Varspec{Setname: setname, Varname: varname, Varvalue: varvalue})
 	}
 	err = rows.Err()
 	if err != nil {

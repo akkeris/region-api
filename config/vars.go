@@ -1,15 +1,15 @@
 package config
 
 import (
-	structs "../structs"
-	utils "../utils"
 	"database/sql"
 	"fmt"
-	"strings"
-	"net/http"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
+	"net/http"
+	structs "region-api/structs"
+	utils "region-api/utils"
+	"strings"
 )
 
 func Deletevar(db *sql.DB, params martini.Params, r render.Render) {
@@ -21,7 +21,7 @@ func Deletevar(db *sql.DB, params martini.Params, r render.Render) {
 		utils.ReportError(err, r)
 		return
 	}
-	r.JSON(http.StatusOK, structs.Messagespec{Status:http.StatusOK, Message:varname + " deleted"})
+	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: varname + " deleted"})
 }
 
 func Getvar(db *sql.DB, params martini.Params, r render.Render) {
@@ -34,7 +34,7 @@ func Getvar(db *sql.DB, params martini.Params, r render.Render) {
 		utils.ReportError(err, r)
 		return
 	}
-	r.JSON(http.StatusOK, structs.Varspec{Setname:setname, Varname:varname, Varvalue:varvalue})
+	r.JSON(http.StatusOK, structs.Varspec{Setname: setname, Varname: varname, Varvalue: varvalue})
 }
 
 func Addvar(db *sql.DB, spec structs.Varspec, berr binding.Errors, r render.Render) {
@@ -47,7 +47,7 @@ func Addvar(db *sql.DB, spec structs.Varspec, berr binding.Errors, r render.Rend
 		utils.ReportError(err, r)
 		return
 	}
-	r.JSON(http.StatusCreated, structs.Messagespec{Status:http.StatusCreated, Message:"added " + spec.Varname})
+	r.JSON(http.StatusCreated, structs.Messagespec{Status: http.StatusCreated, Message: "added " + spec.Varname})
 }
 
 func Addvars(db *sql.DB, specs []structs.Varspec, berr binding.Errors, r render.Render) {
@@ -78,7 +78,7 @@ func Addvars(db *sql.DB, specs []structs.Varspec, berr binding.Errors, r render.
 		utils.ReportError(err, r)
 		return
 	}
-	r.JSON(http.StatusCreated, structs.Messagespec{Status:http.StatusCreated, Message:"added " + strings.Join(names, ",")})
+	r.JSON(http.StatusCreated, structs.Messagespec{Status: http.StatusCreated, Message: "added " + strings.Join(names, ",")})
 }
 
 func Updatevar(db *sql.DB, spec structs.Varspec, berr binding.Errors, r render.Render) {

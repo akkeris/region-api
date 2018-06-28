@@ -1,23 +1,22 @@
 package space
 
-
 import (
-	"../app"
-	"../config"
-	"../structs"
-	"../utils"
 	"bytes"
-	"net/http"
-	"net/http/httptest"
-	"os"
-	"fmt"
-	"testing"
-	"strings"
 	"encoding/json"
+	"fmt"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
 	. "github.com/smartystreets/goconvey/convey"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"region-api/app"
+	"region-api/config"
+	"region-api/structs"
+	"region-api/utils"
+	"strings"
+	"testing"
 )
 
 func Server() *martini.ClassicMartini {
@@ -77,7 +76,6 @@ func Server() *martini.ClassicMartini {
 	return m
 }
 
-
 func Init() *martini.ClassicMartini {
 	pitdb := os.Getenv("PITDB")
 	pool := utils.GetDB(pitdb)
@@ -87,7 +85,7 @@ func Init() *martini.ClassicMartini {
 	return httpMartini
 }
 
-func sendRequest(m *martini.ClassicMartini, method string, url string, payload interface{}) (*httptest.ResponseRecorder) {
+func sendRequest(m *martini.ClassicMartini, method string, url string, payload interface{}) *httptest.ResponseRecorder {
 	b := new(bytes.Buffer)
 	if err := json.NewEncoder(b).Encode(payload); err != nil {
 		panic(err)
@@ -107,12 +105,12 @@ func TestCreatingDeletingSpaces(t *testing.T) {
 			So(w.Body.String(), ShouldContainSubstring, "The specified space does not exist")
 		})
 		Convey("Ensure we can create a space", func() {
-			w := sendRequest(m, "post", "/v1/space", structs.Spacespec{Name:"alamotestspace", Internal:false, ComplianceTags:"", Stack:"ds1"})
+			w := sendRequest(m, "post", "/v1/space", structs.Spacespec{Name: "alamotestspace", Internal: false, ComplianceTags: "", Stack: "ds1"})
 			So(w.Code, ShouldEqual, http.StatusCreated)
 			So(w.Body.String(), ShouldContainSubstring, "space created")
 		})
 		Convey("Ensure we cant create a space twice", func() {
-			w := sendRequest(m, "post", "/v1/space", structs.Spacespec{Name:"alamotestspace", Internal:false, ComplianceTags:"", Stack:"ds1"})
+			w := sendRequest(m, "post", "/v1/space", structs.Spacespec{Name: "alamotestspace", Internal: false, ComplianceTags: "", Stack: "ds1"})
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
 			So(w.Body.String(), ShouldContainSubstring, "The specified space is already taken.")
 		})

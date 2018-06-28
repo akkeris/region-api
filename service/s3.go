@@ -1,18 +1,18 @@
 package service
 
 import (
-	structs "../structs"
-	utils "../utils"
 	"bytes"
 	"encoding/json"
-	"io/ioutil"
-	"net/http"
-	"os"
 	"errors"
 	"github.com/bitly/go-simplejson"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
+	"io/ioutil"
+	"net/http"
+	"os"
+	structs "region-api/structs"
+	utils "region-api/utils"
 )
 
 //Tags3 centralized

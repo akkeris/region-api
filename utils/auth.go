@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"fmt"
 	"github.com/bitly/go-simplejson"
 	"net/http"
 	"os"
@@ -21,6 +22,7 @@ func InitAuth() {
 	vclient := &http.Client{}
 	vresp, err := vclient.Do(vreq)
 	if err != nil {
+		fmt.Println(err)
 	}
 	defer vresp.Body.Close()
 	bodyj, _ := simplejson.NewFromReader(vresp.Body)

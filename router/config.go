@@ -1,11 +1,11 @@
 package router
 
 import (
-	spacepackage "../space"
-	structs "../structs"
-	utils "../utils"
 	"database/sql"
 	"fmt"
+	spacepackage "region-api/space"
+	structs "region-api/structs"
+	utils "region-api/utils"
 	"strings"
 
 	"github.com/go-martini/martini"

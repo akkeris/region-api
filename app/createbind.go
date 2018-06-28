@@ -1,12 +1,12 @@
 package app
 
 import (
-	structs "../structs"
-	utils "../utils"
 	"database/sql"
-	"net/http"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
+	"net/http"
+	structs "region-api/structs"
+	utils "region-api/utils"
 )
 
 //Createbind centralized
@@ -37,5 +37,5 @@ func Createbind(db *sql.DB, spec structs.Bindspec, berr binding.Errors, r render
 		utils.ReportError(inserterr, r)
 		return
 	}
-	r.JSON(http.StatusCreated, structs.Messagespec{Status:http.StatusCreated, Message:"added " + appname + " bound to " + spec.Bindname + " in space " + spec.Space})
+	r.JSON(http.StatusCreated, structs.Messagespec{Status: http.StatusCreated, Message: "added " + appname + " bound to " + spec.Bindname + " in space " + spec.Space})
 }
