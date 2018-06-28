@@ -1,21 +1,21 @@
 package app
 
 import (
-	config "../config"
-	service "../service"
-	structs "../structs"
-	utils "../utils"
-	runtime "../runtime"
 	"database/sql"
-	"os"
-	"log"
-	"strconv"
-	"strings"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
+	"log"
+	"os"
+	config "region-api/config"
+	runtime "region-api/runtime"
+	service "region-api/service"
+	structs "region-api/structs"
+	utils "region-api/utils"
+	"strconv"
+	"strings"
 )
 
-func AddAlamoConfigVars(appname string, space string) ([]structs.EnvVar) {
+func AddAlamoConfigVars(appname string, space string) []structs.EnvVar {
 	var elist []structs.EnvVar
 	var spaceconfigvar structs.EnvVar
 	var appconfigvar structs.EnvVar
@@ -113,14 +113,14 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 		utils.ReportError(err, r)
 		return
 	}
-	
+
 	// Via heuristics and rules, determine and/or override ports and configvars
 	var finalport int
-	finalport = appport 
+	finalport = appport
 	if configvars["PORT"] != "" {
 		holdport, _ := strconv.Atoi(configvars["PORT"])
 		finalport = holdport
-	} 
+	}
 	if deploy1.Port != 0 {
 		finalport = deploy1.Port
 		holdport := strconv.Itoa(deploy1.Port)
@@ -130,17 +130,16 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 		finalport = 4747
 		configvars["PORT"] = "4747"
 	}
-	
+
 	// Assemble config -- alamo "built in config", "user defined config vars", "service configvars"
 	elist := AddAlamoConfigVars(appname, space)
 	for n, v := range configvars {
-		elist = append(elist, structs.EnvVar{Name:n, Value:v})
+		elist = append(elist, structs.EnvVar{Name: n, Value: v})
 	}
 	servicevars := service.GetServiceConfigVars(appbindings)
 	for _, e := range servicevars {
 		elist = append(elist, e)
 	}
-	
 
 	// Assemble secrets
 	var secrets []structs.Namespec
@@ -175,9 +174,14 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 	deployment.Tag = apptag
 	deployment.RevisionHistoryLimit = revisionhistorylimit
 	if len(deploy1.Command) > 0 {
-		deployment.Command = deploy1.Command 
+		deployment.Command = deploy1.Command
 	}
-	
+
+	// Service Mesh Feature Flag
+	if (structs.Features{}) != deploy1.Features {
+		deployment.Features = deploy1.Features
+	}
+
 	newDeployment := !rt.DeploymentExists(space, appname)
 	if newDeployment {
 		err = rt.CreateDeployment(&deployment)

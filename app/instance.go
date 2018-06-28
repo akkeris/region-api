@@ -2,18 +2,18 @@ package app
 
 import (
 	"database/sql"
-	structs "../structs"
-	runtime "../runtime"
-	utils "../utils"
-	"net/http"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/render"
+	"net/http"
+	runtime "region-api/runtime"
+	structs "region-api/structs"
+	utils "region-api/utils"
 )
 
 func GetInstances(db *sql.DB, params martini.Params, r render.Render) {
 	app := params["app"]
 	space := params["space"]
-	rt, err := runtime.GetRuntimeFor(db, space);
+	rt, err := runtime.GetRuntimeFor(db, space)
 	if err != nil {
 		utils.ReportError(err, r)
 		return
@@ -24,8 +24,8 @@ func GetInstances(db *sql.DB, params martini.Params, r render.Render) {
 func DeleteInstance(db *sql.DB, params martini.Params, r render.Render) {
 	space := params["space"]
 	instanceid := params["instanceid"]
-	
-	rt, err := runtime.GetRuntimeFor(db, space);
+
+	rt, err := runtime.GetRuntimeFor(db, space)
 	if err != nil {
 		utils.ReportError(err, r)
 		return
@@ -36,5 +36,5 @@ func DeleteInstance(db *sql.DB, params martini.Params, r render.Render) {
 		utils.ReportError(err, r)
 		return
 	}
-	r.JSON(http.StatusOK, structs.Messagespec{Status:http.StatusOK, Message:"Deleted " + instanceid})
+	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: "Deleted " + instanceid})
 }

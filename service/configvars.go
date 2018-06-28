@@ -1,12 +1,12 @@
 package service
 
 import (
-	vault "../vault"
-	structs "../structs"
+	structs "region-api/structs"
+	vault "region-api/vault"
 	"strings"
 )
 
-func GetServiceConfigVars(appbindings []string) ([]structs.EnvVar) {
+func GetServiceConfigVars(appbindings []string) []structs.EnvVar {
 	elist := []structs.EnvVar{}
 	for _, element := range appbindings {
 		servicetype := strings.Split(element, ":")[0]
@@ -84,16 +84,16 @@ func GetServiceConfigVars(appbindings []string) ([]structs.EnvVar) {
 				elist = append(elist, e1)
 			}
 		}
-        if servicetype == "mongodb" {
-                mongodbvars,_  := Getmongodbvars(servicename)
+		if servicetype == "mongodb" {
+			mongodbvars, _ := Getmongodbvars(servicename)
 
-                for k, v := range mongodbvars {
-                        var e1 structs.EnvVar
-                        e1.Name = k
-                        e1.Value = v
-                        elist = append(elist, e1)
-                }
-        }
+			for k, v := range mongodbvars {
+				var e1 structs.EnvVar
+				e1.Name = k
+				e1.Value = v
+				elist = append(elist, e1)
+			}
+		}
 		if servicetype == "vault" {
 			vaultvars := vault.GetVaultVariables(servicename)
 			for _, element := range vaultvars {

@@ -1,13 +1,13 @@
 package main
 
 import (
-	"./server"
-	"./utils"
 	"database/sql"
 	"fmt"
-	"os"
-	"time"
 	"github.com/stackimpact/stackimpact-go"
+	"os"
+	"region-api/server"
+	"region-api/utils"
+	"time"
 )
 
 func PrintDBStats(db *sql.DB) func() {
@@ -17,13 +17,11 @@ func PrintDBStats(db *sql.DB) func() {
 	}
 }
 
-
-
 func main() {
 	if os.Getenv("STACKIMPACT") != "" {
 		stackimpact.Start(stackimpact.Options{
 			AgentKey: os.Getenv("STACKIMPACT"),
-	  		AppName: "Alamo API",
+			AppName:  "Alamo API",
 		})
 	}
 	utils.InitAuth()

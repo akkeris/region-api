@@ -1,15 +1,15 @@
 package jobs
 
 import (
-	config "../config"
-	service "../service"
-	structs "../structs"
-	utils "../utils"
-	app "../app"
-	runtime "../runtime"
 	"database/sql"
 	"net/http"
 	"os"
+	app "region-api/app"
+	config "region-api/config"
+	runtime "region-api/runtime"
+	service "region-api/service"
+	structs "region-api/structs"
+	utils "region-api/utils"
 	"strings"
 
 	"github.com/go-martini/martini"
@@ -236,9 +236,9 @@ func DeleteCronJob(db *sql.DB, params martini.Params, r render.Render) {
 	if err != nil {
 		utils.ReportError(err, r)
 		return
-	} 
+	}
 
-	r.JSON(http.StatusOK, structs.Messagespec{Status:http.StatusOK, Message:jobName + " deleted"})
+	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: jobName + " deleted"})
 }
 
 func DeployCronJob(db *sql.DB, params martini.Params, req structs.JobDeploy, berr binding.Errors, r render.Render) {
@@ -246,11 +246,11 @@ func DeployCronJob(db *sql.DB, params martini.Params, req structs.JobDeploy, ber
 	space := params["space"]
 
 	var (
-		cmd           string
-		plan          string
-		schedule      string
-		secrets       []structs.Namespec
-		secret        structs.Namespec
+		cmd      string
+		plan     string
+		schedule string
+		secrets  []structs.Namespec
+		secret   structs.Namespec
 	)
 
 	if berr != nil {
@@ -297,10 +297,10 @@ func DeployCronJob(db *sql.DB, params martini.Params, req structs.JobDeploy, ber
 		utils.ReportError(err, r)
 		return
 	}
-	
+
 	elist := app.AddAlamoConfigVars(jobName, space)
 	for n, v := range configvars {
-		elist = append(elist, structs.EnvVar{Name:n, Value:v})
+		elist = append(elist, structs.EnvVar{Name: n, Value: v})
 	}
 	servicevars := service.GetServiceConfigVars(bindings)
 	for _, e := range servicevars {
@@ -337,11 +337,11 @@ func UpdatedDeployedCronJob(db *sql.DB, params martini.Params, req structs.JobDe
 	space := params["space"]
 
 	var (
-		cmd           string
-		plan          string
-		schedule      string
-		secrets       []structs.Namespec
-		secret        structs.Namespec
+		cmd      string
+		plan     string
+		schedule string
+		secrets  []structs.Namespec
+		secret   structs.Namespec
 	)
 
 	if berr != nil {
@@ -388,7 +388,7 @@ func UpdatedDeployedCronJob(db *sql.DB, params martini.Params, req structs.JobDe
 		utils.ReportError(err, r)
 		return
 	}
-	
+
 	elist := []structs.EnvVar{}
 	for k, v := range configvars {
 		var e1 structs.EnvVar
@@ -405,7 +405,7 @@ func UpdatedDeployedCronJob(db *sql.DB, params martini.Params, req structs.JobDe
 	secret.Name = os.Getenv("KUBERNETES_IMAGE_PULL_SECRET")
 	secrets = append(secrets, secret)
 
-		// Create deployment
+	// Create deployment
 	var deployment structs.Deployment
 	deployment.Space = space
 	deployment.App = jobName
@@ -449,4 +449,3 @@ func StopCronJob(db *sql.DB, params martini.Params, r render.Render) {
 	}
 	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: jobName + " deleted"})
 }
-

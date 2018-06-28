@@ -1,12 +1,12 @@
 package app
 
 import (
-	structs "../structs"
-	utils "../utils"
 	"database/sql"
-	"net/http"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/render"
+	"net/http"
+	structs "region-api/structs"
+	utils "region-api/utils"
 )
 
 func GetPlans(db *sql.DB, params martini.Params, r render.Render) {

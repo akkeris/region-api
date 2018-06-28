@@ -1,14 +1,14 @@
 package templates
 
 import (
-	structs "../structs"
-	utils "../utils"
 	"database/sql"
 	"errors"
 	"fmt"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/render"
 	"os"
+	structs "region-api/structs"
+	utils "region-api/utils"
 )
 
 func GetURLTemplates(db *sql.DB, params martini.Params, r render.Render) {

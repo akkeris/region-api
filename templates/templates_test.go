@@ -1,8 +1,6 @@
 package templates
 
 import (
-	"../structs"
-	"../utils"
 	"encoding/json"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/render"
@@ -10,6 +8,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"region-api/structs"
+	"region-api/utils"
 	"testing"
 )
 

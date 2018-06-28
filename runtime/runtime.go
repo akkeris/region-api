@@ -2,30 +2,28 @@ package runtime
 
 import (
 	"database/sql"
+	structs "region-api/structs"
 	"time"
-	structs "../structs"
 )
 
 type Specspec struct {
 	Replicas int `json:"replicas"`
 }
 
-
 type Metadataspec struct {
 	Name      string `json:"name"`
 	Namespace string `json:"namespace"`
 }
 
-
 type Itemspec struct {
 	Metadata struct {
-		Name      string `json:"name"`
+		Name string `json:"name"`
 	} `json:"metadata"`
 }
 
 type Scalespec struct {
 	Metadata Metadataspec `json:"metadata"`
-	Spec Specspec `json:"spec"`
+	Spec     Specspec     `json:"spec"`
 }
 
 type Statusspec struct {
@@ -41,7 +39,7 @@ type Secretspec struct {
 		Name string `json:"name"`
 	} `json:"metadata"`
 	Data Dataspec `json:"data"`
-	Type string `json:"type"`
+	Type string   `json:"type"`
 }
 
 type Itemsspec struct {
@@ -49,7 +47,7 @@ type Itemsspec struct {
 }
 
 type Serviceaccountspec struct {
-	Metadata structs.Namespec `json:"metadata"`
+	Metadata         structs.Namespec   `json:"metadata"`
 	ImagePullSecrets []structs.Namespec `json:"imagePullSecrets"`
 }
 
@@ -81,24 +79,26 @@ type ReadinessProbe struct {
 }
 
 type ContainerItem struct {
-	Name             string          `json:"name"`
-	Image            string          `json:"image"`
-	Command          []string        `json:"command,omitempty"`
+	Name             string                  `json:"name"`
+	Image            string                  `json:"image"`
+	Args             []string                `json:"args,omitempty"`
+	Command          []string                `json:"command,omitempty"`
 	Env              []structs.EnvVar        `json:"env,omitempty"`
-	Ports            []ContainerPort `json:"ports,omitempty"`
-	ImagePullPolicy  string          `json:"imagePullPolicy,omitempty"`
+	Ports            []ContainerPort         `json:"ports,omitempty"`
+	ImagePullPolicy  string                  `json:"imagePullPolicy,omitempty"`
 	ImagePullSecrets []structs.Namespec      `json:"imagePullSecrets,omitempty"`
 	Resources        structs.ResourceSpec    `json:"resources,omitempty"`
-	ReadinessProbe   *ReadinessProbe `json:"readinessProbe,omitempty"`
+	ReadinessProbe   *ReadinessProbe         `json:"readinessProbe,omitempty"`
+	SecurityContext  structs.SecurityContext `json:"securityContext,omitempty"`
+	VolumeMounts     []structs.VolumeMounts  `json:"volumeMounts",omitempty`
 }
 
 type Createspec struct {
-	Message		string		`json:"name"`
-	Metadata	struct {
-		Uid		string		`json:"uid"`
+	Message  string `json:"name"`
+	Metadata struct {
+		Uid string `json:"uid"`
 	} `json:"metadata"`
 }
-
 
 type PortItem struct {
 	Protocol   string `json:"protocol"`
@@ -174,8 +174,13 @@ type Deploymentspec struct {
 	} `json:"metadata"`
 	Spec struct {
 		RevisionHistoryLimit int `json:"revisionHistoryLimit"`
-		Replicas             int `json:"replicas"`
-		Strategy             struct {
+		Metadata             struct {
+			Annotations struct {
+				SidecarIstioIOStatus string `json:"sidecar.istio.io/status"`
+			} `json:"annotations,ommitempty"`
+		} `json:"metadata",omitempty`
+		Replicas int `json:"replicas"`
+		Strategy struct {
 			Type          string `json:"type,omitempty"`
 			RollingUpdate struct {
 				MaxUnavailable int `json:"maxUnavailable"`
@@ -195,10 +200,12 @@ type Deploymentspec struct {
 				} `json:"labels"`
 			} `json:"metadata"`
 			Spec struct {
-				Containers       []ContainerItem `json:"containers"`
-				ImagePullPolicy  string          `json:"imagePullPolicy"`
-				ImagePullSecrets []structs.Namespec    `json:"imagePullSecrets"`
-				DnsPolicy        string			 `json:"dnsPolicy,omitempty"`
+				Containers       []ContainerItem    `json:"containers"`
+				ImagePullPolicy  string             `json:"imagePullPolicy"`
+				ImagePullSecrets []structs.Namespec `json:"imagePullSecrets"`
+				DnsPolicy        string             `json:"dnsPolicy,omitempty"`
+				InitContainers   []ContainerItem    `json:"initContainers,omitempty"`
+				Volumes          []structs.Volumes  `json:"volumes,omitempty"`
 			} `json:"spec"`
 		} `json:"template"`
 	} `json:"spec"`
@@ -245,12 +252,12 @@ type OneOffPod struct {
 		Namespace string `json:"namespace"`
 	} `json:"metadata"`
 	Spec struct {
-		Containers                    []ContainerItem `json:"containers"`
-		ImagePullPolicy               string          `json:"imagePullPolicy,omitempty"`
-		ImagePullSecrets              []structs.Namespec      `json:"imagePullSecrets"`
-		RestartPolicy                 string          `json:"restartPolicy"`
-		TerminationGracePeriodSeconds int             `json:"terminationGracePeriodSeconds"`
-		DnsPolicy                     string          `json:"dnsPolicy,omitempty"`
+		Containers                    []ContainerItem    `json:"containers"`
+		ImagePullPolicy               string             `json:"imagePullPolicy,omitempty"`
+		ImagePullSecrets              []structs.Namespec `json:"imagePullSecrets"`
+		RestartPolicy                 string             `json:"restartPolicy"`
+		TerminationGracePeriodSeconds int                `json:"terminationGracePeriodSeconds"`
+		DnsPolicy                     string             `json:"dnsPolicy,omitempty"`
 	} `json:"spec"`
 }
 
@@ -296,11 +303,11 @@ type Job struct {
 				} `json:"labels"`
 			} `json:"metadata"`
 			Spec struct {
-				Containers       []ContainerItem `json:"containers"`
-				NodeSelector     string          `json:"nodeSelector,omitempty"`
-				ImagePullSecrets []structs.Namespec      `json:"imagePullSecrets"`
-				RestartPolicy    string          `json:"restartPolicy"`
-				DnsPolicy        string          `json:"dnsPolicy,omitempty"`
+				Containers       []ContainerItem    `json:"containers"`
+				NodeSelector     string             `json:"nodeSelector,omitempty"`
+				ImagePullSecrets []structs.Namespec `json:"imagePullSecrets"`
+				RestartPolicy    string             `json:"restartPolicy"`
+				DnsPolicy        string             `json:"dnsPolicy,omitempty"`
 			} `json:"spec"`
 		} `json:"template"`
 	} `json:"spec"`
@@ -319,7 +326,7 @@ type PodStatusspec struct {
 	} `json:"conditions"`
 	StartTime         time.Time `json:"startTime"`
 	ContainerStatuses []struct {
-		Name string `json:"name"`
+		Name      string                 `json:"name"`
 		State     map[string]interface{} `json:"state"`
 		LastState struct {
 		} `json:"lastState"`
@@ -420,15 +427,14 @@ type ReplicaSetSpec struct {
 
 type Revisionspec struct {
 	Revision int `json:"revision"`
-} 
+}
 
 type Rollbackspec struct {
 	ApiVersion         string            `json:"apiVersion"`
 	Name               string            `json:"name"`
 	UpdatedAnnotations map[string]string `json:"updatedAnnotations,omitempty"`
-	RollbackTo         Revisionspec		 `json:"rollbackTo"`
+	RollbackTo         Revisionspec      `json:"rollbackTo"`
 }
-
 
 type JobScaleGet struct {
 	Kind       string `json:"kind"`
@@ -492,7 +498,6 @@ type JobScaleGet struct {
 	} `json:"spec"`
 }
 
-
 type Runtime interface {
 	Scale(space string, app string, amount int) (e error)
 	GetService(space string, app string) (service KubeService, e error)
@@ -521,11 +526,11 @@ type Runtime interface {
 	GetCurrentImage(space string, app string) (i string, e error)
 	GetPodDetails(space string, app string) []structs.Instance
 	GetPodLogs(app string, space string, pod string) (log string, err error)
-	OneOffExists(space string, name string) (bool)
+	OneOffExists(space string, name string) bool
 	GetDeploymentHistory(space string, app string) (dslist []structs.DeploymentsSpec, err error)
 	RollbackDeployment(space string, app string, revision int) (e error)
 	GetPodStatus(space string, app string) []structs.SpaceAppStatus
-	CronJobExists(space string, job string) (bool)
+	CronJobExists(space string, job string) bool
 	GetCronJob(space string, jobName string) (*structs.CronJobStatus, error)
 	GetCronJobs(space string) (sjobs []structs.CronJobStatus, e error)
 	CreateCronJob(deployment *structs.Deployment) (*structs.CronJobStatus, error)
@@ -535,7 +540,7 @@ type Runtime interface {
 	GetJob(space string, jobName string) (*structs.JobStatus, error)
 	GetJobs(space string) ([]structs.JobStatus, error)
 	ScaleJob(space string, jobName string, replicas int, timeout int) (e error)
-	JobExists(space string, jobName string) (bool)
+	JobExists(space string, jobName string) bool
 	CreateJob(deployment *structs.Deployment) (*structs.JobStatus, error)
 	GetPodsBySpace(space string) (*PodStatus, error)
 	GetNodes() (*structs.KubeNodes, error)
@@ -544,7 +549,7 @@ type Runtime interface {
 var stackRuntimeCache map[string]Runtime = make(map[string]Runtime)
 var stackToSpaceCache map[string]string = make(map[string]string)
 
-func GetRuntimeStack(db *sql.DB, stack string) (rt Runtime, e error)  {
+func GetRuntimeStack(db *sql.DB, stack string) (rt Runtime, e error) {
 	// Cache for the win!
 	i, ok := stackRuntimeCache[stack]
 	if ok {
@@ -552,13 +557,13 @@ func GetRuntimeStack(db *sql.DB, stack string) (rt Runtime, e error)  {
 	}
 
 	var (
-		stackn string
-		description string
-		api_server string
-		api_version string
+		stackn            string
+		description       string
+		api_server        string
+		api_version       string
 		image_pull_secret string
-		auth_type string
-		auth_vault_path string
+		auth_type         string
+		auth_vault_path   string
 	)
 	rows := db.QueryRow("select stacks.stack, stacks.description, stacks.api_server, stacks.api_version, stacks.image_pull_secret, stacks.auth_type, stacks.auth_vault_path from stacks where stacks.stack = ?", stack)
 	err := rows.Scan(&stackn, &description, &api_server, &api_version, &image_pull_secret, &auth_type, &auth_vault_path)
@@ -566,11 +571,11 @@ func GetRuntimeStack(db *sql.DB, stack string) (rt Runtime, e error)  {
 		return nil, err
 	}
 	// If necessary we could flip on the type of runtime to use here:
-	stackRuntimeCache[stack] = NewKubernetes(&KubernetesConfig{Name:stackn, APIServer:api_server, APIVersion:api_version, ImagePullSecret:image_pull_secret, AuthType:auth_type, AuthVaultPath:auth_vault_path})
+	stackRuntimeCache[stack] = NewKubernetes(&KubernetesConfig{Name: stackn, APIServer: api_server, APIVersion: api_version, ImagePullSecret: image_pull_secret, AuthType: auth_type, AuthVaultPath: auth_vault_path})
 	return stackRuntimeCache[stack], nil
 }
 
-func GetRuntimeFor(db *sql.DB, space string) (rt Runtime, e error)  {
+func GetRuntimeFor(db *sql.DB, space string) (rt Runtime, e error) {
 	// Cache for the win!
 	j, ok := stackToSpaceCache[space]
 	if ok {
@@ -581,13 +586,13 @@ func GetRuntimeFor(db *sql.DB, space string) (rt Runtime, e error)  {
 	}
 
 	var (
-		stack string
-		description string
-		api_server string
-		api_version string
+		stack             string
+		description       string
+		api_server        string
+		api_version       string
 		image_pull_secret string
-		auth_type string
-		auth_vault_path string
+		auth_type         string
+		auth_vault_path   string
 	)
 	rows := db.QueryRow("select stacks.stack, stacks.description, stacks.api_server, stacks.api_version, stacks.image_pull_secret, stacks.auth_type, stacks.auth_vault_path from stacks join spaces on spaces.stack = stacks.stack where spaces.name = $1", space)
 	err := rows.Scan(&stack, &description, &api_server, &api_version, &image_pull_secret, &auth_type, &auth_vault_path)
@@ -596,7 +601,7 @@ func GetRuntimeFor(db *sql.DB, space string) (rt Runtime, e error)  {
 	}
 	stackToSpaceCache[space] = stack
 	// If necessary we could flip on the type of runtime to use here:
-	stackRuntimeCache[stack] = NewKubernetes(&KubernetesConfig{Name:stack, APIServer:api_server, APIVersion:api_version, ImagePullSecret:image_pull_secret, AuthType:auth_type, AuthVaultPath:auth_vault_path})
+	stackRuntimeCache[stack] = NewKubernetes(&KubernetesConfig{Name: stack, APIServer: api_server, APIVersion: api_version, ImagePullSecret: image_pull_secret, AuthType: auth_type, AuthVaultPath: auth_vault_path})
 	return stackRuntimeCache[stack], nil
 }
 
@@ -605,72 +610,27 @@ func GetAllRuntimes(db *sql.DB) (rt []Runtime, e error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	defer rows.Close()
 	runtimes := []Runtime{}
 	for rows.Next() {
 		var (
-			stack string
-			description string
-			api_server string
-			api_version string
+			stack             string
+			description       string
+			api_server        string
+			api_version       string
 			image_pull_secret string
-			auth_type string
-			auth_vault_path string
+			auth_type         string
+			auth_vault_path   string
 		)
 		err := rows.Scan(&stack, &description, &api_server, &api_version, &image_pull_secret, &auth_type, &auth_vault_path)
 		if err != nil {
 			return nil, err
 		}
 		// If necessary we could flip on the type of runtime to use here:
-		stackRuntimeCache[stack] = NewKubernetes(&KubernetesConfig{Name:stack, APIServer:api_server, APIVersion:api_version, ImagePullSecret:image_pull_secret, AuthType:auth_type, AuthVaultPath:auth_vault_path})
+		stackRuntimeCache[stack] = NewKubernetes(&KubernetesConfig{Name: stack, APIServer: api_server, APIVersion: api_version, ImagePullSecret: image_pull_secret, AuthType: auth_type, AuthVaultPath: auth_vault_path})
 		runtimes = append(runtimes, stackRuntimeCache[stack])
 	}
-	
+
 	return runtimes, nil
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -1,18 +1,18 @@
 package app
 
 import (
-	config "../config"
-	service "../service"
-	structs "../structs"
-	runtime "../runtime"
-	utils "../utils"
 	"database/sql"
-	"net/http"
 	"fmt"
-	"os"
-	"strings"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
+	"net/http"
+	"os"
+	config "region-api/config"
+	runtime "region-api/runtime"
+	service "region-api/service"
+	structs "region-api/structs"
+	utils "region-api/utils"
+	"strings"
 )
 
 func OneOffDeployment(db *sql.DB, oneoff1 structs.OneOffSpec, berr binding.Errors, r render.Render) {
@@ -41,7 +41,7 @@ func OneOffDeployment(db *sql.DB, oneoff1 structs.OneOffSpec, berr binding.Error
 		return
 	}
 
-	rt, err := runtime.GetRuntimeFor(db, oneoff1.Space);
+	rt, err := runtime.GetRuntimeFor(db, oneoff1.Space)
 	if err != nil {
 		utils.ReportError(err, r)
 		return
@@ -84,13 +84,13 @@ func OneOffDeployment(db *sql.DB, oneoff1 structs.OneOffSpec, berr binding.Error
 	if err != nil {
 		utils.ReportError(err, r)
 		return
-	}	
+	}
 
 	// Assembly config
 	elist := AddAlamoConfigVars(appname, space)
 	// add user specific vars
 	for n, v := range configvars {
-		elist = append(elist, structs.EnvVar{Name:n, Value:v})
+		elist = append(elist, structs.EnvVar{Name: n, Value: v})
 	}
 	// add service vars
 	for _, element := range service.GetServiceConfigVars(appbindings) {
@@ -101,7 +101,7 @@ func OneOffDeployment(db *sql.DB, oneoff1 structs.OneOffSpec, berr binding.Error
 	var secret structs.Namespec
 	secret.Name = os.Getenv("KUBERNETES_IMAGE_PULL_SECRET")
 	secrets = append(secrets, secret)
-	
+
 	// Create deployment
 	var deployment structs.Deployment
 	deployment.Space = space

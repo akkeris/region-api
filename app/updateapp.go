@@ -1,12 +1,12 @@
 package app
 
 import (
-	structs "../structs"
-	utils "../utils"
 	"database/sql"
-	"net/http"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
+	"net/http"
+	structs "region-api/structs"
+	utils "region-api/utils"
 )
 
 //Updateapp centralized
@@ -30,5 +30,5 @@ func Updateapp(db *sql.DB, spec structs.Appspec, berr binding.Errors, r render.R
 		utils.ReportError(inserterr, r)
 		return
 	}
-	r.JSON(http.StatusCreated, structs.Messagespec{Status:http.StatusCreated, Message:"App " + name + "Updated"})
+	r.JSON(http.StatusCreated, structs.Messagespec{Status: http.StatusCreated, Message: "App " + name + "Updated"})
 }
