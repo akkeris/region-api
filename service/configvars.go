@@ -6,103 +6,100 @@ import (
 	"strings"
 )
 
-func GetServiceConfigVars(appbindings []string) ([]structs.EnvVar) {
+func GetServiceConfigVars(appbindings []string) (error, []structs.EnvVar) {
 	elist := []structs.EnvVar{}
 	for _, element := range appbindings {
 		servicetype := strings.Split(element, ":")[0]
 		servicename := strings.Split(element, ":")[1]
 
 		if servicetype == "redis" {
-			redisvars := Getredisvars(servicename)
-			for k, v := range redisvars {
-				var e1 structs.EnvVar
-				e1.Name = k
-				e1.Value = v.(string)
-				elist = append(elist, e1)
+			err, vars := Getredisvars(servicename)
+			if err != nil {
+				return err, elist
+			}
+			for key, value := range vars {
+				elist = append(elist, structs.EnvVar{Name:key, Value:value.(string)})
 			}
 		}
 		if servicetype == "memcached" {
-			memcachedvars := Getmemcachedvars(servicename)
-			for k, v := range memcachedvars {
-				var e1 structs.EnvVar
-				e1.Name = k
-				e1.Value = v.(string)
-				elist = append(elist, e1)
+			err, vars := Getmemcachedvars(servicename)
+			if err != nil {
+				return err, elist
+			}
+			for key, value := range vars {
+				elist = append(elist, structs.EnvVar{Name:key, Value:value.(string)})
 			}
 		}
 		if servicetype == "postgres" {
-			postgresvars := GetPostgresVarsV2(servicename)
-			for k, v := range postgresvars {
-				var e1 structs.EnvVar
-				e1.Name = k
-				e1.Value = v.(string)
-				elist = append(elist, e1)
+			err, vars := GetPostgresVarsV2(servicename)
+			if err != nil {
+				return err, elist
+			}
+			for key, value := range vars {
+				elist = append(elist, structs.EnvVar{Name:key, Value:value.(string)})
 			}
 		}
 		if servicetype == "postgresonprem" {
-			postgresvars := GetPostgresonpremVarsV1(servicename)
-			for k, v := range postgresvars {
-				var e1 structs.EnvVar
-				e1.Name = k
-				e1.Value = v.(string)
-				elist = append(elist, e1)
+			err, vars := GetPostgresonpremVarsV1(servicename)
+			if err != nil {
+				return err, elist
+			}
+			for key, value := range vars {
+				elist = append(elist, structs.EnvVar{Name:key, Value:value.(string)})
 			}
 		}
 		if servicetype == "auroramysql" {
-			auroramysqlvars := Getauroramysqlvars(servicename)
-			for k, v := range auroramysqlvars {
-				var e1 structs.EnvVar
-				e1.Name = k
-				e1.Value = v.(string)
-				elist = append(elist, e1)
+			err, vars := Getauroramysqlvars(servicename)
+			if err != nil {
+				return err, elist
+			}
+			for key, value := range vars {
+				elist = append(elist, structs.EnvVar{Name:key, Value:value.(string)})
 			}
 		}
 		if servicetype == "rabbitmq" {
-			rabbitmqvars := Getrabbitmqvars(servicename)
-			for k, v := range rabbitmqvars {
-				var e1 structs.EnvVar
-				e1.Name = k
-				e1.Value = v.(string)
-				elist = append(elist, e1)
+			err, vars := Getrabbitmqvars(servicename)
+			if err != nil {
+				return err, elist
+			}
+			for key, value := range vars {
+				elist = append(elist, structs.EnvVar{Name:key, Value:value.(string)})
 			}
 		}
 		if servicetype == "s3" {
-			s3vars := Gets3vars(servicename)
-			for k, v := range s3vars {
-				var e1 structs.EnvVar
-				e1.Name = k
-				e1.Value = v.(string)
-				elist = append(elist, e1)
+			err, vars := Gets3vars(servicename)
+			if err != nil {
+				return err, elist
+			}
+			for key, value := range vars {
+				elist = append(elist, structs.EnvVar{Name:key, Value:value.(string)})
 			}
 		}
 		if servicetype == "es" {
-			esvars := Getesvars(servicename)
-			for k, v := range esvars {
-				var e1 structs.EnvVar
-				e1.Name = k
-				e1.Value = v.(string)
-				elist = append(elist, e1)
+			err, vars := Getesvars(servicename)
+			if err != nil {
+				return err, elist
+			}
+			for key, value := range vars {
+				elist = append(elist, structs.EnvVar{Name:key, Value:value.(string)})
 			}
 		}
         if servicetype == "mongodb" {
-                mongodbvars,_  := Getmongodbvars(servicename)
-
-                for k, v := range mongodbvars {
-                        var e1 structs.EnvVar
-                        e1.Name = k
-                        e1.Value = v
-                        elist = append(elist, e1)
-                }
+            err, vars := Getmongodbvars(servicename)
+            if err != nil {
+				return err, elist
+			}
+			for key, value := range vars {
+				elist = append(elist, structs.EnvVar{Name:key, Value:value})
+			}
         }
 		if servicetype == "vault" {
-			vaultvars := vault.GetVaultVariables(servicename)
-			for _, element := range vaultvars {
-				var e1 structs.EnvVar
-				e1.Name = element.Key
-				e1.Value = element.Value
-				elist = append(elist, e1)
+			// vault panics if we cannot reach it, just crash the entire API (apparently)
+			vars := vault.GetVaultVariables(servicename)
+			for _, value := range vars {
+				elist = append(elist, structs.EnvVar{Name:value.Key, Value:value.Value})
 			}
 		}
 	}
-	return elist
+	return nil, elist
 }

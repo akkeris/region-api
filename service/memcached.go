@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
-
+	"errors"
 	"github.com/bitly/go-simplejson"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/binding"
@@ -146,18 +146,21 @@ func Getmemcachedplans(params martini.Params, r render.Render) {
 }
 
 //Getmemcachedvars  centralized
-func Getmemcachedvars(servicename string) map[string]interface{} {
+func Getmemcachedvars(servicename string) (error, map[string]interface{}) {
 	config := make(map[string]interface{})
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", "http://"+os.Getenv("MEMCACHED_BROKER_URL")+"/v1/memcached/url/"+servicename, nil)
 	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Println(err)
+		return err, config
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode > 299 {
+		return errors.New("Failure to obtain MEMCACHED_URL"), config
+	}
 	bodyj, _ := simplejson.NewFromReader(resp.Body)
 	config, _ = bodyj.Map()
-	return config
+	return nil, config
 }
 
 func FlushMemcached(params martini.Params, r render.Render) {

@@ -5,11 +5,10 @@ import (
 	utils "../utils"
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
-
+	"errors"
 	"github.com/bitly/go-simplejson"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/binding"
@@ -148,16 +147,19 @@ func Gets3plans(params martini.Params, r render.Render) {
 }
 
 //Gets3vars  centralized
-func Gets3vars(servicename string) map[string]interface{} {
+func Gets3vars(servicename string) (error, map[string]interface{}) {
 	config := make(map[string]interface{})
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", "http://"+os.Getenv("S3_BROKER_URL")+"/v1/s3/url/"+servicename, nil)
 	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Println(err)
+		return err, map[string]interface{}{}
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode > 299 {
+		return errors.New("Cannot obtain S3_BROKER_URL from downstream broker."), config
+	}
 	bodyj, _ := simplejson.NewFromReader(resp.Body)
 	config, _ = bodyj.Map()
-	return config
+	return nil, config
 }

@@ -48,7 +48,24 @@ type KubernetesConfig struct {
 
 func NewKubernetes(config *KubernetesConfig) (r Runtime) {
 	log.Println("Using kubernetes server " + config.APIServer)
-
+	if config.ImagePullSecret == "" {
+		log.Fatalln("No kubernetes name was available! Aborting.")
+	}
+	if config.ImagePullSecret == "" {
+		log.Fatalln("No kubernetes image pull secret was available! Aborting.")
+	}
+	if config.APIServer == "" {
+		log.Fatalln("No kubernetes api server was available! Aborting.")
+	}
+	if config.APIVersion == "" {
+		log.Fatalln("No kubernetes api version was available! Aborting.")
+	}
+	if config.AuthType == "" {
+		log.Fatalln("No kubernetes auth type was available! Aborting.")
+	}
+	if config.AuthVaultPath == "" {
+		log.Fatalln("No kubernetes auth vault path was available! Aborting.")
+	}
 	var rt Kubernetes
 	rt.clientType = config.AuthType
 	rt.apiServer = config.APIServer
@@ -502,7 +519,7 @@ func (rt Kubernetes) DeleteSpace(name string) (e error) {
 		return e
 	}
 	if resp.StatusCode != 200 {
-		return errors.New("Unable to delete space, invalid response code from kubernetes: " + strconv.Itoa(resp.StatusCode))
+		return errors.New("Unable to delete space, invalid response code from kubernetes: " + resp.Status)
 	}
 	return nil
 }
@@ -518,27 +535,30 @@ func (rt Kubernetes) UpdateSpaceTags(space string, compliance string) (e error) 
 	return e
 }
 
-func (rt Kubernetes) CreateSecret(space string, name string, data string, mimetype string) (s *Secretspec, e error) {
-	var secret *Secretspec = &Secretspec{ Metadata: Metadataspec{Name: name, Namespace:space}, Data: Dataspec{ Dockercfg: data }, Type: mimetype}
-	str, err := json.Marshal(secret)
+func (rt Kubernetes) CreateSecret(space string, name string, data string, mimetype string) (*Secretspec, error) {
+	var secret Secretspec
+	secret.Metadata.Name = name
+	secret.Data.Dockercfg = data
+	secret.Type = mimetype
+	resp, err := rt.k8sRequest("post", "/api/" + rt.defaultApiServerVersion + "/namespaces/" + space + "/secrets", secret)
 	if err != nil {
 		return nil, err
 	}
-	_, err = rt.k8sRequest("post", "/api/" + rt.defaultApiServerVersion + "/namespaces/" + space + "/secrets", bytes.NewBuffer([]byte(string(str))))
-	if err != nil {
-		return nil, err
+	if resp.StatusCode != 201 && resp.StatusCode != 200 {
+		return nil, errors.New("Unable to create secret, invalid response code from kubernetes: " + resp.Status)
 	}
-	return secret, nil
+	return &secret, nil
 }
 
 func (rt Kubernetes) AddImagePullSecretToSpace(space string) (e error) {
 	var sa Serviceaccountspec = Serviceaccountspec{Metadata: structs.Namespec{Name: "default"}}
-	var ips structs.Namespec = structs.Namespec{Name: rt.imagePullSecret}
 	var ipss []structs.Namespec
-	ipss = append(ipss, ips)
+	ipss = append(ipss, structs.Namespec{Name: rt.imagePullSecret})
 	sa.ImagePullSecrets = ipss
-	
-	_, err := rt.k8sRequest("put", "/api/" + rt.defaultApiServerVersion + "/namespaces/" + space + "/serviceaccounts/default", sa)
+	resp, err := rt.k8sRequest("put", "/api/" + rt.defaultApiServerVersion + "/namespaces/" + space + "/serviceaccounts/default", sa)
+	if resp.StatusCode != 201 && resp.StatusCode != 200 {
+		return errors.New("Unable to add secret to space, invalid response code from kubernetes: " + resp.Status)
+	}
 	return err
 }
 

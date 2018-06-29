@@ -19,11 +19,38 @@ import (
 	"os"
 	"io/ioutil"
 	"log"
+	"net/http"
+	"net/http/httputil"
+	"net/url"
+	"time"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/auth"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
 )
+
+func ProxyToShuttle(res http.ResponseWriter, req *http.Request) { 
+	uri, err := url.Parse("http://" + os.Getenv("LOGSHUTTLE_SERVICE_HOST") + ":" + os.Getenv("LOGSHUTTLE_SERVICE_PORT"))
+	if err != nil {
+		log.Println("Error: Unable to proxy to log shuttle")
+		log.Println(err)
+		return
+	}
+	log.Println("Proxying to", uri)
+	httputil.NewSingleHostReverseProxy(uri).ServeHTTP(res, req)
+}
+func ProxyToSession(res http.ResponseWriter, req *http.Request) { 
+	uri, err := url.Parse("http://" + os.Getenv("LOGSESSION_SERVICE_HOST") + ":" + os.Getenv("LOGSESSION_SERVICE_PORT"))
+	if err != nil {
+		log.Println("Error: Unable to proxy to log session")
+		log.Println(err)
+		return
+	}
+	log.Println("Proxying to", uri)
+	rp := httputil.NewSingleHostReverseProxy(uri)
+	rp.FlushInterval = time.Duration(200)*time.Millisecond
+	rp.ServeHTTP(res, req)
+}
 
 func Server() *martini.ClassicMartini {
 	m := martini.Classic()
@@ -249,6 +276,25 @@ func Server() *martini.ClassicMartini {
 	m.Get("/v1/utils/service/space/:space/app/:app", utils.GetService)
 	m.Get("/v1/utils/nodes", utils.GetNodes)
 	m.Get("/v1/utils/urltemplates", templates.GetURLTemplates)
+
+
+	// proxy to log shuttle
+	if os.Getenv("LOGSHUTTLE_SERVICE_HOST") != "" && os.Getenv("LOGSHUTTLE_SERVICE_PORT") != "" {
+		m.Get("/apps/:app_key/log-drains", ProxyToShuttle)
+		m.Post("/apps/:app_key/log-drains", ProxyToShuttle)
+		m.Delete("/apps/:app_key/log-drains/:id", ProxyToShuttle)
+		m.Get("/apps/:app_key/log-drains/:id", ProxyToShuttle)
+		m.Post("/log-events", ProxyToShuttle)
+	} else {
+		log.Println("No LOGSHUTTLE_SERVICE_HOST and LOGSHUTTLE_SERVICE_PORT environment variables found, log shuttle functionality was disabled.")
+	}
+	// proxy to log session
+	if os.Getenv("LOGSESSION_SERVICE_HOST") != "" && os.Getenv("LOGSESSION_SERVICE_PORT") != ""{
+		m.Post("/log-sessions", ProxyToSession)
+		m.Get("/log-sessions/:id", ProxyToSession)
+	} else {
+		log.Println("No LOGSESSION_SERVICE_HOST and LOGSESSION_SERVICE_PORT environment variables found, log session functionality was disabled.")
+	}
 
 	if os.Getenv("ENABLE_AUTH") == "true" {
 		m.Use(auth.Basic(utils.AuthUser, utils.AuthPassword))

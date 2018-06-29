@@ -152,23 +152,18 @@ func AddPath(db *sql.DB, spec structs.Routerpathspec, berr binding.Errors, r ren
 	r.JSON(msg.Status, msg)
 }
 
-func addPath(spec structs.Routerpathspec, db *sql.DB) (m structs.Messagespec, err error) {
-
+func addPath(spec structs.Routerpathspec, db *sql.DB) (structs.Messagespec, error) {
 	var msg structs.Messagespec
-
-	var path string
-	inserterr := db.QueryRow("INSERT INTO routerpaths(domain,path, space, app, replacepath) VALUES($1,$2,$3,$4,$5) returning path;", spec.Domain, spec.Path, spec.Space, spec.App, spec.ReplacePath).Scan(&path)
-	if inserterr != nil {
-		fmt.Println(inserterr)
+	_, err := db.Exec("INSERT INTO routerpaths(domain, path, space, app, replacepath) VALUES($1,$2,$3,$4,$5)", spec.Domain, spec.Path, spec.Space, spec.App, spec.ReplacePath)
+	if err != nil {
+		fmt.Println(err)
 		msg.Status = 500
 		msg.Message = "Error while inserting"
-		return msg, inserterr
+		return msg, err
 	}
 	msg.Status = 201
 	msg.Message = "Path Added"
-
 	return msg, nil
-
 }
 
 func DeletePath(db *sql.DB, params martini.Params, spec structs.Routerpathspec, berr binding.Errors, r render.Render) {
@@ -204,15 +199,7 @@ func DeletePath(db *sql.DB, params martini.Params, spec structs.Routerpathspec, 
 func deletePath(domain string, path string, db *sql.DB) (m structs.Messagespec, err error) {
 
 	var msg structs.Messagespec
-
-	stmt, err := db.Prepare("DELETE from  routerpaths where domain=$1 and path=$2")
-	if err != nil {
-		fmt.Println(err)
-		msg.Status = 500
-		msg.Message = "Error while deleting"
-		return msg, err
-	}
-	del, err := stmt.Exec(domain, path)
+	del, err := db.Exec("DELETE from routerpaths where domain=$1 and path=$2", domain, path)
 	if err != nil {
 		fmt.Println(err)
 		return msg, err
@@ -352,12 +339,7 @@ func DeleteRouter(db *sql.DB, params martini.Params, r render.Render) {
 
 func deleteRouterBase(db *sql.DB, domain string) (m structs.Messagespec, e error) {
 	var msg structs.Messagespec
-	stmt, err := db.Prepare("DELETE from routers where domain=$1")
-	if err != nil {
-		fmt.Println(err)
-		return msg, err
-	}
-	delrouter, err := stmt.Exec(domain)
+	delrouter, err := db.Exec("DELETE from routers where domain=$1", domain)
 	if err != nil {
 		return msg, err
 	}
@@ -372,12 +354,7 @@ func deleteRouterBase(db *sql.DB, domain string) (m structs.Messagespec, e error
 
 func deletePaths(db *sql.DB, domain string) (m structs.Messagespec, e error) {
 	var msg structs.Messagespec
-	stmt, err := db.Prepare("DELETE from routerpaths where domain=$1")
-	if err != nil {
-		fmt.Println(err)
-		return msg, err
-	}
-	delrouter, err := stmt.Exec(domain)
+	delrouter, err := db.Exec("DELETE from routerpaths where domain=$1", domain)
 	if err != nil {
 		return msg, err
 	}
@@ -495,13 +472,7 @@ func getPaths(db *sql.DB, domain string) (p []structs.Routerpathspec, err error)
 
 func IsInternalRouter(db *sql.DB, domain string) (b bool, e error) {
 	var isinternal bool
-	stmt, err := db.Prepare("select coalesce(internal,false) as internal from routers where domain=$1")
-	if err != nil {
-		fmt.Println(err)
-		return false, err
-	}
-	defer stmt.Close()
-	err = stmt.QueryRow(domain).Scan(&isinternal)
+	err := db.QueryRow("select coalesce(internal,false) as internal from routers where domain=$1", domain).Scan(&isinternal)
 	if err != nil {
 		fmt.Println(err)
 		return false, err
