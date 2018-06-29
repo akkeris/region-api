@@ -93,8 +93,13 @@ func OneOffDeployment(db *sql.DB, oneoff1 structs.OneOffSpec, berr binding.Error
 		elist = append(elist, structs.EnvVar{Name:n, Value:v})
 	}
 	// add service vars
-	for _, element := range service.GetServiceConfigVars(appbindings) {
-		elist = append(elist, element)
+	err, servicevars := service.GetServiceConfigVars(appbindings)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	for _, e := range servicevars {
+		elist = append(elist, e)
 	}
 	// create secrets
 	var secrets []structs.Namespec

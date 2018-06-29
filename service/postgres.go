@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
-
+	"errors"
 	"github.com/bitly/go-simplejson"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/binding"
@@ -45,6 +45,7 @@ func GetpostgresplansV1(params martini.Params, r render.Render) {
 }
 
 //Getpostgresurl  centralized
+// ~~ DEPRECREATED ~~
 func GetpostgresurlV1(params martini.Params, r render.Render) {
 	servicename := params["servicename"]
 	var postgres structs.Postgresspec
@@ -282,18 +283,21 @@ func TagPostgresV2(spec structs.Tagspec, berr binding.Errors, r render.Render) {
 	}
 }
 
-func GetPostgresVarsV2(servicename string) map[string]interface{} {
+func GetPostgresVarsV2(servicename string) (error, map[string]interface{}) {
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", "http://"+os.Getenv("POSTGRES_BROKER_URL")+"/v2/postgres/"+servicename, nil)
 
 	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Println(err)
+		return err, map[string]interface{}{}
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode > 299 {
+		return errors.New("Failure to obtain MEMCACHED_URL"), map[string]interface{}{}
+	}
 	bodyj, _ := simplejson.NewFromReader(resp.Body)
 	databaseurl, _ := bodyj.Get("DATABASE_URL").String()
-	return map[string]interface{}{"DATABASE_URL":databaseurl}
+	return nil, map[string]interface{}{"DATABASE_URL":databaseurl}
 }
 
 func ListPostgresBackupsV2(params martini.Params, r render.Render) {

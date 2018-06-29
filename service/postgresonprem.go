@@ -6,11 +6,10 @@ import (
 	utils "../utils"
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"os"
 	"strings"
-
+    "errors"
 	"github.com/bitly/go-simplejson"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/binding"
@@ -114,123 +113,107 @@ func DeletepostgresonpremV1(params martini.Params, r render.Render) {
 	r.JSON(200, bodyj)
 }
 
-
-//Getpostgresonpremvars  centralized
-func GetpostgresonpremvarsV1(servicename string) map[string]interface{} {
-	config := make(map[string]interface{})
-	client := &http.Client{}
-	req, err := http.NewRequest("GET", "http://"+os.Getenv("POSTGRESONPREM_BROKER_URL")+"/v1/postgresonprem/url/"+servicename, nil)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		fmt.Println(err)
-	}
-	defer resp.Body.Close()
-	bodyj, _ := simplejson.NewFromReader(resp.Body)
-	config, _ = bodyj.Map()
-	return config
-}
-
-
-func GetPostgresonpremVarsV1(servicename string) map[string]interface{} {
-        client := &http.Client{}
-        req, err := http.NewRequest("GET", "http://"+os.Getenv("POSTGRESONPREM_BROKER_URL")+"/v1/postgresonprem/"+servicename, nil)
-
-        resp, err := client.Do(req)
-        if err != nil {
-                fmt.Println(err)
-        }
-        defer resp.Body.Close()
-        bodyj, _ := simplejson.NewFromReader(resp.Body)
-        databaseurl, _ := bodyj.Get("DATABASE_URL").String()
-        return map[string]interface{}{"DATABASE_URL":databaseurl}
+func GetPostgresonpremVarsV1(servicename string) (error, map[string]interface{}) {
+    client := &http.Client{}
+    req, err := http.NewRequest("GET", "http://"+os.Getenv("POSTGRESONPREM_BROKER_URL")+"/v1/postgresonprem/"+servicename, nil)
+    resp, err := client.Do(req)
+    if err != nil {
+        return err, map[string]interface{}{}
+    }
+    defer resp.Body.Close()
+    if resp.StatusCode > 299 {
+        return errors.New("Cannot obtain POSTGRESONPREM_BROKER_URL. Received error."), map[string]interface{}{}
+    }
+    bodyj, _ := simplejson.NewFromReader(resp.Body)
+    databaseurl, _ := bodyj.Get("DATABASE_URL").String()
+    return nil, map[string]interface{}{"DATABASE_URL":databaseurl}
 }
 
 
 func CreatePostgresonpremRoleV1(params martini.Params, r render.Render) {
-        client := &http.Client{}
-        req, err := http.NewRequest("POST", "http://"+os.Getenv("POSTGRESONPREM_BROKER_URL")+"/v1/postgresonprem/" + params["servicename"] + "/roles", nil)
-        resp, err := client.Do(req)
-        if err != nil {
-                utils.ReportError(err, r)
-                return
-        }
-        defer resp.Body.Close()
-        bodyj, _ := simplejson.NewFromReader(resp.Body)
+    client := &http.Client{}
+    req, err := http.NewRequest("POST", "http://"+os.Getenv("POSTGRESONPREM_BROKER_URL")+"/v1/postgresonprem/" + params["servicename"] + "/roles", nil)
+    resp, err := client.Do(req)
+    if err != nil {
+            utils.ReportError(err, r)
+            return
+    }
+    defer resp.Body.Close()
+    bodyj, _ := simplejson.NewFromReader(resp.Body)
 
-        r.JSON(201, bodyj)
+    r.JSON(201, bodyj)
 }
 
 func DeletePostgresonpremRoleV1(params martini.Params, r render.Render) {
-        client := &http.Client{}
-        req, err := http.NewRequest("DELETE", "http://"+os.Getenv("POSTGRESONPREM_BROKER_URL")+"/v1/postgresonprem/" + params["servicename"] + "/roles/" + params["role"], nil)
-        resp, err := client.Do(req)
-        if err != nil {
-                utils.ReportError(err, r)
-                return
-        }
-        defer resp.Body.Close()
-        bodyj, _ := simplejson.NewFromReader(resp.Body)
+    client := &http.Client{}
+    req, err := http.NewRequest("DELETE", "http://"+os.Getenv("POSTGRESONPREM_BROKER_URL")+"/v1/postgresonprem/" + params["servicename"] + "/roles/" + params["role"], nil)
+    resp, err := client.Do(req)
+    if err != nil {
+            utils.ReportError(err, r)
+            return
+    }
+    defer resp.Body.Close()
+    bodyj, _ := simplejson.NewFromReader(resp.Body)
 
-        r.JSON(200, bodyj)
+    r.JSON(200, bodyj)
 }
 
 func ListPostgresonpremRolesV1(params martini.Params, r render.Render) {
-        client := &http.Client{}
-        req, err := http.NewRequest("GET", "http://"+os.Getenv("POSTGRESONPREM_BROKER_URL")+"/v1/postgresonprem/" + params["servicename"] + "/roles", nil)
-        resp, err := client.Do(req)
-        if err != nil {
-                utils.ReportError(err, r)
-                return
-        }
-        defer resp.Body.Close()
-        bodyj, _ := simplejson.NewFromReader(resp.Body)
+    client := &http.Client{}
+    req, err := http.NewRequest("GET", "http://"+os.Getenv("POSTGRESONPREM_BROKER_URL")+"/v1/postgresonprem/" + params["servicename"] + "/roles", nil)
+    resp, err := client.Do(req)
+    if err != nil {
+            utils.ReportError(err, r)
+            return
+    }
+    defer resp.Body.Close()
+    bodyj, _ := simplejson.NewFromReader(resp.Body)
 
-        r.JSON(200, bodyj)
+    r.JSON(200, bodyj)
 }
 
 func RotatePostgresonpremRoleV1(params martini.Params, r render.Render) {
-        client := &http.Client{}
-        req, err := http.NewRequest("PUT", "http://"+os.Getenv("POSTGRESONPREM_BROKER_URL")+"/v1/postgresonprem/" + params["servicename"] + "/roles/" + params["role"], nil)
-        resp, err := client.Do(req)
-        if err != nil {
-                utils.ReportError(err, r)
-                return
-        }
-        defer resp.Body.Close()
-        bodyj, _ := simplejson.NewFromReader(resp.Body)
+    client := &http.Client{}
+    req, err := http.NewRequest("PUT", "http://"+os.Getenv("POSTGRESONPREM_BROKER_URL")+"/v1/postgresonprem/" + params["servicename"] + "/roles/" + params["role"], nil)
+    resp, err := client.Do(req)
+    if err != nil {
+            utils.ReportError(err, r)
+            return
+    }
+    defer resp.Body.Close()
+    bodyj, _ := simplejson.NewFromReader(resp.Body)
 
-        r.JSON(200, bodyj)
+    r.JSON(200, bodyj)
 }
 
 
 
 func GetPostgresonpremRoleV1(params martini.Params, r render.Render) {
-        client := &http.Client{}
-        req, err := http.NewRequest("GET", "http://"+os.Getenv("POSTGRESONPREM_BROKER_URL")+"/v1/postgresonprem/" + params["servicename"] + "/roles/" + params["role"], nil)
-        resp, err := client.Do(req)
-        if err != nil {
-                utils.ReportError(err, r)
-                return
-        }
-        defer resp.Body.Close()
-        bodyj, _ := simplejson.NewFromReader(resp.Body)
+    client := &http.Client{}
+    req, err := http.NewRequest("GET", "http://"+os.Getenv("POSTGRESONPREM_BROKER_URL")+"/v1/postgresonprem/" + params["servicename"] + "/roles/" + params["role"], nil)
+    resp, err := client.Do(req)
+    if err != nil {
+            utils.ReportError(err, r)
+            return
+    }
+    defer resp.Body.Close()
+    bodyj, _ := simplejson.NewFromReader(resp.Body)
 
-        r.JSON(200, bodyj)
+    r.JSON(200, bodyj)
 }
 
 func GetPostgresonpremV1(params martini.Params, r render.Render) {
-        client := &http.Client{}
-        req, err := http.NewRequest("GET", "http://"+os.Getenv("POSTGRESONPREM_BROKER_URL")+"/v1/postgresonprem/" + params["servicename"], nil)
-        resp, err := client.Do(req)
-        if err != nil {
-                utils.ReportError(err, r)
-                return
-        }
-        defer resp.Body.Close()
-        bodyj, _ := simplejson.NewFromReader(resp.Body)
+    client := &http.Client{}
+    req, err := http.NewRequest("GET", "http://"+os.Getenv("POSTGRESONPREM_BROKER_URL")+"/v1/postgresonprem/" + params["servicename"], nil)
+    resp, err := client.Do(req)
+    if err != nil {
+            utils.ReportError(err, r)
+            return
+    }
+    defer resp.Body.Close()
+    bodyj, _ := simplejson.NewFromReader(resp.Body)
 
-        r.JSON(200, bodyj)
+    r.JSON(200, bodyj)
 }
 
 

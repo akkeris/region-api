@@ -5,11 +5,10 @@ import (
 	utils "../utils"
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
-
+	"errors"
 	"github.com/bitly/go-simplejson"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/binding"
@@ -179,16 +178,19 @@ func Getesplans(params martini.Params, r render.Render) {
 }
 
 //Getesvars  centralized
-func Getesvars(servicename string) map[string]interface{} {
+func Getesvars(servicename string) (error, map[string]interface{}) {
 	config := make(map[string]interface{})
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", "http://"+os.Getenv("ES_BROKER_URL")+"/v1/es/url/"+servicename, nil)
 	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Println(err)
+		return err, config
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode > 299 {
+		return errors.New("Cannot obtain ES_BROKER_URL from downstream broker."), config
+	}
 	bodyj, _ := simplejson.NewFromReader(resp.Body)
 	config, _ = bodyj.Map()
-	return config
+	return nil, config
 }

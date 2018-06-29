@@ -175,28 +175,19 @@ func GetmongodbV1(params martini.Params, r render.Render) {
 }
 
 
-func Getmongodbvars(servicename string) (m map[string]string, e error) {
+func Getmongodbvars(servicename string) (e error, m map[string]string) {
     m = make(map[string]string)
     client := &http.Client{}
     req, err := http.NewRequest("GET", "http://"+os.Getenv("MONGODB_BROKER_URL")+"/v1/mongodb/" + servicename, nil)
     resp, err := client.Do(req)
     if err != nil {
-        log.Printf("(service.Getmongodbvars) send error %v\n", err)
-        return m , err
+        return err, m
     }
     defer resp.Body.Close()
-
-    log.Printf("(service.Getmongodbvars) resp.StatusCode: %d\n", resp.StatusCode)
     if resp.StatusCode != http.StatusOK {
-        log.Printf("(service.Getmongodbvars) send error %v\n", resp.Status)
-        return m, err
+        return err, m
     }
-
     bodyj, _ := simplejson.NewFromReader(resp.Body)
-    m["DATABASE_URL"], err =bodyj.Get("DATABASE_URL").String()
-    if err != nil {
-      log.Printf("(service.Getmongodbvars) send error %v\n", err)
-      return m, err
-    }
-    return m, nil
+    m["DATABASE_URL"], err = bodyj.Get("DATABASE_URL").String()
+    return err, m
 }

@@ -5,12 +5,11 @@ import (
 	utils "../utils"
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"strings"
-
+	"errors"
 	"github.com/bitly/go-simplejson"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/binding"
@@ -146,16 +145,19 @@ func Getrabbitmqplans(params martini.Params, r render.Render) {
 }
 
 //Getrabbitmqvars  centralized
-func Getrabbitmqvars(servicename string) map[string]interface{} {
+func Getrabbitmqvars(servicename string) (error, map[string]interface{}) {
 	config := make(map[string]interface{})
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", "http://"+os.Getenv("RABBITMQ_BROKER_URL")+"/v1/rabbitmq/url/"+servicename, nil)
 	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Println(err)
+		return err, config
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode > 299 {
+		return errors.New("Cannot obtain RABBITMQ_BROKER_URL from broker service"), config
+	}
 	bodyj, _ := simplejson.NewFromReader(resp.Body)
 	config, _ = bodyj.Map()
-	return config
+	return nil, config
 }
