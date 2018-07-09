@@ -1,7 +1,6 @@
 package runtime
 
 import (
-"fmt"
 	"net/http"
 	"encoding/json"
 	"bytes"
@@ -1171,7 +1170,6 @@ func (rt Kubernetes) JobExists(space string, jobName string) (bool) {
 		return false
 	}
 
-fmt.Println(resp.StatusCode)
 
 	if resp.StatusCode == http.StatusOK {
 		return true
