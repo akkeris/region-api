@@ -1,6 +1,7 @@
 package runtime
 
 import (
+"fmt"
 	"net/http"
 	"encoding/json"
 	"bytes"
@@ -994,7 +995,7 @@ func (rt Kubernetes) DeleteJob(space string, jobName string) (e error) {
 		return errors.New("Cannot delete job with invalid or missing job name")
 	}
 	// Cleanup running/old jobs
-	resp, err := rt.k8sRequest("delete", "/apis/batch/v2alpha1/namespaces/" + space + "/jobs?labelSelector=name=" + jobName, nil)
+	resp, err := rt.k8sRequest("delete", "/apis/batch/v1/namespaces/" + space + "/jobs?labelSelector=name=" + jobName, nil)
 	if err != nil {
 		return err
 	}
@@ -1131,7 +1132,7 @@ func (rt Kubernetes) ScaleJob(space string, jobName string, replicas int, timeou
 	if jobName == "" {
 		return errors.New("FATAL ERROR: Unable to scale job, the jobName is blank.")
 	}
-	resp, e := rt.k8sRequest("get", "/apis/batch/v2alpha1/namespaces/" + space + "/jobs/" + jobName, nil)
+	resp, e := rt.k8sRequest("get", "/apis/batch/v1/namespaces/" + space + "/jobs/" + jobName, nil)
 	if e != nil {
 		return e
 	}
@@ -1148,7 +1149,7 @@ func (rt Kubernetes) ScaleJob(space string, jobName string, replicas int, timeou
 	job.Spec.Parallelism = replicas
     job.Spec.ActiveDeadlineSeconds = timeout
 
-	resp, e = rt.k8sRequest("put", "/apis/batch/v2alpha1/namespaces/" + space + "/jobs/" + jobName, job)
+	resp, e = rt.k8sRequest("put", "/apis/batch/v1/namespaces/" + space + "/jobs/" + jobName, job)
 	if e != nil {
 		return e
 	}
@@ -1165,10 +1166,13 @@ func (rt Kubernetes) JobExists(space string, jobName string) (bool) {
 	if jobName == "" {
 		return false
 	}
-	resp, e := rt.k8sRequest("get", "/apis/batch/v2alpha1/namespaces/" + space + "/jobs/" + jobName, nil)
+	resp, e := rt.k8sRequest("get", "/apis/batch/v1/namespaces/" + space + "/jobs/" + jobName, nil)
 	if e != nil {
 		return false
 	}
+
+fmt.Println(resp.StatusCode)
+
 	if resp.StatusCode == http.StatusOK {
 		return true
 	}
