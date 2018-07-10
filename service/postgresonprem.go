@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/bitly/go-simplejson"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/binding"
@@ -166,20 +165,6 @@ func ListPostgresonpremRolesV1(params martini.Params, r render.Render) {
 	}
 	defer resp.Body.Close()
 	bodyj, _ := simplejson.NewFromReader(resp.Body)
-	r.JSON(200, bodyj)
-}
-
-func RotatePostgresonpremRoleV1(params martini.Params, r render.Render) {
-	client := &http.Client{}
-	req, err := http.NewRequest("PUT", "http://"+os.Getenv("POSTGRESONPREM_BROKER_URL")+"/v1/postgresonprem/"+params["servicename"]+"/roles/"+params["role"], nil)
-	resp, err := client.Do(req)
-	if err != nil {
-		utils.ReportError(err, r)
-		return
-	}
-	defer resp.Body.Close()
-	bodyj, _ := simplejson.NewFromReader(resp.Body)
-
 	r.JSON(200, bodyj)
 }
 

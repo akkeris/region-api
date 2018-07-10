@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -15,11 +14,6 @@ import (
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
-	"io/ioutil"
-	"net/http"
-	"os"
-	structs "region-api/structs"
-	utils "region-api/utils"
 )
 
 //Tages centralized
