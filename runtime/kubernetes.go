@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"errors"
+	"fmt"
 	vault "github.com/akkeris/vault-client"
 	"io/ioutil"
 	"log"
@@ -197,18 +198,19 @@ func deploymentToDeploymentSpec(deployment *structs.Deployment) (dp Deploymentsp
 
 	//Check for ServiceMesh
 	if deployment.Features.ServiceMesh {
+
 		var c2 ContainerItem
 		var ic ContainerItem
-		var alpine ContainerItem
 
 		// Add Metadata
-		krc.Spec.Metadata.Annotations.SidecarIstioIOStatus = "{\"version\":\"1e8f480eee0d2c455cb96c4acc9a723ca2b4bff32a7837e65787a5ef6853c820\",\"initContainers\":[\"istio-init\",\"enable-core-dump\"],\"containers\":[\"istio-proxy\"],\"volumes\":[\"istio-envoy\",\"istio-certs\"]}"
+		krc.Spec.Metadata.Annotations.SidecarIstioIOStatus = "{\"version\":\"55c9e544b52e1d4e45d18a58d0b34ba4b72531e45fb6d1572c77191422556ffc\",\"initContainers\":[\"istio-init\"],\"containers\":[\"istio-proxy\"],\"volumes\":[\"istio-envoy\",\"istio-certs\"],\"imagePullSecrets\":null}"
 
 		// Istio Proxy
 		c2.Name = "istio-proxy"
-		c2.Image = "docker.io/istio/proxy:0.6.0"
-		c1.Args = []string{
+		c2.Image = "docker.io/istio/proxyv2:0.8.0"
+		c2.Args = []string{
 			"proxy",
+			"sidecar",
 			"--configPath",
 			"/etc/istio/proxy",
 			"--binaryPath",
@@ -220,36 +222,60 @@ func deploymentToDeploymentSpec(deployment *structs.Deployment) (dp Deploymentsp
 			"--parentShutdownDuration",
 			"1m0s",
 			"--discoveryAddress",
-			"istio-pilot.istio-system:8080",
+			"istio-pilot.istio-system:15007",
 			"--discoveryRefreshDelay",
-			"1s",
+			"10s",
 			"--zipkinAddress",
 			"zipkin.istio-system:9411",
 			"--connectTimeout",
 			"10s",
 			"--statsdUdpAddress",
-			"istio-mixer.istio-system:9125",
+			"istio-statsd-prom-bridge.istio-system:9125",
 			"--proxyAdminPort",
 			"15000",
 			"--controlPlaneAuthPolicy",
 			"NONE",
 		}
 
-		envList := []structs.EnvVar{}
-		var e1 structs.EnvVar
-		e1.Name = "POD_NAME"
-		e1.ValueFrom.FieldRef.FieldPath = "metadata.name"
-		envList = append(envList, e1)
-
-		var e2 structs.EnvVar
-		e1.Name = "POD_NAMESPACE"
-		e1.ValueFrom.FieldRef.FieldPath = "metadata.namespace"
-		envList = append(envList, e2)
-
-		var e3 structs.EnvVar
-		e1.Name = "INSTANCE_IP"
-		e1.ValueFrom.FieldRef.FieldPath = "status.podIP"
-		envList = append(envList, e3)
+		envList := []structs.EnvVar{
+			structs.EnvVar{
+				Name: "POD_NAME",
+				ValueFrom: &structs.ValueFrom{
+					FieldRef: structs.FieldRef{
+						FieldPath: "metadata.name",
+					},
+				},
+			},
+			structs.EnvVar{
+				Name: "POD_NAMESPACE",
+				ValueFrom: &structs.ValueFrom{
+					FieldRef: structs.FieldRef{
+						FieldPath: "metadata.namespace",
+					},
+				},
+			},
+			structs.EnvVar{
+				Name: "INSTANCE_IP",
+				ValueFrom: &structs.ValueFrom{
+					FieldRef: structs.FieldRef{
+						FieldPath: "status.podIP",
+					},
+				},
+			},
+			structs.EnvVar{
+				Name:  "ISTIO_META_POD_NAME",
+				Value: "REDIRECT",
+			},
+			structs.EnvVar{
+				Name: "ISTIO_META_POD_NAME",
+				ValueFrom: &structs.ValueFrom{
+					FieldRef: structs.FieldRef{
+						FieldPath: "metadata.name",
+					},
+				},
+			},
+		}
+		c2.Env = envList
 
 		c2.VolumeMounts = []structs.VolumeMounts{
 			structs.VolumeMounts{
@@ -257,7 +283,7 @@ func deploymentToDeploymentSpec(deployment *structs.Deployment) (dp Deploymentsp
 				MountPath: "/etc/istio/proxy",
 			},
 			structs.VolumeMounts{
-				Name:      "isto-certs",
+				Name:      "istio-certs",
 				MountPath: "/etc/certs/",
 				ReadOnly:  true,
 			},
@@ -271,45 +297,48 @@ func deploymentToDeploymentSpec(deployment *structs.Deployment) (dp Deploymentsp
 
 		// Istio Init
 		ic.Name = "istio-init"
-		ic.Image = "docker.io/istio/proxy_init:0.6.0"
+		ic.Image = "docker.io/istio/proxy_init:0.8.0"
 		ic.Args = []string{
 			"p",
 			"15001",
 			"-u",
 			"1337",
+			"-m",
+			"REDIRECT",
+			"-i",
+			"*",
+			"-x",
+			"",
+			"-b",
+			"9080",
+			"-d",
+			"",
+		}
+
+		ic.Env = []structs.EnvVar{
+			structs.EnvVar{
+				Name:  "ENABLE_INBOUND_IPV6",
+				Value: "true",
+			},
 		}
 
 		ic.SecurityContext.Capabilities.Add = []string{"NET_ADMIN"}
 		ic.SecurityContext.Privileged = true
 
-		clist = append(clist, ic)
-
-		// Coredump
-		alpine.Name = "enable-core-dump"
-		alpine.Image = "alpine"
-		alpine.Command = []string{"/bin/sh"}
-		alpine.Args = []string{
-			"-c",
-			"sysctl -w kernel.core_pattern=/etc/istio/proxy/core.%%e.%%p.%%t && ulimit -c unlimited",
+		krc.Spec.Template.Spec.InitContainers = &[]ContainerItem{
+			ic,
 		}
-		alpine.SecurityContext.Privileged = true
-
-		clist = append(clist, alpine)
-
 		// Volumes
-		krc.Spec.Template.Spec.Volumes = []structs.Volumes{
+		krc.Spec.Template.Spec.Volumes = &[]structs.Volumes{
 			structs.Volumes{
-				EmptyDir: struct {
-					Medium string `json:"medium,omitempty"`
-				}{
-					Medium: "memory",
+				Name: "istio-envoy",
+				EmptyDir: &structs.EmptyDir{
+					Medium: "Memory",
 				},
 			},
 			structs.Volumes{
-				Secret: struct {
-					Optional   bool   `json:"optional,omitempty"`
-					SecretName string `json:"secretName,omitempty"`
-				}{
+				Name: "istio-certs",
+				Secret: &structs.Secret{
 					Optional:   true,
 					SecretName: "istio.default",
 				},
@@ -331,7 +360,7 @@ func deploymentToDeploymentSpec(deployment *structs.Deployment) (dp Deploymentsp
 	krc.Spec.Template.Spec.ImagePullSecrets = deployment.Secrets
 	krc.Spec.Template.Spec.Containers = clist
 	krc.Spec.Template.Spec.ImagePullPolicy = "Always"
-	krc.Spec.Template.Spec.DnsPolicy = "Default"
+	// krc.Spec.Template.Spec.DnsPolicy = "Default"
 
 	return krc
 }
@@ -357,6 +386,7 @@ func (rt Kubernetes) UpdateDeployment(deployment *structs.Deployment) (err error
 func (rt Kubernetes) CreateDeployment(deployment *structs.Deployment) (err error) {
 	var dp Deploymentspec = deploymentToDeploymentSpec(deployment)
 	resp, err := rt.k8sRequest("POST", "/apis/extensions/v1beta1/namespaces/"+deployment.Space+"/deployments", dp)
+	fmt.Println(string(resp.Body))
 	if err != nil {
 		return err
 	}

@@ -726,15 +726,16 @@ type OrderList struct {
 }
 
 type EnvVar struct {
-	Name      string    `json:"name"`
-	Value     string    `json:"value"`
-	ValueFrom ValueFrom `json:"valueFrom,omitempty"`
+	Name      string     `json:"name"`
+	Value     string     `json:"value"`
+	ValueFrom *ValueFrom `json:"valueFrom,omitempty"`
 }
 
 type ValueFrom struct {
-	FieldRef struct {
-		FieldPath string `json:"fieldPath,ompitempty"`
-	} `json:"fieldRef,omitempty"`
+	FieldRef FieldRef `json:"fieldRef,omitempty"`
+}
+type FieldRef struct {
+	FieldPath string `json:"fieldPath,omitempty"`
 }
 
 type SecurityContext struct {
@@ -753,14 +754,18 @@ type VolumeMounts struct {
 }
 
 type Volumes struct {
-	Name     string `json:"name,omitempty"`
-	EmptyDir struct {
-		Medium string `json:"medium,omitempty"`
-	} `json:"emptyDir"`
-	Secret struct {
-		Optional   bool   `json:"optional,omitempty"`
-		SecretName string `json:"secretName,omitempty"`
-	} `json:"secret"`
+	Name     string    `json:"name,omitempty"`
+	EmptyDir *EmptyDir `json:"emptyDir,omitempty"`
+	Secret   *Secret   `json:"secret,omitempty"`
+}
+
+type EmptyDir struct {
+	Medium string `json:"medium,omitempty"`
+}
+
+type Secret struct {
+	Optional   bool   `json:"optional,omitempty"`
+	SecretName string `json:"secretName,omitempty"`
 }
 
 type OrderSpec struct {

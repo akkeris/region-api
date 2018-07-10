@@ -204,8 +204,8 @@ type Deploymentspec struct {
 				ImagePullPolicy  string             `json:"imagePullPolicy"`
 				ImagePullSecrets []structs.Namespec `json:"imagePullSecrets"`
 				DnsPolicy        string             `json:"dnsPolicy,omitempty"`
-				InitContainers   []ContainerItem    `json:"initContainers,omitempty"`
-				Volumes          []structs.Volumes  `json:"volumes,omitempty"`
+				InitContainers   *[]ContainerItem   `json:"initContainers,omitempty"`
+				Volumes          *[]structs.Volumes `json:"volumes,omitempty"`
 			} `json:"spec"`
 		} `json:"template"`
 	} `json:"spec"`

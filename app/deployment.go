@@ -2,6 +2,7 @@ package app
 
 import (
 	"database/sql"
+	"fmt"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
 	"log"
@@ -191,6 +192,7 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 	if newDeployment {
 		err = rt.CreateDeployment(&deployment)
 		if err != nil {
+			fmt.Println(err)
 			utils.ReportError(err, r)
 			return
 		}
