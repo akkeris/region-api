@@ -166,7 +166,6 @@ func ListPostgresonpremRolesV1(params martini.Params, r render.Render) {
 	}
 	defer resp.Body.Close()
 	bodyj, _ := simplejson.NewFromReader(resp.Body)
-
 	r.JSON(200, bodyj)
 }
 

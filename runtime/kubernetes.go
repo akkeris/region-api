@@ -1118,7 +1118,6 @@ func (rt Kubernetes) DeleteJob(space string, jobName string) (e error) {
 	}
 	// Cleanup running/old jobs
 	resp, err := rt.k8sRequest("delete", "/apis/batch/v1/namespaces/"+space+"/jobs?labelSelector=name="+jobName, nil)
-
 	if err != nil {
 		return err
 	}
@@ -1271,9 +1270,7 @@ func (rt Kubernetes) ScaleJob(space string, jobName string, replicas int, timeou
 
 	job.Spec.Parallelism = replicas
 	job.Spec.ActiveDeadlineSeconds = timeout
-
 	resp, e = rt.k8sRequest("put", "/apis/batch/v1/namespaces/"+space+"/jobs/"+jobName, job)
-
 	if e != nil {
 		return e
 	}
@@ -1291,7 +1288,6 @@ func (rt Kubernetes) JobExists(space string, jobName string) bool {
 		return false
 	}
 	resp, e := rt.k8sRequest("get", "/apis/batch/v1/namespaces/"+space+"/jobs/"+jobName, nil)
-
 	if e != nil {
 		return false
 	}

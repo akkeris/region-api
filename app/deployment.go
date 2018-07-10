@@ -141,6 +141,7 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 	if err != nil {
 		utils.ReportError(err, r)
 		return
+
 	}
 	for _, e := range servicevars {
 		elist = append(elist, e)
@@ -180,13 +181,12 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 	deployment.RevisionHistoryLimit = revisionhistorylimit
 	if len(deploy1.Command) > 0 {
 		deployment.Command = deploy1.Command
-	}
 
+	}
 	// Service Mesh Feature Flag
 	if (structs.Features{}) != deploy1.Features {
 		deployment.Features = deploy1.Features
 	}
-
 	newDeployment := !rt.DeploymentExists(space, appname)
 	if newDeployment {
 		err = rt.CreateDeployment(&deployment)

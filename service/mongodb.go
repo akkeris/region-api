@@ -189,4 +189,5 @@ func Getmongodbvars(servicename string) (e error, m map[string]string) {
 	bodyj, _ := simplejson.NewFromReader(resp.Body)
 	m["DATABASE_URL"], err = bodyj.Get("DATABASE_URL").String()
 	return err, m
+
 }

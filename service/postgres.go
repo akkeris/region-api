@@ -297,8 +297,8 @@ func GetPostgresVarsV2(servicename string) (error, map[string]interface{}) {
 	}
 	bodyj, _ := simplejson.NewFromReader(resp.Body)
 	databaseurl, _ := bodyj.Get("DATABASE_URL").String()
-
 	return nil, map[string]interface{}{"DATABASE_URL": databaseurl}
+
 }
 
 func ListPostgresBackupsV2(params martini.Params, r render.Render) {
