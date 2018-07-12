@@ -1,9 +1,6 @@
 package router
 
 import (
-	spacepack "../space"
-	structs "../structs"
-	templates "../templates"
 	"bufio"
 	"bytes"
 	"crypto/tls"
@@ -14,6 +11,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	vault "github.com/akkeris/vault-client"
 	"github.com/bitly/go-simplejson"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/render"
@@ -21,7 +19,9 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	vault "github.com/akkeris/vault-client"
+	spacepack "region-api/space"
+	structs "region-api/structs"
+	templates "region-api/templates"
 	"strconv"
 	"strings"
 	"text/template"
@@ -230,8 +230,8 @@ func DeleteF5(router structs.Routerspec, db *sql.DB) (m structs.Messagespec, e e
 	var msg structs.Messagespec
 	startClient()
 	partition, virtual, err := getF5pv(router)
-	fmt.Println("Partition: "+partition)
-	fmt.Println("Virtual:" +virtual)
+	fmt.Println("Partition: " + partition)
+	fmt.Println("Virtual:" + virtual)
 
 	if err != nil {
 		fmt.Println(err)
@@ -324,7 +324,7 @@ func addRule(rule structs.Rulespec) {
 	if err != nil {
 		fmt.Println("Error preparing request")
 	}
-        str = bytes.Replace(str, []byte("\\u003e"), []byte(">"), -1)
+	str = bytes.Replace(str, []byte("\\u003e"), []byte(">"), -1)
 	jsonStr := []byte(string(str))
 	fmt.Println(string(str))
 	urlStr := F5url + "/mgmt/tm/ltm/rule"
@@ -351,7 +351,7 @@ func updateRule(rule structs.Rulespec) {
 	if err != nil {
 		fmt.Println("Error preparing request")
 	}
-        str = bytes.Replace(str, []byte("\\u003e"), []byte(">"), -1)
+	str = bytes.Replace(str, []byte("\\u003e"), []byte(">"), -1)
 	jsonStr := []byte(string(str))
 	fmt.Println(string(str))
 	urlStr := F5url + "/mgmt/tm/ltm/rule/~" + rule.Partition + "~" + rule.Name
@@ -568,7 +568,7 @@ func detachRule(rule string, partition string, virtual string) (m structs.Messag
 	}
 	jsonStr := []byte(string(str))
 	//    fmt.Println(string(str))
-        urlStr := F5url + "/mgmt/tm/ltm/virtual/~" + partition + "~" + virtual
+	urlStr := F5url + "/mgmt/tm/ltm/virtual/~" + partition + "~" + virtual
 
 	req, _ := http.NewRequest("PATCH", urlStr, bytes.NewBuffer(jsonStr))
 	req.Header.Add("X-F5-Auth-Token", F5token)

@@ -1,49 +1,50 @@
 package runtime
 
 import (
-	"net/http"
-	"encoding/json"
 	"bytes"
-    "crypto/tls"
-    "crypto/x509"
-    "sync"
-	"reflect"
-    "errors"
-    "strconv"
-    "time"
-    "log"
-    "strings"
-    "os"
-    "io/ioutil"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/json"
+	"errors"
+	"fmt"
 	vault "github.com/akkeris/vault-client"
-	structs "../structs"
+	"io/ioutil"
+	"log"
+	"net/http"
+	"os"
+	"reflect"
+	structs "region-api/structs"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
 )
 
 type KubeRequest struct {
-	Status string
+	Status     string
 	StatusCode int
-	Body []byte
+	Body       []byte
 }
 
 type Kubernetes struct {
 	Runtime
-	clientType string
-	apiServer string
+	clientType              string
+	apiServer               string
 	defaultApiServerVersion string
-	clientToken string
-	imagePullSecret string
-	client *http.Client
-	mutex *sync.Mutex
-	debug bool
+	clientToken             string
+	imagePullSecret         string
+	client                  *http.Client
+	mutex                   *sync.Mutex
+	debug                   bool
 }
 
 type KubernetesConfig struct {
-	Name string
-	APIServer string
-	APIVersion string
+	Name            string
+	APIServer       string
+	APIVersion      string
 	ImagePullSecret string
-	AuthType string
-	AuthVaultPath string
+	AuthType        string
+	AuthVaultPath   string
 }
 
 func NewKubernetes(config *KubernetesConfig) (r Runtime) {
@@ -89,10 +90,10 @@ func NewKubernetes(config *KubernetesConfig) (r Runtime) {
 		caCertPool.AppendCertsFromPEM([]byte(ca_crt))
 		tlsConfig := &tls.Config{
 			Certificates: []tls.Certificate{cert},
-			RootCAs: caCertPool,
+			RootCAs:      caCertPool,
 		}
 		tlsConfig.BuildNameToCertificate()
-		rt.client = &http.Client{Transport:&http.Transport{TLSClientConfig: tlsConfig}}
+		rt.client = &http.Client{Transport: &http.Transport{TLSClientConfig: tlsConfig}}
 	} else if rt.clientType == "token" {
 		rt.clientToken = vault.GetField(config.AuthVaultPath, "token")
 		rt.client = &http.Client{}
@@ -106,33 +107,33 @@ func NewKubernetes(config *KubernetesConfig) (r Runtime) {
 
 func (rt Kubernetes) k8sRequest(method string, path string, payload interface{}) (r *KubeRequest, e error) {
 	body, _ := json.Marshal(payload)
-	req, err := http.NewRequest(strings.ToUpper(method), "https://" + rt.apiServer + path, bytes.NewReader(body))
+	req, err := http.NewRequest(strings.ToUpper(method), "https://"+rt.apiServer+path, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
 	if rt.clientType == "token" {
-		req.Header.Add("Authorization", "Bearer " + rt.clientToken)
+		req.Header.Add("Authorization", "Bearer "+rt.clientToken)
 	}
 	req.Header.Add("Accept", "application/json")
 	req.Header.Add("Content-type", "application/json")
 
 	if rt.debug {
-		log.Printf("-> k8: %s %s with headers [%s] with payload [%s]\n", method, "https://" + rt.apiServer + path, req.Header, body)
+		log.Printf("-> k8: %s %s with headers [%s] with payload [%s]\n", method, "https://"+rt.apiServer+path, req.Header, body)
 	}
 	rt.mutex.Lock()
 	resp, err := rt.client.Do(req)
 	rt.mutex.Unlock()
 	if err != nil {
 		if rt.debug {
-			log.Printf("<- k8 ERROR: %s %s - %s\n", method, "https://" + rt.apiServer + path, err)
+			log.Printf("<- k8 ERROR: %s %s - %s\n", method, "https://"+rt.apiServer+path, err)
 		}
 		return nil, err
 	}
 	respBody, _ := ioutil.ReadAll(resp.Body)
 	if rt.debug {
-		log.Printf("<- k8: %s %s - %s\n", method, "https://" + rt.apiServer + path, resp.Status)
+		log.Printf("<- k8: %s %s - %s\n", method, "https://"+rt.apiServer+path, resp.Status)
 	}
-	return &KubeRequest{Body:respBody, Status:resp.Status, StatusCode:resp.StatusCode}, nil
+	return &KubeRequest{Body: respBody, Status: resp.Status, StatusCode: resp.StatusCode}, nil
 }
 
 func (rt Kubernetes) Scale(space string, app string, amount int) (e error) {
@@ -145,8 +146,8 @@ func (rt Kubernetes) Scale(space string, app string, amount int) (e error) {
 	if amount < 0 {
 		return errors.New("FATAL ERROR: Unable to scale app, amount is not a whole positive number.")
 	}
-	_, err := rt.k8sRequest("put", "/apis/extensions/v1beta1/namespaces/" + space + "/deployments/" + app + "/scale", 
-		Scalespec{ Metadata: Metadataspec{Name: app, Namespace:space}, Spec: Specspec{Replicas: amount}})
+	_, err := rt.k8sRequest("put", "/apis/extensions/v1beta1/namespaces/"+space+"/deployments/"+app+"/scale",
+		Scalespec{Metadata: Metadataspec{Name: app, Namespace: space}, Spec: Specspec{Replicas: amount}})
 	if err != nil {
 		return err
 	}
@@ -187,14 +188,166 @@ func deploymentToDeploymentSpec(deployment *structs.Deployment) (dp Deploymentsp
 	resources.Requests.Memory = deployment.MemoryRequest
 	resources.Limits.Memory = deployment.MemoryLimit
 	c1.Resources = resources
-	
+
 	// assemble secrets
 	c1.ImagePullSecrets = deployment.Secrets
 
-
 	clist = append(clist, c1)
-	// Assemble kubernetes deployment - appname, space, instances, revisionhistorylimit, secrets, containers
+
 	var krc Deploymentspec
+
+	//Check for ServiceMesh
+	if deployment.Features.ServiceMesh {
+
+		var c2 ContainerItem
+		var ic ContainerItem
+
+		// Add Metadata
+		krc.Spec.Metadata.Annotations.SidecarIstioIOStatus = "{\"version\":\"55c9e544b52e1d4e45d18a58d0b34ba4b72531e45fb6d1572c77191422556ffc\",\"initContainers\":[\"istio-init\"],\"containers\":[\"istio-proxy\"],\"volumes\":[\"istio-envoy\",\"istio-certs\"],\"imagePullSecrets\":null}"
+
+		// Istio Proxy
+		c2.Name = "istio-proxy"
+		c2.Image = "docker.io/istio/proxyv2:0.8.0"
+		c2.Args = []string{
+			"proxy",
+			"sidecar",
+			"--configPath",
+			"/etc/istio/proxy",
+			"--binaryPath",
+			"/usr/local/bin/envoy",
+			"--serviceCluster",
+			"details",
+			"--drainDuration",
+			"45s",
+			"--parentShutdownDuration",
+			"1m0s",
+			"--discoveryAddress",
+			"istio-pilot.istio-system:15007",
+			"--discoveryRefreshDelay",
+			"10s",
+			"--zipkinAddress",
+			"zipkin.istio-system:9411",
+			"--connectTimeout",
+			"10s",
+			"--statsdUdpAddress",
+			"istio-statsd-prom-bridge.istio-system:9125",
+			"--proxyAdminPort",
+			"15000",
+			"--controlPlaneAuthPolicy",
+			"NONE",
+		}
+
+		envList := []structs.EnvVar{
+			structs.EnvVar{
+				Name: "POD_NAME",
+				ValueFrom: &structs.ValueFrom{
+					FieldRef: structs.FieldRef{
+						FieldPath: "metadata.name",
+					},
+				},
+			},
+			structs.EnvVar{
+				Name: "POD_NAMESPACE",
+				ValueFrom: &structs.ValueFrom{
+					FieldRef: structs.FieldRef{
+						FieldPath: "metadata.namespace",
+					},
+				},
+			},
+			structs.EnvVar{
+				Name: "INSTANCE_IP",
+				ValueFrom: &structs.ValueFrom{
+					FieldRef: structs.FieldRef{
+						FieldPath: "status.podIP",
+					},
+				},
+			},
+			structs.EnvVar{
+				Name:  "ISTIO_META_POD_NAME",
+				Value: "REDIRECT",
+			},
+			structs.EnvVar{
+				Name: "ISTIO_META_POD_NAME",
+				ValueFrom: &structs.ValueFrom{
+					FieldRef: structs.FieldRef{
+						FieldPath: "metadata.name",
+					},
+				},
+			},
+		}
+		c2.Env = envList
+
+		c2.VolumeMounts = []structs.VolumeMounts{
+			structs.VolumeMounts{
+				Name:      "istio-envoy",
+				MountPath: "/etc/istio/proxy",
+			},
+			structs.VolumeMounts{
+				Name:      "istio-certs",
+				MountPath: "/etc/certs/",
+				ReadOnly:  true,
+			},
+		}
+
+		c2.SecurityContext.Privileged = false
+		c2.SecurityContext.ReadOnlyRootFilesystem = true
+		c2.SecurityContext.RunAsUser = 1337
+
+		clist = append(clist, c2)
+
+		// Istio Init
+		ic.Name = "istio-init"
+		ic.Image = "docker.io/istio/proxy_init:0.8.0"
+		ic.Args = []string{
+			"p",
+			"15001",
+			"-u",
+			"1337",
+			"-m",
+			"REDIRECT",
+			"-i",
+			"*",
+			"-x",
+			"",
+			"-b",
+			"9080",
+			"-d",
+			"",
+		}
+
+		ic.Env = []structs.EnvVar{
+			structs.EnvVar{
+				Name:  "ENABLE_INBOUND_IPV6",
+				Value: "true",
+			},
+		}
+
+		ic.SecurityContext.Capabilities.Add = []string{"NET_ADMIN"}
+		ic.SecurityContext.Privileged = true
+
+		krc.Spec.Template.Spec.InitContainers = &[]ContainerItem{
+			ic,
+		}
+		// Volumes
+		krc.Spec.Template.Spec.Volumes = &[]structs.Volumes{
+			structs.Volumes{
+				Name: "istio-envoy",
+				EmptyDir: &structs.EmptyDir{
+					Medium: "Memory",
+				},
+			},
+			structs.Volumes{
+				Name: "istio-certs",
+				Secret: &structs.Secret{
+					Optional:   true,
+					SecretName: "istio.default",
+				},
+			},
+		}
+	}
+
+	// Assemble kubernetes deployme, appname, space, instances, revisionhistorylimit, secrets, containers
+
 	krc.Metadata.Name = deployment.App
 	krc.Metadata.Namespace = deployment.Space
 	krc.Spec.Replicas = deployment.Amount
@@ -207,7 +360,7 @@ func deploymentToDeploymentSpec(deployment *structs.Deployment) (dp Deploymentsp
 	krc.Spec.Template.Spec.ImagePullSecrets = deployment.Secrets
 	krc.Spec.Template.Spec.Containers = clist
 	krc.Spec.Template.Spec.ImagePullPolicy = "Always"
-	krc.Spec.Template.Spec.DnsPolicy = "Default"
+	// krc.Spec.Template.Spec.DnsPolicy = "Default"
 
 	return krc
 }
@@ -219,7 +372,7 @@ func (rt Kubernetes) UpdateDeployment(deployment *structs.Deployment) (err error
 	if deployment.App == "" {
 		return errors.New("FATAL ERROR: Unable to update deployment, the app is blank.")
 	}
-	resp, err := rt.k8sRequest("PUT", "/apis/extensions/v1beta1/namespaces/" + deployment.Space + "/deployments/" + deployment.App, 
+	resp, err := rt.k8sRequest("PUT", "/apis/extensions/v1beta1/namespaces/"+deployment.Space+"/deployments/"+deployment.App,
 		deploymentToDeploymentSpec(deployment))
 	if err != nil {
 		return err
@@ -232,7 +385,8 @@ func (rt Kubernetes) UpdateDeployment(deployment *structs.Deployment) (err error
 
 func (rt Kubernetes) CreateDeployment(deployment *structs.Deployment) (err error) {
 	var dp Deploymentspec = deploymentToDeploymentSpec(deployment)
-	resp, err := rt.k8sRequest("POST", "/apis/extensions/v1beta1/namespaces/" + deployment.Space + "/deployments", dp) 
+	resp, err := rt.k8sRequest("POST", "/apis/extensions/v1beta1/namespaces/"+deployment.Space+"/deployments", dp)
+	fmt.Println(string(resp.Body))
 	if err != nil {
 		return err
 	}
@@ -249,7 +403,7 @@ func (rt Kubernetes) GetDeployment(space string, app string) (*Deploymentspec, e
 	if app == "" {
 		return nil, errors.New("FATAL ERROR: Unable to get deployment, the app is blank.")
 	}
-	resp, e := rt.k8sRequest("get", "/apis/extensions/v1beta1/namespaces/" + space + "/deployments/" + app, nil)
+	resp, e := rt.k8sRequest("get", "/apis/extensions/v1beta1/namespaces/"+space+"/deployments/"+app, nil)
 	if e != nil {
 		return nil, e
 	}
@@ -271,7 +425,7 @@ func (rt Kubernetes) DeploymentExists(space string, app string) (exists bool) {
 	if app == "" {
 		return false
 	}
-	resp, e := rt.k8sRequest("get", "/apis/extensions/v1beta1/namespaces/" + space + "/deployments/" + app, nil)
+	resp, e := rt.k8sRequest("get", "/apis/extensions/v1beta1/namespaces/"+space+"/deployments/"+app, nil)
 	if e != nil {
 		return false
 	}
@@ -288,7 +442,7 @@ func (rt Kubernetes) DeleteDeployment(space string, app string) (e error) {
 	if app == "" {
 		return errors.New("FATAL ERROR: Unable to remove deployment, the app is blank.")
 	}
-	_, e = rt.k8sRequest("delete", "/apis/extensions/v1beta1/namespaces/" + space + "/deployments/" + app, nil)
+	_, e = rt.k8sRequest("delete", "/apis/extensions/v1beta1/namespaces/"+space+"/deployments/"+app, nil)
 	return e
 }
 
@@ -304,7 +458,7 @@ func (rt Kubernetes) RestartDeployment(space string, app string) (e error) {
 	}
 	oldenvs := deployment.Spec.Template.Spec.Containers[0].Env
 	var newenvs []structs.EnvVar
-	newenvs = append(newenvs, structs.EnvVar{Name:"RESTART", Value:time.Now().Format(time.RFC850)})
+	newenvs = append(newenvs, structs.EnvVar{Name: "RESTART", Value: time.Now().Format(time.RFC850)})
 	for _, element := range oldenvs {
 		if element.Name != "RESTART" {
 			newenvs = append(newenvs, element)
@@ -312,7 +466,7 @@ func (rt Kubernetes) RestartDeployment(space string, app string) (e error) {
 	}
 	deployment.Spec.Template.Spec.Containers[0].Env = newenvs
 
-	_, e = rt.k8sRequest("put", "/apis/extensions/v1beta1/namespaces/" + space + "/deployments/" + app, deployment)
+	_, e = rt.k8sRequest("put", "/apis/extensions/v1beta1/namespaces/"+space+"/deployments/"+app, deployment)
 	return e
 }
 
@@ -330,7 +484,7 @@ func (rt Kubernetes) GetDeployments() (*DeploymentCollectionspec, error) {
 }
 
 func (rt Kubernetes) GetDeploymentHistory(space string, app string) (dslist []structs.DeploymentsSpec, e error) {
-	resp, err := rt.k8sRequest("get", "/apis/extensions/v1beta1/namespaces/" + space + "/replicasets?labelSelector=name=" + app, nil)
+	resp, err := rt.k8sRequest("get", "/apis/extensions/v1beta1/namespaces/"+space+"/replicasets?labelSelector=name="+app, nil)
 	if err != nil {
 		log.Println(err)
 	}
@@ -352,9 +506,9 @@ func (rt Kubernetes) GetDeploymentHistory(space string, app string) (dslist []st
 }
 
 func (rt Kubernetes) RollbackDeployment(space string, app string, revision int) (e error) {
-	var rollbackspec Rollbackspec = Rollbackspec{ApiVersion:"extensions/v1beta1", Name:app, RollbackTo:Revisionspec{Revision:revision}}
+	var rollbackspec Rollbackspec = Rollbackspec{ApiVersion: "extensions/v1beta1", Name: app, RollbackTo: Revisionspec{Revision: revision}}
 	rollbackspec.RollbackTo.Revision = revision
-	_, e = rt.k8sRequest("post", "/apis/extensions/v1beta1/namespaces/" + space + "/deployments/" + app + "/rollback", rollbackspec)
+	_, e = rt.k8sRequest("post", "/apis/extensions/v1beta1/namespaces/"+space+"/deployments/"+app+"/rollback", rollbackspec)
 	if e != nil {
 		return e
 	}
@@ -362,7 +516,7 @@ func (rt Kubernetes) RollbackDeployment(space string, app string, revision int) 
 }
 
 func (rt Kubernetes) GetReplicas(space string, app string) (rs []string, e error) {
-	resp, err := rt.k8sRequest("get", "/apis/extensions/v1beta1/namespaces/" + space + "/replicasets?labelSelector=name=" + app, nil)
+	resp, err := rt.k8sRequest("get", "/apis/extensions/v1beta1/namespaces/"+space+"/replicasets?labelSelector=name="+app, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -384,13 +538,12 @@ func (rt Kubernetes) DeleteReplica(space string, app string, replica string) (e 
 	if replica == "" {
 		return errors.New("Unable to delete replica, the replica is blank.")
 	}
-	_, e = rt.k8sRequest("delete", "/apis/extensions/v1beta1/namespaces/" + space + "/replicasets/" + replica, nil)
+	_, e = rt.k8sRequest("delete", "/apis/extensions/v1beta1/namespaces/"+space+"/replicasets/"+replica, nil)
 	return e
 }
 
-
 func (rt Kubernetes) GetPods(space string, app string) (rs []string, e error) {
-	resp, err := rt.k8sRequest("get", "/api/" + rt.defaultApiServerVersion + "/namespaces/" + space + "/pods?labelSelector=name=" + app, nil)
+	resp, err := rt.k8sRequest("get", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+space+"/pods?labelSelector=name="+app, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -405,14 +558,14 @@ func (rt Kubernetes) GetPods(space string, app string) (rs []string, e error) {
 	return rs, nil
 }
 
-func (rt Kubernetes) OneOffExists(space string, name string) (bool) {
+func (rt Kubernetes) OneOffExists(space string, name string) bool {
 	if space == "" {
 		return false
 	}
 	if name == "" {
 		return false
 	}
-	resp, e := rt.k8sRequest("get", "/api/" + rt.defaultApiServerVersion + "/namespaces/" + space  +"/pods/" + name, nil)
+	resp, e := rt.k8sRequest("get", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+space+"/pods/"+name, nil)
 	if e != nil {
 		log.Println(e)
 		return false
@@ -424,7 +577,7 @@ func (rt Kubernetes) OneOffExists(space string, name string) (bool) {
 	}
 }
 
-func (rt Kubernetes) CreateOneOffPod(deployment *structs.Deployment) (e error) {  
+func (rt Kubernetes) CreateOneOffPod(deployment *structs.Deployment) (e error) {
 	if deployment.Space == "" {
 		return errors.New("FATAL ERROR: Unable to create one off deployment, space is blank.")
 	}
@@ -442,7 +595,7 @@ func (rt Kubernetes) CreateOneOffPod(deployment *structs.Deployment) (e error) {
 	koneoff.Spec.ImagePullPolicy = "Always"
 	koneoff.Spec.DnsPolicy = "Default"
 
-	var container ContainerItem	
+	var container ContainerItem
 	container.ImagePullPolicy = "Always"
 	container.Name = deployment.App
 	container.Image = deployment.Image + ":" + deployment.Tag
@@ -463,8 +616,8 @@ func (rt Kubernetes) CreateOneOffPod(deployment *structs.Deployment) (e error) {
 
 	koneoff.Spec.ImagePullSecrets = deployment.Secrets
 	koneoff.Spec.Containers = clist
-	
-	_, e = rt.k8sRequest("post", "/api/" + rt.defaultApiServerVersion + "/namespaces/" + deployment.Space + "/pods", koneoff)
+
+	_, e = rt.k8sRequest("post", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+deployment.Space+"/pods", koneoff)
 	return e
 }
 
@@ -475,7 +628,7 @@ func (rt Kubernetes) DeletePod(space string, pod string) (e error) {
 	if pod == "" {
 		return errors.New("Unable to delete pod is blank.")
 	}
-	_, e = rt.k8sRequest("delete", "/api/" + rt.defaultApiServerVersion + "/namespaces/" + space + "/pods/" + pod, nil)
+	_, e = rt.k8sRequest("delete", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+space+"/pods/"+pod, nil)
 	return e
 }
 
@@ -486,7 +639,7 @@ func (rt Kubernetes) DeletePods(space string, label string) (e error) {
 	if label == "" {
 		return errors.New("Unable to delete pods, the label is blank.")
 	}
-	_, e = rt.k8sRequest("delete", "/api/" + rt.defaultApiServerVersion + "/namespaces/" + space + "/pods?labelSelector=name=" + label, nil)
+	_, e = rt.k8sRequest("delete", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+space+"/pods?labelSelector=name="+label, nil)
 	return e
 }
 
@@ -499,7 +652,7 @@ func (rt Kubernetes) CreateSpace(name string, compliance string) (e error) {
 	if len(compliance) > 0 {
 		namespace.Metadata.Labels.ComplianceTags = compliance
 	}
-	resp, e := rt.k8sRequest("post", "/api/" + rt.defaultApiServerVersion + "/namespaces", namespace)
+	resp, e := rt.k8sRequest("post", "/api/"+rt.defaultApiServerVersion+"/namespaces", namespace)
 
 	if e != nil {
 		return e
@@ -514,7 +667,7 @@ func (rt Kubernetes) DeleteSpace(name string) (e error) {
 	if name == "" || name == "kube-public" || name == "kube-system" {
 		return errors.New("Unable to delete space, the name was invalid.")
 	}
-	resp, e := rt.k8sRequest("delete", "/api/" + rt.defaultApiServerVersion + "/namespaces/" + name, nil)
+	resp, e := rt.k8sRequest("delete", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+name, nil)
 	if e != nil {
 		return e
 	}
@@ -531,7 +684,7 @@ func (rt Kubernetes) UpdateSpaceTags(space string, compliance string) (e error) 
 	var namespace Namespacespec
 	namespace.Metadata.Name = space
 	namespace.Metadata.Labels.ComplianceTags = compliance
-	_, e = rt.k8sRequest("patch", "/api/" + rt.defaultApiServerVersion + "/namespaces/" + space, namespace)
+	_, e = rt.k8sRequest("patch", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+space, namespace)
 	return e
 }
 
@@ -540,7 +693,7 @@ func (rt Kubernetes) CreateSecret(space string, name string, data string, mimety
 	secret.Metadata.Name = name
 	secret.Data.Dockercfg = data
 	secret.Type = mimetype
-	resp, err := rt.k8sRequest("post", "/api/" + rt.defaultApiServerVersion + "/namespaces/" + space + "/secrets", secret)
+	resp, err := rt.k8sRequest("post", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+space+"/secrets", secret)
 	if err != nil {
 		return nil, err
 	}
@@ -555,7 +708,7 @@ func (rt Kubernetes) AddImagePullSecretToSpace(space string) (e error) {
 	var ipss []structs.Namespec
 	ipss = append(ipss, structs.Namespec{Name: rt.imagePullSecret})
 	sa.ImagePullSecrets = ipss
-	resp, err := rt.k8sRequest("put", "/api/" + rt.defaultApiServerVersion + "/namespaces/" + space + "/serviceaccounts/default", sa)
+	resp, err := rt.k8sRequest("put", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+space+"/serviceaccounts/default", sa)
 	if resp.StatusCode != 201 && resp.StatusCode != 200 {
 		return errors.New("Unable to add secret to space, invalid response code from kubernetes: " + resp.Status)
 	}
@@ -577,7 +730,7 @@ func (rt Kubernetes) GetCurrentImage(space string, app string) (i string, e erro
 }
 
 func (rt Kubernetes) GetPodStatus(space string, app string) []structs.SpaceAppStatus {
-	resp, err := rt.k8sRequest("GET", "/api/" + rt.defaultApiServerVersion + "/namespaces/" + space + "/pods?labelSelector=name=" + app, nil)
+	resp, err := rt.k8sRequest("GET", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+space+"/pods?labelSelector=name="+app, nil)
 	if err != nil {
 		log.Println("Cannot get pod from kuberenetes:")
 		log.Println(err)
@@ -626,7 +779,7 @@ func (rt Kubernetes) GetPodDetails(space string, app string) []structs.Instance 
 		log.Println("FATAL ERROR: Unable to get pod details, the app is blank.")
 		return instances
 	}
-	resp, err := rt.k8sRequest("GET", "/api/" + rt.defaultApiServerVersion + "/namespaces/" + space + "/pods?labelSelector=name=" + app, nil)
+	resp, err := rt.k8sRequest("GET", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+space+"/pods?labelSelector=name="+app, nil)
 	if err != nil {
 		log.Println("Cannot get pod from kuberenetes:")
 		log.Println(err)
@@ -709,7 +862,7 @@ func (rt Kubernetes) GetPodDetails(space string, app string) []structs.Instance 
 
 func (rt Kubernetes) GetPodLogs(space string, app string, pod string) (log string, err error) {
 	limitBytes := "1000000" //100kb
-	resp, e := rt.k8sRequest("get", "/api/" + rt.defaultApiServerVersion + "/namespaces/" + space + "/pods/" + pod + "/log?limitBytes=" + limitBytes + "&container=" + app, nil)
+	resp, e := rt.k8sRequest("get", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+space+"/pods/"+pod+"/log?limitBytes="+limitBytes+"&container="+app, nil)
 	if e != nil {
 		return "", e
 	}
@@ -728,7 +881,7 @@ func (rt Kubernetes) GetService(space string, app string) (KubeService, error) {
 	if app == "" {
 		return response, errors.New("FATAL ERROR: Unable to get service, the app is blank.")
 	}
-	resp, e := rt.k8sRequest("get", "/api/" + rt.defaultApiServerVersion + "/namespaces/" + space + "/services/" + app, nil)
+	resp, e := rt.k8sRequest("get", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+space+"/services/"+app, nil)
 	if e != nil {
 		return response, e
 	}
@@ -768,7 +921,7 @@ func (rt Kubernetes) CreateService(space string, app string, port int) (c *Creat
 	service.Spec.Ports = portlist
 	service.Spec.Type = "NodePort"
 
-	resp, e := rt.k8sRequest("post", "/api/" + rt.defaultApiServerVersion + "/namespaces/" + space + "/services", service)
+	resp, e := rt.k8sRequest("post", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+space+"/services", service)
 	if e != nil {
 		return nil, e
 	}
@@ -795,8 +948,8 @@ func (rt Kubernetes) UpdateService(space string, app string, port int) (c *Creat
 		return nil, e
 	}
 	existingservice.Spec.Ports[0].TargetPort = port
-	
-	resp, e := rt.k8sRequest("put", "/api/" + rt.defaultApiServerVersion + "/namespaces/" + space + "/services/" + app, existingservice)
+
+	resp, e := rt.k8sRequest("put", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+space+"/services/"+app, existingservice)
 	if e != nil {
 		return nil, e
 	}
@@ -815,7 +968,7 @@ func (rt Kubernetes) DeleteService(space string, app string) (e error) {
 	if app == "" {
 		return errors.New("Unable to delete service, the app is blank.")
 	}
-	resp, err := rt.k8sRequest("delete", "/api/" + rt.defaultApiServerVersion + "/namespaces/" + space + "/services/" + app, nil)
+	resp, err := rt.k8sRequest("delete", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+space+"/services/"+app, nil)
 	if err != nil {
 		return err
 	}
@@ -828,7 +981,7 @@ func (rt Kubernetes) DeleteService(space string, app string) (e error) {
 }
 
 func (rt Kubernetes) GetServices() (*ServiceCollectionspec, error) {
-	resp, e := rt.k8sRequest("get", "/api/" + rt.defaultApiServerVersion + "/services", nil)
+	resp, e := rt.k8sRequest("get", "/api/"+rt.defaultApiServerVersion+"/services", nil)
 	if e != nil {
 		return nil, e
 	}
@@ -840,8 +993,8 @@ func (rt Kubernetes) GetServices() (*ServiceCollectionspec, error) {
 	return &services, nil
 }
 
-func (rt Kubernetes) CronJobExists(space string, job string) (bool) {
-	resp, err := rt.k8sRequest("get", "/apis/batch/v2alpha1/namespaces/" + space + "/cronjobs/" + job, nil)
+func (rt Kubernetes) CronJobExists(space string, job string) bool {
+	resp, err := rt.k8sRequest("get", "/apis/batch/v2alpha1/namespaces/"+space+"/cronjobs/"+job, nil)
 	if err != nil {
 		return false
 	}
@@ -898,7 +1051,7 @@ func (rt Kubernetes) CreateCronJob(deployment *structs.Deployment) (*structs.Cro
 		return nil, errors.New("FATAL ERROR: Unable to create cronjob, space is blank.")
 	}
 	// Update or Create Job
-	resp, err := rt.k8sRequest("post", "/apis/batch/v2alpha1/namespaces/" + deployment.Space + "/cronjobs", deploymentToCronJob(deployment))
+	resp, err := rt.k8sRequest("post", "/apis/batch/v2alpha1/namespaces/"+deployment.Space+"/cronjobs", deploymentToCronJob(deployment))
 	if err != nil {
 		return nil, err
 	}
@@ -920,7 +1073,7 @@ func (rt Kubernetes) UpdateCronJob(deployment *structs.Deployment) (*structs.Cro
 	if deployment.App == "" {
 		return nil, errors.New("FATAL ERROR: Unable to update cron job, the app is blank.")
 	}
-	resp, err := rt.k8sRequest("put", "/apis/batch/v2alpha1/namespaces/" + deployment.Space + "/cronjobs/" + deployment.App, deploymentToCronJob(deployment))
+	resp, err := rt.k8sRequest("put", "/apis/batch/v2alpha1/namespaces/"+deployment.Space+"/cronjobs/"+deployment.App, deploymentToCronJob(deployment))
 	if err != nil {
 		return nil, err
 	}
@@ -970,7 +1123,7 @@ func (rt Kubernetes) CreateJob(deployment *structs.Deployment) (*structs.JobStat
 	job.Spec.Template.Spec.Containers = clist
 	job.Spec.Template.Spec.RestartPolicy = "OnFailure"
 
-	resp, err := rt.k8sRequest("post", "/apis/batch/v1/namespaces/" + deployment.Space + "/jobs", job)
+	resp, err := rt.k8sRequest("post", "/apis/batch/v1/namespaces/"+deployment.Space+"/jobs", job)
 	if err != nil {
 		return nil, err
 	}
@@ -994,7 +1147,7 @@ func (rt Kubernetes) DeleteJob(space string, jobName string) (e error) {
 		return errors.New("Cannot delete job with invalid or missing job name")
 	}
 	// Cleanup running/old jobs
-	resp, err := rt.k8sRequest("delete", "/apis/batch/v1/namespaces/" + space + "/jobs?labelSelector=name=" + jobName, nil)
+	resp, err := rt.k8sRequest("delete", "/apis/batch/v1/namespaces/"+space+"/jobs?labelSelector=name="+jobName, nil)
 	if err != nil {
 		return err
 	}
@@ -1018,7 +1171,7 @@ func (rt Kubernetes) DeleteCronJob(space string, jobName string) (e error) {
 		return errors.New("Cannot delete job with invalid or missing job name")
 	}
 	// Delete Cron Job
-	resp, err := rt.k8sRequest("delete", "/apis/batch/v2alpha1/namespaces/" + space + "/cronjobs/" + jobName, nil)
+	resp, err := rt.k8sRequest("delete", "/apis/batch/v2alpha1/namespaces/"+space+"/cronjobs/"+jobName, nil)
 	if err != nil {
 		return err
 	}
@@ -1035,7 +1188,7 @@ func (rt Kubernetes) GetJob(space string, jobName string) (*structs.JobStatus, e
 	if jobName == "" {
 		return nil, errors.New("FATAL ERROR: Unable to get job, the job name is blank.")
 	}
-	resp, err := rt.k8sRequest("get", "/apis/batch/v1/namespaces/" + space + "/jobs/" + jobName, nil)
+	resp, err := rt.k8sRequest("get", "/apis/batch/v1/namespaces/"+space+"/jobs/"+jobName, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -1055,7 +1208,7 @@ func (rt Kubernetes) GetJobs(space string) ([]structs.JobStatus, error) {
 	if space == "" {
 		return nil, errors.New("FATAL ERROR: Unable to get jobs, space is blank.")
 	}
-	resp, err := rt.k8sRequest("get", "/apis/batch/v1/namespaces/" + space + "/jobs", nil)
+	resp, err := rt.k8sRequest("get", "/apis/batch/v1/namespaces/"+space+"/jobs", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -1084,7 +1237,7 @@ func (rt Kubernetes) GetCronJob(space string, jobName string) (*structs.CronJobS
 	if jobName == "" {
 		return nil, errors.New("FATAL ERROR: Unable to get cron job, the jobName is blank.")
 	}
-	resp, err := rt.k8sRequest("get", "/apis/batch/v2alpha1/namespaces/" + space + "/cronjobs/" + jobName, nil)
+	resp, err := rt.k8sRequest("get", "/apis/batch/v2alpha1/namespaces/"+space+"/cronjobs/"+jobName, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -1104,7 +1257,7 @@ func (rt Kubernetes) GetCronJobs(space string) (sjobs []structs.CronJobStatus, e
 	if space == "" {
 		return nil, errors.New("FATAL ERROR: Unable to get cron jobs, space is blank.")
 	}
-	resp, err := rt.k8sRequest("get", "/apis/batch/v2alpha1/namespaces/" + space + "/cronjobs", nil)
+	resp, err := rt.k8sRequest("get", "/apis/batch/v2alpha1/namespaces/"+space+"/cronjobs", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -1131,7 +1284,7 @@ func (rt Kubernetes) ScaleJob(space string, jobName string, replicas int, timeou
 	if jobName == "" {
 		return errors.New("FATAL ERROR: Unable to scale job, the jobName is blank.")
 	}
-	resp, e := rt.k8sRequest("get", "/apis/batch/v1/namespaces/" + space + "/jobs/" + jobName, nil)
+	resp, e := rt.k8sRequest("get", "/apis/batch/v1/namespaces/"+space+"/jobs/"+jobName, nil)
 	if e != nil {
 		return e
 	}
@@ -1146,9 +1299,8 @@ func (rt Kubernetes) ScaleJob(space string, jobName string, replicas int, timeou
 	}
 
 	job.Spec.Parallelism = replicas
-    job.Spec.ActiveDeadlineSeconds = timeout
-
-	resp, e = rt.k8sRequest("put", "/apis/batch/v1/namespaces/" + space + "/jobs/" + jobName, job)
+	job.Spec.ActiveDeadlineSeconds = timeout
+	resp, e = rt.k8sRequest("put", "/apis/batch/v1/namespaces/"+space+"/jobs/"+jobName, job)
 	if e != nil {
 		return e
 	}
@@ -1158,18 +1310,17 @@ func (rt Kubernetes) ScaleJob(space string, jobName string, replicas int, timeou
 	return nil
 }
 
-func (rt Kubernetes) JobExists(space string, jobName string) (bool) {
+func (rt Kubernetes) JobExists(space string, jobName string) bool {
 	if space == "" {
 		return false
 	}
 	if jobName == "" {
 		return false
 	}
-	resp, e := rt.k8sRequest("get", "/apis/batch/v1/namespaces/" + space + "/jobs/" + jobName, nil)
+	resp, e := rt.k8sRequest("get", "/apis/batch/v1/namespaces/"+space+"/jobs/"+jobName, nil)
 	if e != nil {
 		return false
 	}
-
 
 	if resp.StatusCode == http.StatusOK {
 		return true
@@ -1181,7 +1332,7 @@ func (rt Kubernetes) GetPodsBySpace(space string) (*PodStatus, error) {
 	if space == "" {
 		return nil, errors.New("FATAL ERROR: Unable to get pods by space, space is blank.")
 	}
-	resp, err := rt.k8sRequest("get", "/api/" + rt.defaultApiServerVersion + "/namespaces/" + space + "/pods", nil)
+	resp, err := rt.k8sRequest("get", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+space+"/pods", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -1194,7 +1345,7 @@ func (rt Kubernetes) GetPodsBySpace(space string) (*PodStatus, error) {
 }
 
 func (rt Kubernetes) GetNodes() (*structs.KubeNodes, error) {
-	resp, err := rt.k8sRequest("get", "/api/" + rt.defaultApiServerVersion + "/nodes", nil)
+	resp, err := rt.k8sRequest("get", "/api/"+rt.defaultApiServerVersion+"/nodes", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -1205,5 +1356,3 @@ func (rt Kubernetes) GetNodes() (*structs.KubeNodes, error) {
 	}
 	return &nodes, nil
 }
-
-

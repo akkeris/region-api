@@ -1,20 +1,20 @@
 package service
 
 import (
-	structs "../structs"
-	utils "../utils"
 	"bytes"
 	"encoding/json"
-	"fmt"
-	"io/ioutil"
-	"net/http"
-	"os"
-	"strings"
 	"errors"
+	"fmt"
 	"github.com/bitly/go-simplejson"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
+	"io/ioutil"
+	"net/http"
+	"os"
+	structs "region-api/structs"
+	utils "region-api/utils"
+	"strings"
 )
 
 //Getpostgresplans  centralized
@@ -266,7 +266,7 @@ func TagPostgresV2(spec structs.Tagspec, berr binding.Errors, r render.Render) {
 		return
 	}
 	jsonStr := []byte(string(str))
-	req, err := http.NewRequest("POST", "http://"+os.Getenv("POSTGRES_BROKER_URL")+"/v2/postgres/" + spec.Resource + "/tags", bytes.NewBuffer(jsonStr))
+	req, err := http.NewRequest("POST", "http://"+os.Getenv("POSTGRES_BROKER_URL")+"/v2/postgres/"+spec.Resource+"/tags", bytes.NewBuffer(jsonStr))
 	resp, err := client.Do(req)
 	if err != nil {
 		utils.ReportError(err, r)
@@ -297,12 +297,13 @@ func GetPostgresVarsV2(servicename string) (error, map[string]interface{}) {
 	}
 	bodyj, _ := simplejson.NewFromReader(resp.Body)
 	databaseurl, _ := bodyj.Get("DATABASE_URL").String()
-	return nil, map[string]interface{}{"DATABASE_URL":databaseurl}
+	return nil, map[string]interface{}{"DATABASE_URL": databaseurl}
+
 }
 
 func ListPostgresBackupsV2(params martini.Params, r render.Render) {
 	client := &http.Client{}
-	req, err := http.NewRequest("GET", "http://"+os.Getenv("POSTGRES_BROKER_URL")+"/v2/postgres/" + params["servicename"] + "/backups", nil)
+	req, err := http.NewRequest("GET", "http://"+os.Getenv("POSTGRES_BROKER_URL")+"/v2/postgres/"+params["servicename"]+"/backups", nil)
 	resp, err := client.Do(req)
 	if err != nil {
 		utils.ReportError(err, r)
@@ -316,7 +317,7 @@ func ListPostgresBackupsV2(params martini.Params, r render.Render) {
 
 func GetPostgresBackupV2(params martini.Params, r render.Render) {
 	client := &http.Client{}
-	req, err := http.NewRequest("GET", "http://"+os.Getenv("POSTGRES_BROKER_URL")+"/v2/postgres/" + params["servicename"] + "/backups/" + params["backup"], nil)
+	req, err := http.NewRequest("GET", "http://"+os.Getenv("POSTGRES_BROKER_URL")+"/v2/postgres/"+params["servicename"]+"/backups/"+params["backup"], nil)
 	resp, err := client.Do(req)
 	if err != nil {
 		utils.ReportError(err, r)
@@ -330,7 +331,7 @@ func GetPostgresBackupV2(params martini.Params, r render.Render) {
 
 func CreatePostgresBackupV2(params martini.Params, r render.Render) {
 	client := &http.Client{}
-	req, err := http.NewRequest("PUT", "http://"+os.Getenv("POSTGRES_BROKER_URL")+"/v2/postgres/" + params["servicename"] + "/backups", nil)
+	req, err := http.NewRequest("PUT", "http://"+os.Getenv("POSTGRES_BROKER_URL")+"/v2/postgres/"+params["servicename"]+"/backups", nil)
 	resp, err := client.Do(req)
 	if err != nil {
 		utils.ReportError(err, r)
@@ -344,7 +345,7 @@ func CreatePostgresBackupV2(params martini.Params, r render.Render) {
 
 func RestorePostgresBackupV2(params martini.Params, r render.Render) {
 	client := &http.Client{}
-	req, err := http.NewRequest("PUT", "http://"+os.Getenv("POSTGRES_BROKER_URL")+"/v2/postgres/" + params["servicename"] + "/backups/" + params["backup"], nil)
+	req, err := http.NewRequest("PUT", "http://"+os.Getenv("POSTGRES_BROKER_URL")+"/v2/postgres/"+params["servicename"]+"/backups/"+params["backup"], nil)
 	resp, err := client.Do(req)
 	if err != nil {
 		utils.ReportError(err, r)
@@ -358,7 +359,7 @@ func RestorePostgresBackupV2(params martini.Params, r render.Render) {
 
 func ListPostgresLogsV2(params martini.Params, r render.Render) {
 	client := &http.Client{}
-	req, err := http.NewRequest("GET", "http://"+os.Getenv("POSTGRES_BROKER_URL")+"/v2/postgres/" + params["servicename"] + "/logs", nil)
+	req, err := http.NewRequest("GET", "http://"+os.Getenv("POSTGRES_BROKER_URL")+"/v2/postgres/"+params["servicename"]+"/logs", nil)
 	resp, err := client.Do(req)
 	if err != nil {
 		utils.ReportError(err, r)
@@ -372,7 +373,7 @@ func ListPostgresLogsV2(params martini.Params, r render.Render) {
 
 func GetPostgresLogsV2(params martini.Params, r render.Render) {
 	client := &http.Client{}
-	req, err := http.NewRequest("GET", "http://"+os.Getenv("POSTGRES_BROKER_URL")+"/v2/postgres/" + params["servicename"] + "/logs/" + params["dir"] + "/" + params["file"], nil)
+	req, err := http.NewRequest("GET", "http://"+os.Getenv("POSTGRES_BROKER_URL")+"/v2/postgres/"+params["servicename"]+"/logs/"+params["dir"]+"/"+params["file"], nil)
 	resp, err := client.Do(req)
 	if err != nil {
 		utils.ReportError(err, r)
@@ -390,7 +391,7 @@ func GetPostgresLogsV2(params martini.Params, r render.Render) {
 
 func RestartPostgresV2(params martini.Params, r render.Render) {
 	client := &http.Client{}
-	req, err := http.NewRequest("PUT", "http://"+os.Getenv("POSTGRES_BROKER_URL")+"/v2/postgres/" + params["servicename"], nil)
+	req, err := http.NewRequest("PUT", "http://"+os.Getenv("POSTGRES_BROKER_URL")+"/v2/postgres/"+params["servicename"], nil)
 	resp, err := client.Do(req)
 	if err != nil {
 		utils.ReportError(err, r)
@@ -404,7 +405,7 @@ func RestartPostgresV2(params martini.Params, r render.Render) {
 
 func CreatePostgresRoleV2(params martini.Params, r render.Render) {
 	client := &http.Client{}
-	req, err := http.NewRequest("POST", "http://"+os.Getenv("POSTGRES_BROKER_URL")+"/v2/postgres/" + params["servicename"] + "/roles", nil)
+	req, err := http.NewRequest("POST", "http://"+os.Getenv("POSTGRES_BROKER_URL")+"/v2/postgres/"+params["servicename"]+"/roles", nil)
 	resp, err := client.Do(req)
 	if err != nil {
 		utils.ReportError(err, r)
@@ -418,7 +419,7 @@ func CreatePostgresRoleV2(params martini.Params, r render.Render) {
 
 func DeletePostgresRoleV2(params martini.Params, r render.Render) {
 	client := &http.Client{}
-	req, err := http.NewRequest("DELETE", "http://"+os.Getenv("POSTGRES_BROKER_URL")+"/v2/postgres/" + params["servicename"] + "/roles/" + params["role"], nil)
+	req, err := http.NewRequest("DELETE", "http://"+os.Getenv("POSTGRES_BROKER_URL")+"/v2/postgres/"+params["servicename"]+"/roles/"+params["role"], nil)
 	resp, err := client.Do(req)
 	if err != nil {
 		utils.ReportError(err, r)
@@ -432,7 +433,7 @@ func DeletePostgresRoleV2(params martini.Params, r render.Render) {
 
 func ListPostgresRolesV2(params martini.Params, r render.Render) {
 	client := &http.Client{}
-	req, err := http.NewRequest("GET", "http://"+os.Getenv("POSTGRES_BROKER_URL")+"/v2/postgres/" + params["servicename"] + "/roles", nil)
+	req, err := http.NewRequest("GET", "http://"+os.Getenv("POSTGRES_BROKER_URL")+"/v2/postgres/"+params["servicename"]+"/roles", nil)
 	resp, err := client.Do(req)
 	if err != nil {
 		utils.ReportError(err, r)
@@ -446,7 +447,7 @@ func ListPostgresRolesV2(params martini.Params, r render.Render) {
 
 func RotatePostgresRoleV2(params martini.Params, r render.Render) {
 	client := &http.Client{}
-	req, err := http.NewRequest("PUT", "http://"+os.Getenv("POSTGRES_BROKER_URL")+"/v2/postgres/" + params["servicename"] + "/roles/" + params["role"], nil)
+	req, err := http.NewRequest("PUT", "http://"+os.Getenv("POSTGRES_BROKER_URL")+"/v2/postgres/"+params["servicename"]+"/roles/"+params["role"], nil)
 	resp, err := client.Do(req)
 	if err != nil {
 		utils.ReportError(err, r)
@@ -460,7 +461,7 @@ func RotatePostgresRoleV2(params martini.Params, r render.Render) {
 
 func GetPostgresRoleV2(params martini.Params, r render.Render) {
 	client := &http.Client{}
-	req, err := http.NewRequest("GET", "http://"+os.Getenv("POSTGRES_BROKER_URL")+"/v2/postgres/" + params["servicename"] + "/roles/" + params["role"], nil)
+	req, err := http.NewRequest("GET", "http://"+os.Getenv("POSTGRES_BROKER_URL")+"/v2/postgres/"+params["servicename"]+"/roles/"+params["role"], nil)
 	resp, err := client.Do(req)
 	if err != nil {
 		utils.ReportError(err, r)
@@ -474,7 +475,7 @@ func GetPostgresRoleV2(params martini.Params, r render.Render) {
 
 func GetPostgresV2(params martini.Params, r render.Render) {
 	client := &http.Client{}
-	req, err := http.NewRequest("GET", "http://"+os.Getenv("POSTGRES_BROKER_URL")+"/v2/postgres/" + params["servicename"], nil)
+	req, err := http.NewRequest("GET", "http://"+os.Getenv("POSTGRES_BROKER_URL")+"/v2/postgres/"+params["servicename"], nil)
 	resp, err := client.Do(req)
 	if err != nil {
 		utils.ReportError(err, r)

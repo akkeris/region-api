@@ -1,8 +1,8 @@
 package service
 
 import (
-	vault "../vault"
-	structs "../structs"
+	structs "region-api/structs"
+	vault "region-api/vault"
 	"strings"
 )
 
@@ -18,7 +18,7 @@ func GetServiceConfigVars(appbindings []string) (error, []structs.EnvVar) {
 				return err, elist
 			}
 			for key, value := range vars {
-				elist = append(elist, structs.EnvVar{Name:key, Value:value.(string)})
+				elist = append(elist, structs.EnvVar{Name: key, Value: value.(string)})
 			}
 		}
 		if servicetype == "memcached" {
@@ -27,7 +27,7 @@ func GetServiceConfigVars(appbindings []string) (error, []structs.EnvVar) {
 				return err, elist
 			}
 			for key, value := range vars {
-				elist = append(elist, structs.EnvVar{Name:key, Value:value.(string)})
+				elist = append(elist, structs.EnvVar{Name: key, Value: value.(string)})
 			}
 		}
 		if servicetype == "postgres" {
@@ -36,7 +36,7 @@ func GetServiceConfigVars(appbindings []string) (error, []structs.EnvVar) {
 				return err, elist
 			}
 			for key, value := range vars {
-				elist = append(elist, structs.EnvVar{Name:key, Value:value.(string)})
+				elist = append(elist, structs.EnvVar{Name: key, Value: value.(string)})
 			}
 		}
 		if servicetype == "postgresonprem" {
@@ -45,7 +45,7 @@ func GetServiceConfigVars(appbindings []string) (error, []structs.EnvVar) {
 				return err, elist
 			}
 			for key, value := range vars {
-				elist = append(elist, structs.EnvVar{Name:key, Value:value.(string)})
+				elist = append(elist, structs.EnvVar{Name: key, Value: value.(string)})
 			}
 		}
 		if servicetype == "auroramysql" {
@@ -54,7 +54,7 @@ func GetServiceConfigVars(appbindings []string) (error, []structs.EnvVar) {
 				return err, elist
 			}
 			for key, value := range vars {
-				elist = append(elist, structs.EnvVar{Name:key, Value:value.(string)})
+				elist = append(elist, structs.EnvVar{Name: key, Value: value.(string)})
 			}
 		}
 		if servicetype == "rabbitmq" {
@@ -63,7 +63,7 @@ func GetServiceConfigVars(appbindings []string) (error, []structs.EnvVar) {
 				return err, elist
 			}
 			for key, value := range vars {
-				elist = append(elist, structs.EnvVar{Name:key, Value:value.(string)})
+				elist = append(elist, structs.EnvVar{Name: key, Value: value.(string)})
 			}
 		}
 		if servicetype == "s3" {
@@ -72,7 +72,7 @@ func GetServiceConfigVars(appbindings []string) (error, []structs.EnvVar) {
 				return err, elist
 			}
 			for key, value := range vars {
-				elist = append(elist, structs.EnvVar{Name:key, Value:value.(string)})
+				elist = append(elist, structs.EnvVar{Name: key, Value: value.(string)})
 			}
 		}
 		if servicetype == "es" {
@@ -81,23 +81,24 @@ func GetServiceConfigVars(appbindings []string) (error, []structs.EnvVar) {
 				return err, elist
 			}
 			for key, value := range vars {
-				elist = append(elist, structs.EnvVar{Name:key, Value:value.(string)})
+				elist = append(elist, structs.EnvVar{Name: key, Value: value.(string)})
 			}
 		}
-        if servicetype == "mongodb" {
-            err, vars := Getmongodbvars(servicename)
-            if err != nil {
+		if servicetype == "mongodb" {
+			err, vars := Getmongodbvars(servicename)
+			if err != nil {
 				return err, elist
 			}
 			for key, value := range vars {
-				elist = append(elist, structs.EnvVar{Name:key, Value:value})
+				elist = append(elist, structs.EnvVar{Name: key, Value: value})
 			}
-        }
+		}
+
 		if servicetype == "vault" {
 			// vault panics if we cannot reach it, just crash the entire API (apparently)
 			vars := vault.GetVaultVariables(servicename)
 			for _, value := range vars {
-				elist = append(elist, structs.EnvVar{Name:value.Key, Value:value.Value})
+				elist = append(elist, structs.EnvVar{Name: value.Key, Value: value.Value})
 			}
 		}
 	}

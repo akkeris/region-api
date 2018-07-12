@@ -1,11 +1,9 @@
 package router
 
 import (
-	"../structs"
-	"../utils"
 	"bytes"
 	"encoding/json"
-        "fmt"
+	"fmt"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
@@ -13,6 +11,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"region-api/structs"
+	"region-api/utils"
 	"testing"
 )
 
@@ -26,7 +26,7 @@ func Server() *martini.ClassicMartini {
 	m.Put("/v1/router/:router", PushRouter)
 	m.Get("/v1/routers", DescribeRouters)
 	m.Get("/v1/router/:router", DescribeRouter)
-        m.Delete("/v1/router/:router/path",binding.Json(structs.Routerpathspec{}), DeletePath)
+	m.Delete("/v1/router/:router/path", binding.Json(structs.Routerpathspec{}), DeletePath)
 	return m
 }
 
@@ -135,18 +135,18 @@ func TestHandlers(t *testing.T) {
 							//replacepath:="/octhc"
 							var testPath structs.Routerpathspec
 							//testPath.Domain=testDomain
-						        testPath.Path=path
+							testPath.Path = path
 							//testPath.App=testapp
 							//testPath.Space=testspace
 							b := new(bytes.Buffer)
 							if err := json.NewEncoder(b).Encode(testPath); err != nil {
-							    panic(err)
+								panic(err)
 							}
-                                                        fmt.Println(string(b.Bytes()))
+							fmt.Println(string(b.Bytes()))
 							r, _ := http.NewRequest("DELETE", "/v1/router/"+testDomain+"/path", b)
 							w := httptest.NewRecorder()
 							m.ServeHTTP(w, r)
-fmt.Println(w)
+							fmt.Println(w)
 							So(w.Code, ShouldEqual, http.StatusOK)
 						})
 					})

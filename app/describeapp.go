@@ -1,13 +1,13 @@
 package app
 
 import (
-	structs "../structs"
-	utils "../utils"
-	runtime "../runtime"
-	"net/http"
 	"database/sql"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/render"
+	"net/http"
+	runtime "region-api/runtime"
+	structs "region-api/structs"
+	utils "region-api/utils"
 )
 
 //Describeapp centralized
@@ -22,7 +22,7 @@ func Describeapp(db *sql.DB, params martini.Params, r render.Render) {
 		if err.Error() == "sql: no rows in result set" {
 			// To be backwards compatible with older systems lets fake a response back
 			// this ... isn't ideal, but .. well..
-			r.JSON(http.StatusOK, structs.Appspec{Name:"", Port:-1, Spaces:nil})
+			r.JSON(http.StatusOK, structs.Appspec{Name: "", Port: -1, Spaces: nil})
 			return
 		}
 		utils.ReportError(err, r)
@@ -34,7 +34,7 @@ func Describeapp(db *sql.DB, params martini.Params, r render.Render) {
 		return
 	}
 
-	r.JSON(http.StatusOK, structs.Appspec{Name:name, Port:port, Spaces:spaceapps})
+	r.JSON(http.StatusOK, structs.Appspec{Name: name, Port: port, Spaces: spaceapps})
 }
 
 func getSpacesapps(db *sql.DB, appname string) (sa []structs.Spaceappspec, err error) {
@@ -61,7 +61,7 @@ func getSpacesapps(db *sql.DB, appname string) (sa []structs.Spaceappspec, err e
 			utils.LogError("", err)
 			return spaceapps, err
 		}
-		spaceapps = append(spaceapps, structs.Spaceappspec{Appname:appname, Instances:instances, Space:space, Plan:plan, Healthcheck:healthcheck, Bindings:bindings})
+		spaceapps = append(spaceapps, structs.Spaceappspec{Appname: appname, Instances: instances, Space: space, Plan: plan, Healthcheck: healthcheck, Bindings: bindings})
 	}
 	return spaceapps, nil
 }
@@ -78,7 +78,7 @@ func getBindings(db *sql.DB, appname string, space string) (b []structs.Bindspec
 			utils.LogError("", err)
 			return bindings, err
 		}
-		bindings = append(bindings, structs.Bindspec{App:appname, Bindtype:bindtype, Bindname:bindname, Space:space})
+		bindings = append(bindings, structs.Bindspec{App: appname, Bindtype: bindtype, Bindname: bindname, Space: space})
 	}
 	return bindings, nil
 }
@@ -105,7 +105,7 @@ func Describespace(db *sql.DB, params martini.Params, r render.Render) {
 		}
 
 		bindings, _ := getBindings(db, appname, spacename)
-		list = append(list, structs.Spaceappspec{Appname:appname, Space:spacename, Instances:instances, Plan:plan, Healthcheck:healthcheck, Bindings:bindings})
+		list = append(list, structs.Spaceappspec{Appname: appname, Space: spacename, Instances: instances, Plan: plan, Healthcheck: healthcheck, Bindings: bindings})
 	}
 	r.JSON(http.StatusOK, list)
 }
@@ -122,14 +122,14 @@ func DescribeappInSpace(db *sql.DB, params martini.Params, r render.Render) {
 		if err.Error() == "sql: no rows in result set" {
 			// To be backwards compatible with older systems lets fake a response back
 			// this ... isn't ideal, but .. well..
-			r.JSON(http.StatusOK, structs.Spaceappspec{Appname:appname, Space:spacename, Instances:0, Plan:"", Healthcheck:"", Bindings:nil})
+			r.JSON(http.StatusOK, structs.Spaceappspec{Appname: appname, Space: spacename, Instances: 0, Plan: "", Healthcheck: "", Bindings: nil})
 			return
 		}
 		utils.ReportError(err, r)
 		return
 	}
 	bindings, _ := getBindings(db, appname, spacename)
-	currentapp := structs.Spaceappspec{Appname:appname, Space:spacename, Instances:instances, Plan:plan, Healthcheck:healthcheck, Bindings:bindings}
+	currentapp := structs.Spaceappspec{Appname: appname, Space: spacename, Instances: instances, Plan: plan, Healthcheck: healthcheck, Bindings: bindings}
 
 	rt, err := runtime.GetRuntimeFor(db, spacename)
 	if err != nil {

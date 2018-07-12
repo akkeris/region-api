@@ -1,25 +1,24 @@
 package maintenance
 
 import (
-	spacepack "../space"
-	structs "../structs"
-	utils "../utils"
 	"bytes"
 	"crypto/tls"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	vault "github.com/akkeris/vault-client"
 	"github.com/bitly/go-simplejson"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/render"
 	"io/ioutil"
 	"net/http"
 	"os"
-	vault "github.com/akkeris/vault-client"
+	spacepack "region-api/space"
+	structs "region-api/structs"
+	utils "region-api/utils"
 	"strings"
 )
-
 
 var Client *http.Client
 var F5url string
@@ -153,7 +152,7 @@ func updaterule(partition string, rulename string, rule structs.Rule) (e error) 
 }
 
 func startclient() {
-        f5secret := os.Getenv("F5_SECRET")
+	f5secret := os.Getenv("F5_SECRET")
 	F5url = vault.GetField(f5secret, "url")
 	f5username := vault.GetField(f5secret, "username")
 	f5password := vault.GetField(f5secret, "password")

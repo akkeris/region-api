@@ -3,7 +3,7 @@ package structs
 import "time"
 
 type Namespec struct {
-	Name      string `json:"name"`
+	Name string `json:"name"`
 }
 
 type KV struct {
@@ -37,11 +37,16 @@ type Routerspec struct {
 
 //Deployspec deployment spec
 type Deployspec struct {
-	AppName string   `json:"appname"`
-	Image   string   `json:"appimage"`
-	Space   string   `json:"space"`
-	Port    int      `json:"port"`
-	Command []string `json:"command"`
+	AppName  string   `json:"appname"`
+	Image    string   `json:"appimage"`
+	Space    string   `json:"space"`
+	Port     int      `json:"port"`
+	Command  []string `json:"command"`
+	Features Features `json:"features,omitempty"`
+}
+
+type Features struct {
+	ServiceMesh bool `json:"serviceMesh,omitempty"`
 }
 
 //Setspec setspec
@@ -91,7 +96,6 @@ type Applist struct {
 type Spacelist struct {
 	Spaces []string `json:"spaces"`
 }
-
 
 //Spaceappspec application spec
 type Spaceappspec struct {
@@ -172,20 +176,21 @@ type Auroramysqlspec struct {
 }
 
 type Deployment struct {
-	Space string 
-	App string
-	Amount int
+	Space                string
+	App                  string
+	Amount               int
 	RevisionHistoryLimit int
-	Port int
-	HealthCheck string
-	Image string
-	Tag string 
-	Command []string 
-	MemoryRequest string
-	MemoryLimit string
-	Secrets []Namespec
-	ConfigVars []EnvVar
-	Schedule string
+	Port                 int
+	HealthCheck          string
+	Image                string
+	Tag                  string
+	Command              []string
+	MemoryRequest        string
+	MemoryLimit          string
+	Secrets              []Namespec
+	ConfigVars           []EnvVar
+	Schedule             string
+	Features             Features
 }
 
 //Deployresponse deploy response
@@ -198,7 +203,6 @@ type Deployresponse struct {
 type Brokerresponse struct {
 	Response string `json:"response"`
 }
-
 
 type Vaultsecretspec struct {
 	LeaseID       string      `json:"lease_id"`
@@ -215,9 +219,8 @@ type Spacespec struct {
 	Name           string `json:"name"`
 	Internal       bool   `json:"internal"`
 	ComplianceTags string `json:"compliancetags"`
-	Stack		   string `json:"stack,omitempty"`
+	Stack          string `json:"stack,omitempty"`
 }
-
 
 type DeploymentsSpec struct {
 	Name              string    `json:"name"`
@@ -240,7 +243,6 @@ type SpaceAppStatus struct {
 	Ready          bool                   `json:"ready"`
 	Restarted      int                    `json:"restarted"`
 }
-
 
 type Subscriber struct {
 	Subscriber   string
@@ -305,7 +307,6 @@ type Creds struct {
 	Key   string `json:"key"`
 	Value string `json:"value"`
 }
-
 
 type Appstatus struct {
 	App         string    `json:"app"`
@@ -396,7 +397,6 @@ type CronJobStatus struct {
 	} `json:"active"`
 	LastScheduleTime time.Time `json:"lastScheduleTime"`
 }
-
 
 type ResourceSpec struct {
 	Requests struct {
@@ -726,8 +726,46 @@ type OrderList struct {
 }
 
 type EnvVar struct {
-	Name  string `json:"name"`
-	Value string `json:"value"`
+	Name      string     `json:"name"`
+	Value     string     `json:"value"`
+	ValueFrom *ValueFrom `json:"valueFrom,omitempty"`
+}
+
+type ValueFrom struct {
+	FieldRef FieldRef `json:"fieldRef,omitempty"`
+}
+type FieldRef struct {
+	FieldPath string `json:"fieldPath,omitempty"`
+}
+
+type SecurityContext struct {
+	Privileged             bool `json:"privileged,omitempty"`
+	ReadOnlyRootFilesystem bool `json:"readOnlyRootFilesystem,omitempty"`
+	RunAsUser              int  `json:"runAsUser,omitempty"`
+	Capabilities           struct {
+		Add []string `json:"add,omitempty"`
+	} `json:"capabilites,omitempty"`
+}
+
+type VolumeMounts struct {
+	MountPath string `json:"mountPath,omitempty"`
+	Name      string `json:"name,omitempty"`
+	ReadOnly  bool   `json:"readOnly,omitempty"`
+}
+
+type Volumes struct {
+	Name     string    `json:"name,omitempty"`
+	EmptyDir *EmptyDir `json:"emptyDir,omitempty"`
+	Secret   *Secret   `json:"secret,omitempty"`
+}
+
+type EmptyDir struct {
+	Medium string `json:"medium,omitempty"`
+}
+
+type Secret struct {
+	Optional   bool   `json:"optional,omitempty"`
+	SecretName string `json:"secretName,omitempty"`
 }
 
 type OrderSpec struct {
@@ -779,8 +817,8 @@ type KubeNodeItems struct {
 }
 
 type KubeNodes struct {
-	Kind       string `json:"kind"`
-	APIVersion string `json:"apiVersion"`
+	Kind       string          `json:"kind"`
+	APIVersion string          `json:"apiVersion"`
 	Items      []KubeNodeItems `json:"items"`
 }
 
@@ -788,4 +826,3 @@ type URLTemplates struct {
 	Internal string `json:"internal"`
 	External string `json:"external"`
 }
-

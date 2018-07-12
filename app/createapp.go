@@ -1,13 +1,13 @@
 package app
 
 import (
-	structs "../structs"
-	utils "../utils"
 	"database/sql"
-	"net/http"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
 	"github.com/nu7hatch/gouuid"
+	"net/http"
+	structs "region-api/structs"
+	utils "region-api/utils"
 )
 
 //Createapp centralized
@@ -32,10 +32,10 @@ func Createapp(db *sql.DB, spec structs.Appspec, berr binding.Errors, r render.R
 	inserterr := db.QueryRow("INSERT INTO apps(appid,name,port) VALUES($1,$2,$3) returning appid;", newappid, spec.Name, spec.Port).Scan(&appid)
 	if inserterr != nil {
 		// dont report this error, its fairly typical and sort of a
-		// throw back to some design decisions we made early on, in reality this 
+		// throw back to some design decisions we made early on, in reality this
 		// end point should probably just be removed.
-		r.JSON(http.StatusInternalServerError, structs.Messagespec{Status:http.StatusInternalServerError, Message:inserterr.Error()})
+		r.JSON(http.StatusInternalServerError, structs.Messagespec{Status: http.StatusInternalServerError, Message: inserterr.Error()})
 		return
 	}
-	r.JSON(http.StatusCreated, structs.Messagespec{Status:http.StatusCreated, Message:"App Created with ID " + appid})
+	r.JSON(http.StatusCreated, structs.Messagespec{Status: http.StatusCreated, Message: "App Created with ID " + appid})
 }

@@ -1,9 +1,6 @@
 package certs
 
 import (
-	router "../router"
-	structs "../structs"
-	utils "../utils"
 	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
@@ -15,6 +12,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	vault "github.com/akkeris/vault-client"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
@@ -22,7 +20,9 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	vault "github.com/akkeris/vault-client"
+	router "region-api/router"
+	structs "region-api/structs"
+	utils "region-api/utils"
 	"strconv"
 	"strings"
 )
@@ -311,10 +311,10 @@ func certificateRequest(request structs.CertificateRequestSpec, db *sql.DB) (err
 
 	}
 	response, err := sendRequestToDigicert(csr, certtype)
-        
+
 	if err != nil {
 		fmt.Println(err)
-		return err,nil
+		return err, nil
 	}
 	request.Request = strconv.Itoa(response.Requests[0].ID)
 	requestobject, err := getRequestObject(request.Request)
@@ -329,8 +329,8 @@ func certificateRequest(request structs.CertificateRequestSpec, db *sql.DB) (err
 		return err, nil
 	}
 	cert_req := structs.CertificateRequest{
-		Response:response,
-		ID:uuid,
+		Response: response,
+		ID:       uuid,
 	}
 	return nil, &cert_req
 }
@@ -447,15 +447,14 @@ func generateRequest(request structs.CertificateRequestSpec) (r structs.Digicert
 	csr.Organization.ID = 95612
 	validityyears := 2
 	if os.Getenv("CERT_VALIDITY_YEARS") != "" {
-		validityyears,err = strconv.Atoi(os.Getenv("CERT_VALIDITY_YEARS"))
+		validityyears, err = strconv.Atoi(os.Getenv("CERT_VALIDITY_YEARS"))
 		if err != nil {
-	       fmt.Println("The CERT_VALIDITY_YEARS was invalid, it must be a positive number.")
-	       fmt.Println(err)
-	       validityyears = 2
-	    }
+			fmt.Println("The CERT_VALIDITY_YEARS was invalid, it must be a positive number.")
+			fmt.Println(err)
+			validityyears = 2
+		}
 	}
-    
-     
+
 	csr.ValidityYears = validityyears
 	csr.Comments = "Requested by: " + request.Requestedby + ". " + request.Comment
 
