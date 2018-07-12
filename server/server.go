@@ -307,8 +307,11 @@ func CreateDB(db *sql.DB) {
 	if err != nil {
 		buf, err = ioutil.ReadFile("region-api/create.sql")
 		if err != nil {
-			log.Println("Error: Unable to run migration scripts, could not load create.sql.")
-			log.Fatalln(err)
+			buf, err = ioutil.ReadFile("../create.sql")
+			if err != nil {
+				log.Println("Error: Unable to run migration scripts, could not load create.sql.")
+				log.Fatalln(err)
+			}
 		}
 	}
 	_, err = db.Query(string(buf))
