@@ -299,7 +299,7 @@ func deploymentToDeploymentSpec(deployment *structs.Deployment) (dp Deploymentsp
 		ic.Name = "istio-init"
 		ic.Image = "docker.io/istio/proxy_init:0.8.0"
 		ic.Args = []string{
-			"p",
+			"-p",
 			"15001",
 			"-u",
 			"1337",
@@ -313,13 +313,6 @@ func deploymentToDeploymentSpec(deployment *structs.Deployment) (dp Deploymentsp
 			"9080",
 			"-d",
 			"",
-		}
-
-		ic.Env = []structs.EnvVar{
-			structs.EnvVar{
-				Name:  "ENABLE_INBOUND_IPV6",
-				Value: "true",
-			},
 		}
 
 		ic.SecurityContext.Capabilities.Add = []string{"NET_ADMIN"}
