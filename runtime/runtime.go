@@ -150,6 +150,7 @@ type KubeService struct {
 	} `json:"metadata"`
 	Spec struct {
 		Ports []struct {
+			Name       string `json:"name,omitempty"`
 			Protocol   string `json:"protocol"`
 			Port       int    `json:"port"`
 			TargetPort int    `json:"targetPort"`
@@ -198,6 +199,7 @@ type Deploymentspec struct {
 				Name   string `json:"name"`
 				Labels struct {
 					Name string `json:"name"`
+					App  string `json:"app,omitempty"`
 				} `json:"labels"`
 			} `json:"metadata"`
 			Spec struct {

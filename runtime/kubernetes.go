@@ -356,6 +356,7 @@ func deploymentToDeploymentSpec(deployment *structs.Deployment) (dp Deploymentsp
 	krc.Spec.Selector.MatchLabels.Name = deployment.App
 	krc.Spec.Template.Metadata.Name = deployment.App
 	krc.Spec.Template.Metadata.Labels.Name = deployment.App
+	krc.Spec.Template.Metadata.Labels.App = deployment.App + "-" + deployment.Space
 	krc.Spec.Strategy.RollingUpdate.MaxUnavailable = 0
 	krc.Spec.Template.Spec.ImagePullSecrets = deployment.Secrets
 	krc.Spec.Template.Spec.Containers = clist
