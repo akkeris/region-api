@@ -915,6 +915,7 @@ func (rt Kubernetes) CreateService(space string, app string, port int) (c *Creat
 	portitem.Protocol = "TCP"
 	portitem.Port = 80
 	portitem.TargetPort = port
+	portitem.Name = "http"
 
 	portlist := []PortItem{}
 	portlist = append(portlist, portitem)

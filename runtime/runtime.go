@@ -101,6 +101,7 @@ type Createspec struct {
 }
 
 type PortItem struct {
+	Name       string `json:"name,omitempty"`
 	Protocol   string `json:"protocol"`
 	Port       int    `json:"port"`
 	TargetPort int    `json:"targetPort"`
