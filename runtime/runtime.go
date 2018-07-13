@@ -198,6 +198,7 @@ type Deploymentspec struct {
 				Name   string `json:"name"`
 				Labels struct {
 					Name string `json:"name"`
+					App  string `json:"app,omitempty"`
 				} `json:"labels"`
 			} `json:"metadata"`
 			Spec struct {
