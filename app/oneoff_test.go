@@ -1,10 +1,6 @@
 package app
 
 import (
-	"../config"
-	"../space"
-	"../structs"
-	"../utils"
 	"bytes"
 	"database/sql"
 	"encoding/json"
@@ -16,6 +12,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"region-api/config"
+	"region-api/space"
+	"region-api/structs"
+	"region-api/utils"
 	"testing"
 	"time"
 )
@@ -133,9 +133,9 @@ func TestOneoffs(t *testing.T) {
 					//configvars to set
 					var configset []structs.Varspec
 					configvar1 := structs.Varspec{Setname: testBindSetName, Varname: "EXIT_CODE", Varvalue: "0"}
-                                        configvar2 := structs.Varspec{Setname: testBindSetName, Varname: "SLEEP_SECONDS", Varvalue: "5"}
+					configvar2 := structs.Varspec{Setname: testBindSetName, Varname: "SLEEP_SECONDS", Varvalue: "5"}
 					configset = append(configset, configvar1)
-                                        configset = append(configset, configvar2)
+					configset = append(configset, configvar2)
 					bs := new(bytes.Buffer)
 					if err := json.NewEncoder(bs).Encode(configset); err != nil {
 						panic(err)
@@ -256,9 +256,9 @@ func TestOneoffs(t *testing.T) {
 															panic(err)
 														}
 														So(w.Code, ShouldEqual, http.StatusOK)
-                                                                                                                fmt.Println(response.Logs) 
+														fmt.Println(response.Logs)
 														So(response.Logs, ShouldNotBeEmpty)
-       
+
 														Convey("the instance can be deleted", func() {
 															r, _ := http.NewRequest("DELETE", "/v1/space/"+testAppSpace+"/app/"+testAppName+"/instance/"+instance, nil)
 															w := httptest.NewRecorder()

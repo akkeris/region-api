@@ -1,20 +1,20 @@
 package jobs
 
 import (
-	config "../config"
-	service "../service"
-	structs "../structs"
-	utils "../utils"
-	runtime "../runtime"
-	app "../app"
 	"database/sql"
-	"net/http"
-	"os"
-	"strconv"
-	"strings"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
+	"net/http"
+	"os"
+	app "region-api/app"
+	config "region-api/config"
+	runtime "region-api/runtime"
+	service "region-api/service"
+	structs "region-api/structs"
+	utils "region-api/utils"
+	"strconv"
+	"strings"
 )
 
 // GetJobs gets a list of current jobs
@@ -100,7 +100,7 @@ func GetDeployedJob(db *sql.DB, params martini.Params, r render.Render) {
 	jobName := params["jobName"]
 	space := params["space"]
 
-	rt, err := runtime.GetRuntimeFor(db, space);
+	rt, err := runtime.GetRuntimeFor(db, space)
 	if err != nil {
 		utils.ReportError(err, r)
 		return
@@ -118,8 +118,8 @@ func GetDeployedJob(db *sql.DB, params martini.Params, r render.Render) {
 // GetDeployedJobs returns the running jobs info
 func GetDeployedJobs(db *sql.DB, params martini.Params, r render.Render) {
 	space := params["space"]
-	
-	rt, err := runtime.GetRuntimeFor(db, space);
+
+	rt, err := runtime.GetRuntimeFor(db, space)
 	if err != nil {
 		utils.ReportError(err, r)
 		return
@@ -236,10 +236,10 @@ func DeployJob(db *sql.DB, params martini.Params, req structs.JobDeploy, berr bi
 	space := params["space"]
 
 	var (
-		cmd           string
-		plan          string
-		secrets       []structs.Namespec
-		secret        structs.Namespec
+		cmd     string
+		plan    string
+		secrets []structs.Namespec
+		secret  structs.Namespec
 	)
 
 	if req.Image == "" {
@@ -291,10 +291,10 @@ func DeployJob(db *sql.DB, params martini.Params, req structs.JobDeploy, berr bi
 		utils.ReportError(err, r)
 		return
 	}
-	
+
 	elist := app.AddAlamoConfigVars(jobName, space)
 	for n, v := range configvars {
-		elist = append(elist, structs.EnvVar{Name:n, Value:v})
+		elist = append(elist, structs.EnvVar{Name: n, Value: v})
 	}
 	// add service vars
 	err, servicevars := service.GetServiceConfigVars(appbindings)
@@ -336,7 +336,7 @@ func StopJob(db *sql.DB, params martini.Params, r render.Render) {
 	jobName := params["jobName"]
 	space := params["space"]
 
-    rt, err := runtime.GetRuntimeFor(db, space)
+	rt, err := runtime.GetRuntimeFor(db, space)
 	if err != nil {
 		utils.ReportError(err, r)
 		return
@@ -360,8 +360,8 @@ func StopJob(db *sql.DB, params martini.Params, r render.Render) {
 func CleanJobs(db *sql.DB, params martini.Params, r render.Render) {
 	space := params["space"]
 	jobName := params["jobName"]
-	
-	rt, err := runtime.GetRuntimeFor(db, space);
+
+	rt, err := runtime.GetRuntimeFor(db, space)
 	if err != nil {
 		utils.ReportError(err, r)
 		return
@@ -386,9 +386,9 @@ func ScaleJob(db *sql.DB, params martini.Params, r render.Render) {
 	jobName := params["jobName"]
 	space := params["space"]
 	replicas := params["replicas"]
-    timeout := params["timeout"]
+	timeout := params["timeout"]
 
-    rt, err := runtime.GetRuntimeFor(db, space);
+	rt, err := runtime.GetRuntimeFor(db, space)
 	if err != nil {
 		utils.ReportError(err, r)
 		return
@@ -401,11 +401,11 @@ func ScaleJob(db *sql.DB, params martini.Params, r render.Render) {
 			utils.ReportError(err, r)
 			return
 		}
-        timeouti, err := strconv.Atoi(timeout)
-        if err != nil {
-                utils.ReportError(err, r)
-                return
-        }
+		timeouti, err := strconv.Atoi(timeout)
+		if err != nil {
+			utils.ReportError(err, r)
+			return
+		}
 		err = rt.ScaleJob(space, jobName, replicasi, timeouti)
 		if err != nil {
 			utils.ReportError(err, r)
@@ -418,4 +418,3 @@ func ScaleJob(db *sql.DB, params martini.Params, r render.Render) {
 		r.JSON(http.StatusNotFound, message)
 	}
 }
-

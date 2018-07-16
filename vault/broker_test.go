@@ -1,8 +1,8 @@
 package vault
 
 import (
-	structs "../structs"
-	"../utils"
+	structs "region-api/structs"
+	"region-api/utils"
 
 	"bytes"
 	"net/http"

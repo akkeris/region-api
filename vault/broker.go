@@ -1,16 +1,16 @@
 package vault
 
 import (
-	structs "../structs"
 	"encoding/json"
-	"io/ioutil"
-	"net/http"
-	"os"
-	"strings"
-	"log"
 	"github.com/bitly/go-simplejson"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/render"
+	"io/ioutil"
+	"log"
+	"net/http"
+	"os"
+	structs "region-api/structs"
+	"strings"
 )
 
 func GetVaultList(params martini.Params, r render.Render) {
@@ -109,7 +109,7 @@ func getCreds(secret string) []structs.Creds {
 	step5 := strings.Replace(step4, "/stage/", "/", -1)
 	step6 := strings.Replace(step5, "/stg/", "/", -1)
 	step7 := strings.Replace(step6, "/intp-prod/", "/", -1)
-    step8 := strings.Replace(step7, "/xo/", "/", -1)
+	step8 := strings.Replace(step7, "/xo/", "/", -1)
 	step9 := strings.Replace(step8, "/", "_", -1)
 	prefix := strings.ToUpper(step9)
 	var creds []structs.Creds

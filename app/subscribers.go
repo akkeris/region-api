@@ -1,11 +1,11 @@
 package app
 
 import (
-	structs "../structs"
-	utils "../utils"
 	"database/sql"
 	"fmt"
 	"os"
+	structs "region-api/structs"
+	utils "region-api/utils"
 	"strconv"
 	"strings"
 

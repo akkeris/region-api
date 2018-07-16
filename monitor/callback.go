@@ -1,10 +1,10 @@
 package monitor
 
 import (
-	structs "../structs"
-	utils "../utils"
 	"database/sql"
 	"fmt"
+	structs "region-api/structs"
+	utils "region-api/utils"
 
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/binding"
