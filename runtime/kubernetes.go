@@ -216,7 +216,7 @@ func deploymentToDeploymentSpec(deployment *structs.Deployment) (dp Deploymentsp
 			"--binaryPath",
 			"/usr/local/bin/envoy",
 			"--serviceCluster",
-			"details",
+			deployment.App,
 			"--drainDuration",
 			"45s",
 			"--parentShutdownDuration",
@@ -321,6 +321,8 @@ func deploymentToDeploymentSpec(deployment *structs.Deployment) (dp Deploymentsp
 		krc.Spec.Template.Spec.InitContainers = &[]ContainerItem{
 			ic,
 		}
+		krc.Spec.Selector.MatchLabels.App = deployment.App
+		krc.Spec.Selector.MatchLabels.Version = "v1"
 		// Volumes
 		krc.Spec.Template.Spec.Volumes = &[]structs.Volumes{
 			structs.Volumes{

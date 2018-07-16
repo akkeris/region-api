@@ -191,7 +191,9 @@ type Deploymentspec struct {
 		} `json:"strategy"`
 		Selector struct {
 			MatchLabels struct {
-				Name string `json:"name"`
+				Name    string `json:"name"`
+				App     string `json:"app,omitempty"`
+				Version string `json:"version,omitempty"`
 			} `json:"matchLabels"`
 		} `json:"selector"`
 		Template struct {
