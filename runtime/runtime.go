@@ -178,8 +178,8 @@ type Deploymentspec struct {
 		RevisionHistoryLimit int `json:"revisionHistoryLimit"`
 		Metadata             struct {
 			Annotations struct {
-				SidecarIstioIOStatus string `json:"sidecar.istio.io/status"`
-			} `json:"annotations,ommitempty"`
+				SidecarIstioIOStatus string `json:"sidecar.istio.io/status,omitempty"`
+			} `json:"annotations`
 		} `json:"metadata",omitempty`
 		Replicas int `json:"replicas"`
 		Strategy struct {
