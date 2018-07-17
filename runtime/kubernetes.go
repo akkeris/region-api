@@ -6,7 +6,6 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"errors"
-	"fmt"
 	vault "github.com/akkeris/vault-client"
 	"io/ioutil"
 	"log"
@@ -351,7 +350,9 @@ func deploymentToDeploymentSpec(deployment *structs.Deployment) (dp Deploymentsp
 	krc.Spec.Selector.MatchLabels.Name = deployment.App
 	krc.Spec.Template.Metadata.Name = deployment.App
 	krc.Spec.Template.Metadata.Labels.Name = deployment.App
-	krc.Spec.Template.Metadata.Labels.App = deployment.App + "-" + deployment.Space
+	krc.Spec.Template.Metadata.Labels.App = deployment.App
+	krc.Spec.Template.Metadata.Labels.Version = "v1"
+
 	krc.Spec.Strategy.RollingUpdate.MaxUnavailable = 0
 	krc.Spec.Template.Spec.ImagePullSecrets = deployment.Secrets
 	krc.Spec.Template.Spec.Containers = clist
@@ -382,7 +383,6 @@ func (rt Kubernetes) UpdateDeployment(deployment *structs.Deployment) (err error
 func (rt Kubernetes) CreateDeployment(deployment *structs.Deployment) (err error) {
 	var dp Deploymentspec = deploymentToDeploymentSpec(deployment)
 	resp, err := rt.k8sRequest("POST", "/apis/extensions/v1beta1/namespaces/"+deployment.Space+"/deployments", dp)
-	fmt.Println(string(resp.Body))
 	if err != nil {
 		return err
 	}
