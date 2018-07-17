@@ -744,7 +744,7 @@ type SecurityContext struct {
 	RunAsUser              int  `json:"runAsUser,omitempty"`
 	Capabilities           struct {
 		Add []string `json:"add,omitempty"`
-	} `json:"capabilites,omitempty"`
+	} `json:"capabilities,omitempty"`
 }
 
 type VolumeMounts struct {
