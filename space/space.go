@@ -236,6 +236,9 @@ func getSpace(db *sql.DB, space string) (s structs.Spacespec, e error) {
 	if err != nil {
 		return spaceobject, err
 	}
+	spaceobject.Name = space
+	spaceobject.Internal = internal
+	spaceobject.Stack = stack
 	return spaceobject, nil
 }
 
