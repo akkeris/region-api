@@ -233,7 +233,7 @@ func getSpace(db *sql.DB, space string) (s structs.Spacespec, e error) {
 	var internal bool
 	var stack string
 	var compliancetags string
-	err := db.QueryRow("select internal, COALESCE(compliancetags, '') as compliancetags, stack from spaces where name = $1", space).Scan(&internal, compliancetags, &stack)
+	err := db.QueryRow("select internal, COALESCE(compliancetags, '') as compliancetags, stack from spaces where name = $1", space).Scan(&internal, &compliancetags, &stack)
 	if err != nil {
 		return spaceobject, err
 	}
