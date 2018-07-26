@@ -153,6 +153,7 @@ type S3spec struct {
 	S3bucket    string `json:"S3_BUCKET"`
 	S3accesskey string `json:"S3_ACCESS_KEY"`
 	S3secretkey string `json:"S3_SECRET_KEY"`
+	S3region string `json:"S3_REGION"`
 	Spec        string `json:"spec"`
 }
 
