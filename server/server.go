@@ -52,6 +52,33 @@ func ProxyToSession(res http.ResponseWriter, req *http.Request) {
 	rp.ServeHTTP(res, req)
 }
 
+
+func ProxyToInfluxDb(res http.ResponseWriter, req *http.Request) {
+	uri, err := url.Parse(os.Getenv("INFLUXDB_URL"))
+	if err != nil {
+		log.Println("Error: Unable to proxy to influxdb")
+		log.Println(err)
+		return
+	}
+	log.Println("Proxying influxdb to", uri)
+	rp := httputil.NewSingleHostReverseProxy(uri)
+	rp.FlushInterval = time.Duration(200) * time.Millisecond
+	rp.ServeHTTP(res, req)
+}
+
+func ProxyToPrometheus(res http.ResponseWriter, req *http.Request) {
+	uri, err := url.Parse(os.Getenv("PROMETHEUS_URL"))
+	if err != nil {
+		log.Println("Error: Unable to proxy to influxdb")
+		log.Println(err)
+		return
+	}
+	log.Println("Proxying prometheus metrics to", uri)
+	rp := httputil.NewSingleHostReverseProxy(uri)
+	rp.FlushInterval = time.Duration(200) * time.Millisecond
+	rp.ServeHTTP(res, req)
+}
+
 func Server() *martini.ClassicMartini {
 	m := martini.Classic()
 	m.Use(render.Renderer())
@@ -293,6 +320,18 @@ func Server() *martini.ClassicMartini {
 		m.Get("/log-sessions/:id", ProxyToSession)
 	} else {
 		log.Println("No LOGSESSION_SERVICE_HOST and LOGSESSION_SERVICE_PORT environment variables found, log session functionality was disabled.")
+	}
+	// proxy influxdb
+	if os.Getenv("INFLUXDB_URL") != "" {
+		m.Get("/query**", ProxyToInfluxDb)
+	} else {
+		log.Println("No INFLUXDB_URL environment variables found, influx metrics functionality was disabled.")
+	}
+	// proxy prometheus
+	if os.Getenv("PROMETHEUS_URL") != "" {
+		m.Get("/api/v1/query_range**", ProxyToPrometheus)
+	} else {
+		log.Println("No PROMETHEUS_URL environment variables found, prometheus metrics functionality was disabled.")
 	}
 
 	if os.Getenv("ENABLE_AUTH") == "true" {
