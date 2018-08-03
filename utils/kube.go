@@ -1,15 +1,15 @@
 package utils
 
 import (
-	"net/http"
 	"database/sql"
-	structs "../structs"
-	runtime "../runtime"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/render"
+	"net/http"
+	runtime "region-api/runtime"
+	structs "region-api/structs"
 )
 
-// These are raw kubernetes interfaces for 
+// These are raw kubernetes interfaces for
 // additional information needed by other apis
 // or for debug/maintenance reasons, these should
 // not be used for adding or removing resources
@@ -66,7 +66,6 @@ func GetServices(db *sql.DB, params martini.Params, r render.Render) {
 	r.JSON(http.StatusOK, list)
 }
 
-
 func GetService(db *sql.DB, params martini.Params, r render.Render) {
 	space := params["space"]
 	app := params["app"]
@@ -93,7 +92,7 @@ func GetKubeSystemPods(db *sql.DB, params martini.Params, r render.Render) {
 
 	list := []runtime.PodStatusItems{}
 	for _, rt := range rts {
-		podStatus, err := rt.GetPodsBySpace("kube-system") 
+		podStatus, err := rt.GetPodsBySpace("kube-system")
 		if err != nil {
 			ReportError(err, r)
 			return
@@ -123,7 +122,6 @@ func GetKubeSystemPods(db *sql.DB, params martini.Params, r render.Render) {
 	r.JSON(msg.Status, msg)
 }
 
-
 func GetNodes(db *sql.DB, params martini.Params, r render.Render) {
 	rts, err := runtime.GetAllRuntimes(db)
 	if err != nil {
@@ -140,5 +138,5 @@ func GetNodes(db *sql.DB, params martini.Params, r render.Render) {
 		list = append(list, nodes.Items...)
 	}
 
-	r.JSON(200, structs.KubeNodes{Kind:"NodeList", APIVersion:"v1", Items:list})
+	r.JSON(200, structs.KubeNodes{Kind: "NodeList", APIVersion: "v1", Items: list})
 }

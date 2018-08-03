@@ -1,14 +1,15 @@
 package service
 
 import (
-	structs "../structs"
-	utils "../utils"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"net/http"
 	"os"
-	"errors"
+	structs "region-api/structs"
+	utils "region-api/utils"
+
 	"github.com/bitly/go-simplejson"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/binding"
@@ -143,11 +144,11 @@ func Getesurl(params martini.Params, r render.Render) {
 		return
 	}
 	es.Spec = "es:" + servicename
-        if (resp.StatusCode==503){
-             if resp.Header.Get("x-ignore-errors") == "true"{
-                 r.Header().Add("x-ignore-errors", "true")
-             }
-        }
+	if resp.StatusCode == 503 {
+		if resp.Header.Get("x-ignore-errors") == "true" {
+			r.Header().Add("x-ignore-errors", "true")
+		}
+	}
 	r.JSON(resp.StatusCode, es)
 }
 

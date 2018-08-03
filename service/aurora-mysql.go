@@ -1,13 +1,13 @@
 package service
 
 import (
-	structs "../structs"
-	utils "../utils"
 	"bytes"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
 	"os"
+	structs "region-api/structs"
+	utils "region-api/utils"
 	"strings"
 	"errors"
 	"github.com/bitly/go-simplejson"

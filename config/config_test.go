@@ -1,8 +1,6 @@
 package config
 
 import (
-	"../structs"
-	"../utils"
 	"bytes"
 	"database/sql"
 	"encoding/json"
@@ -14,6 +12,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"region-api/structs"
+	"region-api/utils"
 	"testing"
 )
 

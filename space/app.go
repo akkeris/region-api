@@ -1,15 +1,15 @@
 package space
 
 import (
-	structs "../structs"
-	utils "../utils"
-	runtime "../runtime"
 	"database/sql"
-	"log"
-	"net/http"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
+	"log"
+	"net/http"
+	runtime "region-api/runtime"
+	structs "region-api/structs"
+	utils "region-api/utils"
 )
 
 func AddApp(db *sql.DB, params martini.Params, spaceapp structs.Spaceappspec, berr binding.Errors, r render.Render) {
@@ -32,7 +32,7 @@ func AddApp(db *sql.DB, params martini.Params, spaceapp structs.Spaceappspec, be
 		utils.ReportError(inserterr, r)
 		return
 	}
-	r.JSON(http.StatusCreated, structs.Messagespec{Status:http.StatusCreated, Message:"app added to space"})
+	r.JSON(http.StatusCreated, structs.Messagespec{Status: http.StatusCreated, Message: "app added to space"})
 }
 
 func UpdateAppPlan(db *sql.DB, params martini.Params, spaceapp structs.Spaceappspec, berr binding.Errors, r render.Render) {
@@ -48,7 +48,7 @@ func UpdateAppPlan(db *sql.DB, params martini.Params, spaceapp structs.Spaceapps
 		utils.ReportError(err, r)
 		return
 	}
-	r.JSON(http.StatusOK, structs.Messagespec{Status:http.StatusOK, Message:"App: " + appname + "updated to use " + spaceapp.Plan + " plan"})
+	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: "App: " + appname + "updated to use " + spaceapp.Plan + " plan"})
 }
 
 func UpdateAppHealthCheck(db *sql.DB, params martini.Params, spaceapp structs.Spaceappspec, berr binding.Errors, r render.Render) {
@@ -70,7 +70,7 @@ func UpdateAppHealthCheck(db *sql.DB, params martini.Params, spaceapp structs.Sp
 		utils.ReportError(err, r)
 		return
 	}
-	r.JSON(http.StatusOK, structs.Messagespec{Status:http.StatusOK, Message:"App: " + appname + " updated to use " + spaceapp.Healthcheck + " healthcheck"})
+	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: "App: " + appname + " updated to use " + spaceapp.Healthcheck + " healthcheck"})
 }
 
 func DeleteAppHealthCheck(db *sql.DB, params martini.Params, r render.Render) {
@@ -83,14 +83,14 @@ func DeleteAppHealthCheck(db *sql.DB, params martini.Params, r render.Render) {
 		utils.ReportError(err, r)
 		return
 	}
-	r.JSON(http.StatusOK, structs.Messagespec{Status:http.StatusOK, Message:"App: " + appname + " healthcheck removed"})
+	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: "App: " + appname + " healthcheck removed"})
 }
 
 func DeleteApp(db *sql.DB, params martini.Params, r render.Render) {
 	appname := params["app"]
 	space := params["space"]
 
-	rt, err := runtime.GetRuntimeFor(db, space);
+	rt, err := runtime.GetRuntimeFor(db, space)
 	if err != nil {
 		utils.ReportError(err, r)
 		return
@@ -123,7 +123,7 @@ func DeleteApp(db *sql.DB, params martini.Params, r render.Render) {
 	} else {
 		log.Println("Error getting replica sets:", err)
 	}
-	
+
 	var podlist []string
 	podlist, err = rt.GetPods(space, appname)
 	// in a previous iteration we ignored the error, i'll do so here
@@ -144,13 +144,13 @@ func DeleteApp(db *sql.DB, params martini.Params, r render.Render) {
 		utils.ReportError(err, r)
 		return
 	}
-	
+
 	_, err = db.Exec("DELETE from spacesapps where space=$1 and appname=$2", space, appname)
 	if err != nil {
 		utils.ReportError(err, r)
 		return
 	}
-	r.JSON(http.StatusOK, structs.Messagespec{Status:http.StatusOK, Message:appname + " removed"})
+	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: appname + " removed"})
 }
 
 func ScaleApp(db *sql.DB, params martini.Params, spaceapp structs.Spaceappspec, berr binding.Errors, r render.Render) {
@@ -180,5 +180,5 @@ func ScaleApp(db *sql.DB, params martini.Params, spaceapp structs.Spaceappspec, 
 		utils.ReportError(err, r)
 		return
 	}
-	r.JSON(http.StatusAccepted, structs.Messagespec{Status:http.StatusAccepted, Message:"instances updated"})
+	r.JSON(http.StatusAccepted, structs.Messagespec{Status: http.StatusAccepted, Message: "instances updated"})
 }

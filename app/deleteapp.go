@@ -1,12 +1,12 @@
 package app
 
 import (
-	structs "../structs"
-	utils "../utils"
 	"database/sql"
-	"net/http"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/render"
+	"net/http"
+	structs "region-api/structs"
+	utils "region-api/utils"
 )
 
 //Deleteapp centralized
@@ -15,7 +15,7 @@ func Deleteapp(db *sql.DB, params martini.Params, r render.Render) {
 	var space string
 	err := db.QueryRow("select space from spacesapps where appname = $1", appname).Scan(&space)
 	if err == nil && space != "" {
-		utils.ReportInvalidRequest("application still exists in spaces: " + space, r)
+		utils.ReportInvalidRequest("application still exists in spaces: "+space, r)
 		return
 	}
 	_, err = db.Exec("DELETE from apps where name=$1", appname)
@@ -23,5 +23,5 @@ func Deleteapp(db *sql.DB, params martini.Params, r render.Render) {
 		utils.ReportError(err, r)
 		return
 	}
-	r.JSON(http.StatusOK, structs.Messagespec{Status:http.StatusOK, Message:appname + " deleted"})
+	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: appname + " deleted"})
 }

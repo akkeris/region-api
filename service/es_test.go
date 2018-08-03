@@ -1,8 +1,6 @@
 package service
 
 import (
-	"../structs"
-	"../utils"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -13,6 +11,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"region-api/structs"
+	"region-api/utils"
 	"testing"
 )
 

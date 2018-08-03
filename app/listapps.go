@@ -1,12 +1,12 @@
 package app
 
 import (
-	structs "../structs"
-	utils "../utils"
 	"database/sql"
-	"net/http"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/render"
+	"net/http"
+	structs "region-api/structs"
+	utils "region-api/utils"
 )
 
 //Listapps centralized
@@ -28,5 +28,5 @@ func Listapps(db *sql.DB, params martini.Params, r render.Render) {
 		utils.ReportError(err, r)
 		return
 	}
-	r.JSON(http.StatusOK, structs.Applist{Apps:applist})
+	r.JSON(http.StatusOK, structs.Applist{Apps: applist})
 }

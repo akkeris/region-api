@@ -2,9 +2,9 @@ package app
 
 import (
 	"database/sql"
-	"../utils"
 	"net/http"
-	runtime "../runtime"
+	runtime "region-api/runtime"
+	"region-api/utils"
 
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/render"
@@ -15,8 +15,8 @@ func GetAppLogs(db *sql.DB, params martini.Params, r render.Render) {
 	app := params["appname"]
 	space := params["space"]
 	instance := params["instanceid"]
-	
-	rt, err := runtime.GetRuntimeFor(db, space);
+
+	rt, err := runtime.GetRuntimeFor(db, space)
 	if err != nil {
 		utils.ReportError(err, r)
 		return

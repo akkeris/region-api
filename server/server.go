@@ -1,35 +1,35 @@
 package server
 
 import (
-	"../app"
-	"../certs"
-	"../config"
-	"../features"
-	"../jobs"
-	"../monitor"
-	"../router"
-	"../service"
-	"../space"
-	"../structs"
-	"../templates"
-	"../utils"
-	"../vault"
-	"../maintenance"
 	"database/sql"
-	"os"
+	"github.com/go-martini/martini"
+	"github.com/martini-contrib/auth"
+	"github.com/martini-contrib/binding"
+	"github.com/martini-contrib/render"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
+	"region-api/app"
+	"region-api/certs"
+	"region-api/config"
+	"region-api/features"
+	"region-api/jobs"
+	"region-api/maintenance"
+	"region-api/monitor"
+	"region-api/router"
+	"region-api/service"
+	"region-api/space"
+	"region-api/structs"
+	"region-api/templates"
+	"region-api/utils"
+	"region-api/vault"
 	"time"
-	"github.com/go-martini/martini"
-	"github.com/martini-contrib/auth"
-	"github.com/martini-contrib/binding"
-	"github.com/martini-contrib/render"
 )
 
-func ProxyToShuttle(res http.ResponseWriter, req *http.Request) { 
+func ProxyToShuttle(res http.ResponseWriter, req *http.Request) {
 	uri, err := url.Parse("http://" + os.Getenv("LOGSHUTTLE_SERVICE_HOST") + ":" + os.Getenv("LOGSHUTTLE_SERVICE_PORT"))
 	if err != nil {
 		log.Println("Error: Unable to proxy to log shuttle")
@@ -39,7 +39,7 @@ func ProxyToShuttle(res http.ResponseWriter, req *http.Request) {
 	log.Println("Proxying to", uri)
 	httputil.NewSingleHostReverseProxy(uri).ServeHTTP(res, req)
 }
-func ProxyToSession(res http.ResponseWriter, req *http.Request) { 
+func ProxyToSession(res http.ResponseWriter, req *http.Request) {
 	uri, err := url.Parse("http://" + os.Getenv("LOGSESSION_SERVICE_HOST") + ":" + os.Getenv("LOGSESSION_SERVICE_PORT"))
 	if err != nil {
 		log.Println("Error: Unable to proxy to log session")
@@ -48,7 +48,7 @@ func ProxyToSession(res http.ResponseWriter, req *http.Request) {
 	}
 	log.Println("Proxying to", uri)
 	rp := httputil.NewSingleHostReverseProxy(uri)
-	rp.FlushInterval = time.Duration(200)*time.Millisecond
+	rp.FlushInterval = time.Duration(200) * time.Millisecond
 	rp.ServeHTTP(res, req)
 }
 
@@ -146,12 +146,12 @@ func Server() *martini.ClassicMartini {
 	m.Get("/v2/services/postgres/:servicename/roles/:role", service.GetPostgresRoleV2)
 	m.Get("/v2/services/postgres/:servicename", service.GetPostgresV2)
 
-	m.Get(   "/v1/service/mongodb/plans", service.GetmongodbplansV1)
-	m.Post(  "/v1/service/mongodb/instance", binding.Json(structs.Provisionspec{}), service.ProvisionmongodbV1)
-	m.Get(   "/v1/service/mongodb/url/:servicename", service.GetmongodburlV1)
+	m.Get("/v1/service/mongodb/plans", service.GetmongodbplansV1)
+	m.Post("/v1/service/mongodb/instance", binding.Json(structs.Provisionspec{}), service.ProvisionmongodbV1)
+	m.Get("/v1/service/mongodb/url/:servicename", service.GetmongodburlV1)
 	m.Delete("/v1/service/mongodb/instance/:servicename", service.DeletemongodbV1)
-	m.Get(   "/v1/service/mongodb/:servicename", service.GetmongodbV1)
-	m.Get(   "/v1/service/mongodb/instance/:servicename", service.GetmongodbV1)
+	m.Get("/v1/service/mongodb/:servicename", service.GetmongodbV1)
+	m.Get("/v1/service/mongodb/instance/:servicename", service.GetmongodbV1)
 
 	m.Get("/v1/service/aurora-mysql/plans", service.Getauroramysqlplans)
 	m.Get("/v1/service/aurora-mysql/url/:servicename", service.Getauroramysqlurl)
@@ -222,7 +222,7 @@ func Server() *martini.ClassicMartini {
 	m.Get("/v1/router/:router", router.DescribeRouter)
 	m.Post("/v1/router", binding.Json(structs.Routerspec{}), router.CreateRouter)
 	m.Post("/v1/router/:router/path", binding.Json(structs.Routerpathspec{}), router.AddPath)
-	m.Delete("/v1/router/:router/path",binding.Json(structs.Routerpathspec{}), router.DeletePath)
+	m.Delete("/v1/router/:router/path", binding.Json(structs.Routerpathspec{}), router.DeletePath)
 
 	m.Put("/v1/router/:router/path", binding.Json(structs.Routerpathspec{}), router.UpdatePath)
 	m.Put("/v1/router/:router", router.PushRouter)
@@ -277,7 +277,6 @@ func Server() *martini.ClassicMartini {
 	m.Get("/v1/utils/nodes", utils.GetNodes)
 	m.Get("/v1/utils/urltemplates", templates.GetURLTemplates)
 
-
 	// proxy to log shuttle
 	if os.Getenv("LOGSHUTTLE_SERVICE_HOST") != "" && os.Getenv("LOGSHUTTLE_SERVICE_PORT") != "" {
 		m.Get("/apps/:app_key/log-drains", ProxyToShuttle)
@@ -289,7 +288,7 @@ func Server() *martini.ClassicMartini {
 		log.Println("No LOGSHUTTLE_SERVICE_HOST and LOGSHUTTLE_SERVICE_PORT environment variables found, log shuttle functionality was disabled.")
 	}
 	// proxy to log session
-	if os.Getenv("LOGSESSION_SERVICE_HOST") != "" && os.Getenv("LOGSESSION_SERVICE_PORT") != ""{
+	if os.Getenv("LOGSESSION_SERVICE_HOST") != "" && os.Getenv("LOGSESSION_SERVICE_PORT") != "" {
 		m.Post("/log-sessions", ProxyToSession)
 		m.Get("/log-sessions/:id", ProxyToSession)
 	} else {
@@ -306,10 +305,13 @@ func Server() *martini.ClassicMartini {
 func CreateDB(db *sql.DB) {
 	buf, err := ioutil.ReadFile("./create.sql")
 	if err != nil {
-		buf, err = ioutil.ReadFile("../create.sql")
+		buf, err = ioutil.ReadFile("region-api/create.sql")
 		if err != nil {
-			log.Println("Error: Unable to run migration scripts, could not load create.sql.")
-			log.Fatalln(err)
+			buf, err = ioutil.ReadFile("../create.sql")
+			if err != nil {
+				log.Println("Error: Unable to run migration scripts, could not load create.sql.")
+				log.Fatalln(err)
+			}
 		}
 	}
 	_, err = db.Query(string(buf))
@@ -318,7 +320,7 @@ func CreateDB(db *sql.DB) {
 		log.Fatalln(err)
 	}
 
-	// This will inspect the stacks, if we have environment variables for a stack and 
+	// This will inspect the stacks, if we have environment variables for a stack and
 	// one does not exist in our database we'll create a record for it.
 	var defaultStack = "ds1"
 	if os.Getenv("DEFAULT_STACK") != "" {
@@ -343,7 +345,7 @@ func CreateDB(db *sql.DB) {
 		if authType == "token" {
 			os.Getenv("KUBERNETES_TOKEN_SECRET")
 		}
-		_, err := db.Exec("insert into stacks (stack, description, api_server, api_version, image_pull_secret, auth_type, auth_vault_path) values ($1, $2, $3, $4, $5, $6, $7) on conflict (stack) do nothing", 
+		_, err := db.Exec("insert into stacks (stack, description, api_server, api_version, image_pull_secret, auth_type, auth_vault_path) values ($1, $2, $3, $4, $5, $6, $7) on conflict (stack) do nothing",
 			defaultStack, "", os.Getenv("KUBERNETES_API_SERVER"), os.Getenv("KUBERNETES_API_VERSION"), os.Getenv("KUBERNETES_IMAGE_PULL_SECRET"), authType, authPath)
 		if err != nil {
 			log.Println("Error: Unable to insert default kubernetes stack.")

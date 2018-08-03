@@ -1,18 +1,18 @@
 package space
 
 import (
-	structs "../structs"
-	utils "../utils"
 	"database/sql"
 	"encoding/json"
-	"io/ioutil"
-	"net/http"
-	"os"
-	"strings"
-	runtime "../runtime"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
+	"io/ioutil"
+	"net/http"
+	"os"
+	runtime "region-api/runtime"
+	structs "region-api/structs"
+	utils "region-api/utils"
+	"strings"
 )
 
 func UpdateSpaceTags(db *sql.DB, space structs.Spacespec, berr binding.Errors, r render.Render) {
@@ -24,7 +24,7 @@ func UpdateSpaceTags(db *sql.DB, space structs.Spacespec, berr binding.Errors, r
 		space.ComplianceTags = strings.Replace(space.ComplianceTags, ",", "-", -1)
 	}
 	space.ComplianceTags = strings.Replace(space.ComplianceTags, " ", "", -1)
-	
+
 	rt, err := runtime.GetRuntimeFor(db, space.Name)
 	if err != nil {
 		utils.ReportError(err, r)
@@ -41,7 +41,7 @@ func UpdateSpaceTags(db *sql.DB, space structs.Spacespec, berr binding.Errors, r
 		utils.ReportError(err, r)
 		return
 	}
-	r.JSON(http.StatusCreated, structs.Messagespec{Status:http.StatusCreated, Message:"space updated"})
+	r.JSON(http.StatusCreated, structs.Messagespec{Status: http.StatusCreated, Message: "space updated"})
 }
 
 func Createspace(db *sql.DB, space structs.Spacespec, berr binding.Errors, r render.Render) {
@@ -49,7 +49,7 @@ func Createspace(db *sql.DB, space structs.Spacespec, berr binding.Errors, r ren
 		utils.ReportInvalidRequest(berr[0].Message, r)
 		return
 	}
-	
+
 	if space.Name == "kube-system" || space.Name == "default" || space.Name == "kube-public" || space.Name == "akkeris" {
 		utils.ReportInvalidRequest("The space name is invalid or reserved keywords", r)
 		return
@@ -67,7 +67,7 @@ func Createspace(db *sql.DB, space structs.Spacespec, berr binding.Errors, r ren
 			space.Stack = "ds1"
 		}
 	}
-	
+
 	// this must happen before GetRuntimeFor.
 	_, err = addSpace(db, space)
 	if err != nil {
@@ -99,13 +99,13 @@ func Createspace(db *sql.DB, space structs.Spacespec, berr binding.Errors, r ren
 		utils.ReportError(err, r)
 		return
 	}
-	
+
 	err = rt.AddImagePullSecretToSpace(space.Name)
 	if err != nil {
 		utils.ReportError(err, r)
 		return
 	}
-	r.JSON(http.StatusCreated, structs.Messagespec{Status:http.StatusCreated, Message:"space created"})
+	r.JSON(http.StatusCreated, structs.Messagespec{Status: http.StatusCreated, Message: "space created"})
 }
 
 func Deletespace(db *sql.DB, params martini.Params, r render.Render) {
@@ -115,7 +115,7 @@ func Deletespace(db *sql.DB, params martini.Params, r render.Render) {
 		utils.ReportInvalidRequest("The space was blank or invalid.", r)
 		return
 	}
-	
+
 	rt, err := runtime.GetRuntimeFor(db, space)
 	if err != nil {
 		utils.ReportError(err, r)
@@ -125,7 +125,7 @@ func Deletespace(db *sql.DB, params martini.Params, r render.Render) {
 	_, err = getSpace(db, space)
 	if err != nil {
 		if err.Error() == "sql: no rows in result set" {
-			r.JSON(http.StatusNotFound, structs.Messagespec{Status:http.StatusNotFound, Message:"The specified space does not exist"})
+			r.JSON(http.StatusNotFound, structs.Messagespec{Status: http.StatusNotFound, Message: "The specified space does not exist"})
 			return
 		} else {
 			utils.ReportError(err, r)
@@ -138,9 +138,9 @@ func Deletespace(db *sql.DB, params martini.Params, r render.Render) {
 		utils.ReportError(err, r)
 		return
 	}
-	
+
 	if len(pods.Items) != 0 {
-		r.JSON(http.StatusConflict, structs.Messagespec{Status:http.StatusConflict, Message:"The space cannot be deleted as it still has pods in it."})
+		r.JSON(http.StatusConflict, structs.Messagespec{Status: http.StatusConflict, Message: "The space cannot be deleted as it still has pods in it."})
 		return
 	}
 
@@ -152,7 +152,7 @@ func Deletespace(db *sql.DB, params martini.Params, r render.Render) {
 	}
 
 	if appsCount > 0 {
-		r.JSON(http.StatusConflict, structs.Messagespec{Status:http.StatusConflict, Message:"The space cannot be deleted as it still has apps in it."})
+		r.JSON(http.StatusConflict, structs.Messagespec{Status: http.StatusConflict, Message: "The space cannot be deleted as it still has apps in it."})
 		return
 	}
 
@@ -169,7 +169,7 @@ func Deletespace(db *sql.DB, params martini.Params, r render.Render) {
 		return
 	}
 
-	r.JSON(http.StatusOK, structs.Messagespec{Status:http.StatusOK, Message:"space deleted"})
+	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: "space deleted"})
 }
 
 func getQuayPullSecret(datacenter string) (vs structs.Vaultsecretspec, err error) {
@@ -208,17 +208,17 @@ func addSpace(db *sql.DB, space structs.Spacespec) (msg structs.Messagespec, err
 	}
 
 	if inserterr != nil {
-		return structs.Messagespec{Status:http.StatusInternalServerError, Message:inserterr.Error()}, inserterr
+		return structs.Messagespec{Status: http.StatusInternalServerError, Message: inserterr.Error()}, inserterr
 	}
 
-	return structs.Messagespec{Status:http.StatusOK, Message:"Created space"}, nil
+	return structs.Messagespec{Status: http.StatusOK, Message: "Created space"}, nil
 }
 
 func Space(db *sql.DB, params martini.Params, r render.Render) {
 	space, err := getSpace(db, params["space"])
 	if err != nil {
 		if err.Error() == "sql: no rows in result set" {
-			r.JSON(http.StatusNotFound, structs.Messagespec{Status:http.StatusNotFound, Message:"The specified space does not exist"})
+			r.JSON(http.StatusNotFound, structs.Messagespec{Status: http.StatusNotFound, Message: "The specified space does not exist"})
 			return
 		} else {
 			utils.ReportError(err, r)
@@ -232,10 +232,15 @@ func getSpace(db *sql.DB, space string) (s structs.Spacespec, e error) {
 	var spaceobject structs.Spacespec
 	var internal bool
 	var stack string
-	err := db.QueryRow("select internal, stack from spaces where name = $1", space).Scan(&internal, &stack)
+	var compliancetags string
+	err := db.QueryRow("select internal, COALESCE(compliancetags, '') as compliancetags, stack from spaces where name = $1", space).Scan(&internal, &compliancetags, &stack)
 	if err != nil {
 		return spaceobject, err
 	}
+	spaceobject.Name = space
+	spaceobject.Internal = internal
+	spaceobject.ComplianceTags = compliancetags
+	spaceobject.Stack = stack
 	return spaceobject, nil
 }
 

@@ -1,18 +1,18 @@
 package service
 
 import (
-	structs "../structs"
-	utils "../utils"
 	"bytes"
 	"encoding/json"
-	"io/ioutil"
-	"net/http"
-	"os"
 	"errors"
 	"github.com/bitly/go-simplejson"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
+	"io/ioutil"
+	"net/http"
+	"os"
+	structs "region-api/structs"
+	utils "region-api/utils"
 )
 
 //Tags3 centralized
@@ -88,11 +88,13 @@ func Provisions3(spec structs.Provisionspec, berr binding.Errors, r render.Rende
 	s3bucket, _ := bodyj.Get("S3_BUCKET").String()
 	s3accesskey, _ := bodyj.Get("S3_ACCESS_KEY").String()
 	s3secretkey, _ := bodyj.Get("S3_SECRET_KEY").String()
+	s3region, _ := bodyj.Get("S3_REGION").String()
 	toreturn := make(map[string]interface{})
 	toreturn["S3_LOCATION"] = s3url
 	toreturn["S3_ACCESS_KEY"] = s3accesskey
 	toreturn["S3_SECRET_KEY"] = s3secretkey
 	toreturn["S3_BUCKET"] = s3bucket
+	toreturn["S3_REGION"] = s3region
 	toreturn["spec"] = "s3:" + s3bucket
 
 	r.JSON(201, toreturn)
