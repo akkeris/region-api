@@ -332,6 +332,8 @@ func DeleteRouter(db *sql.DB, params martini.Params, r render.Render) {
 		utils.ReportError(err, r)
 		return
 	}
+        removeDNSRecord(db, domain)
+
 	msg.Status = 200
 	msg.Message = "Router Deleted"
 	r.JSON(msg.Status, msg)
