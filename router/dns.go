@@ -26,7 +26,7 @@ func addDNSRecord(db *sql.DB, domain string) {
 	}
 
 	svc := route53.New(session.New(&aws.Config{
-		Region: aws.String("us-west-2"),
+		Region: aws.String(os.Getenv("REGION")),
 	}))
 	params := &route53.ListHostedZonesByNameInput{
 		DNSName:  aws.String(os.Getenv("DOMAIN_NAME")),
@@ -111,7 +111,7 @@ func removeDNSRecord(db *sql.DB, domain string) {
         }
 
         svc := route53.New(session.New(&aws.Config{
-                Region: aws.String("us-west-2"),
+                Region: aws.String(os.Getenv("REGION")),
         }))
         params := &route53.ListHostedZonesByNameInput{
                 DNSName:  aws.String(os.Getenv("DOMAIN_NAME")),
