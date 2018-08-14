@@ -24,8 +24,6 @@ func DescribeRouters(db *sql.DB, params martini.Params, r render.Render) {
 	}
 	var routers []structs.Routerspec
 	for _, element := range list {
-		fmt.Println(element)
-
 		var spec structs.Routerspec
 		spec.Domain = element
 		internal, err := IsInternalRouter(db, element)
@@ -138,10 +136,6 @@ func AddPath(db *sql.DB, spec structs.Routerpathspec, berr binding.Errors, r ren
 	}
 
 	var msg structs.Messagespec
-	fmt.Println(spec.Path)
-	fmt.Println(spec.Space)
-	fmt.Println(spec.App)
-	fmt.Println(spec.ReplacePath)
 	spec.App = strings.Replace(spec.App, "-"+spec.Space, "", -1)
 	msg, err = addPath(spec, db)
 	if err != nil {
@@ -184,9 +178,6 @@ func DeletePath(db *sql.DB, params martini.Params, spec structs.Routerpathspec, 
 	}
 
 	var msg structs.Messagespec
-	fmt.Println(path)
-	fmt.Println(domain)
-
 	msg, err := deletePath(domain, path, db)
 	if err != nil {
 		fmt.Println(err)
@@ -231,7 +222,6 @@ func CreateRouter(db *sql.DB, spec structs.Routerspec, berr binding.Errors, r re
 		spec.Internal = false
 	}
 	var msg structs.Messagespec
-	fmt.Println(spec.Domain)
 	msg, err := createRouter(spec, db)
 	if err != nil {
 		fmt.Println(err)
@@ -243,8 +233,6 @@ func CreateRouter(db *sql.DB, spec structs.Routerspec, berr binding.Errors, r re
 
 func createRouter(spec structs.Routerspec, db *sql.DB) (m structs.Messagespec, err error) {
 	var msg structs.Messagespec
-	fmt.Println(spec.Domain)
-
 	newrouteriduuid, _ := uuid.NewV4()
 	newrouterid := newrouteriduuid.String()
 
@@ -395,11 +383,6 @@ func UpdatePath(db *sql.DB, spec structs.Routerpathspec, berr binding.Errors, r 
 		return
 	}
 	var msg structs.Messagespec
-	fmt.Println(spec.Path)
-	fmt.Println(spec.Space)
-	fmt.Println(spec.App)
-	fmt.Println(spec.ReplacePath)
-
 	msg, err := updatePath(spec, db)
 	if err != nil {
 		fmt.Println(err)

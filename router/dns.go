@@ -41,30 +41,20 @@ func addDNSRecord(db *sql.DB, domain string) {
 
 	for _, element := range resp.HostedZones {
 		if *element.Config.PrivateZone {
-			fmt.Println(*element.Id)
 			paramschange := addRecordSet(*element.Id, domain, internalip)
-			respchange, err := svc.ChangeResourceRecordSets(paramschange)
-
+			_, err := svc.ChangeResourceRecordSets(paramschange)
 			if err != nil {
 				fmt.Println(err)
 				return
 			}
-
-			fmt.Println(respchange)
-
 		}
 		if !*element.Config.PrivateZone && !isinternal {
-			fmt.Println(*element.Id)
 			paramschange := addRecordSet(*element.Id, domain, externalip)
-			respchange, err := svc.ChangeResourceRecordSets(paramschange)
-
+			_, err := svc.ChangeResourceRecordSets(paramschange)
 			if err != nil {
 				fmt.Println(err)
 				return
 			}
-
-			fmt.Println(respchange)
-
 		}
 	}
 
