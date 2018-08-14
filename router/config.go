@@ -286,7 +286,6 @@ func PushRouter(db *sql.DB, params martini.Params, r render.Render) {
 func pushRouter(db *sql.DB, r structs.Routerspec) (m structs.Messagespec, e error) {
 	msg, err := UpdateF5(r, db)
 	return msg, err
-
 }
 
 func DeleteRouter(db *sql.DB, params martini.Params, r render.Render) {

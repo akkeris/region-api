@@ -92,6 +92,9 @@ func (f5 F5Client) Request(method string, path string, payload interface{}) (r *
 		}
 	} else {
 		req, err = http.NewRequest(strings.ToUpper(method), f5.Url + path, nil)
+		if err != nil {
+			return nil, err
+		}
 	}
 	req.Header.Add("X-F5-Auth-Token", f5.Token)
 	req.Header.Add("Content-Type", "application/json")
