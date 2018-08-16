@@ -27,6 +27,7 @@ import (
 	"text/template"
 	"sync"
 	"log"
+	"time"
 )
 
 
@@ -36,6 +37,11 @@ type F5Request struct {
 	Body       []byte
 }
 
+type f5creds struct {
+	Username          string `json:"username"`
+	Password          string `json:"password"`
+	LoginProviderName string `json:"loginProviderName"`
+}
 
 type F5Client struct {
 	Url 		string
@@ -74,7 +80,7 @@ func LeadingZero(num int) string {
 }
 
 
-func (f5 F5Client) Request(method string, path string, payload interface{}) (r *F5Request, err error) {
+func (f5 *F5Client) Request(method string, path string, payload interface{}) (r *F5Request, err error) {
 	var req *http.Request
 	var body string
 	if payload != nil {
@@ -95,6 +101,9 @@ func (f5 F5Client) Request(method string, path string, payload interface{}) (r *
 		if err != nil {
 			return nil, err
 		}
+	}
+	if f5.Token == "" {
+		return nil, fmt.Errorf("The f5 client is not yet ready or has an empty token.")
 	}
 	req.Header.Add("X-F5-Auth-Token", f5.Token)
 	req.Header.Add("Content-Type", "application/json")
@@ -118,6 +127,18 @@ func (f5 F5Client) Request(method string, path string, payload interface{}) (r *
 		}
 		return nil, err
 	}
+	if resp.StatusCode == 401 {
+		// Wait a second (or two), then retry the request, but only if were able to successfully
+		// get a new token. Do not allow anyone to use the connection in the meantime.
+		f5.mutex.Lock()
+		time.Sleep(2 * time.Second)
+		f5.mutex.Unlock()
+		if err := f5.getToken(); err != nil {
+			fmt.Printf("** FATAL ERROR ** Unable to obtain token in NewF5Client: %s\n", err.Error())
+			return nil, err
+		}
+		return f5.Request(method, path, payload)
+	}
 	if resp.StatusCode > 299 || resp.StatusCode < 200 {
 		err = fmt.Errorf("%s (%d)", resp.Status, resp.StatusCode)
 		if f5.Debug {
@@ -131,10 +152,40 @@ func (f5 F5Client) Request(method string, path string, payload interface{}) (r *
 	return &F5Request{Body: respBody, Status: resp.Status, StatusCode: resp.StatusCode}, nil
 }
 
-type f5creds struct {
-	Username          string `json:"username"`
-	Password          string `json:"password"`
-	LoginProviderName string `json:"loginProviderName"`
+func (f5 *F5Client) getToken() error {
+	str, err := json.Marshal(f5creds{Username:f5.Username, Password:f5.Password, LoginProviderName:"tmos"})
+	if err != nil {
+		log.Printf("Error creating new F5 client, unable to marshal data: %s\n", err.Error())
+		return err
+	}
+	req, err := http.NewRequest("POST", f5.Url + "/mgmt/shared/authn/login", bytes.NewBuffer([]byte(string(str))))
+	req.Header.Add("Authorization", "Basic " + base64.StdEncoding.EncodeToString([]byte(f5.Username + ":" + f5.Password)))
+	req.Header.Add("Content-Type", "application/json")
+	f5.mutex.Lock()
+	resp, err := f5.client.Do(req)
+	defer f5.mutex.Unlock()
+	if err != nil {
+		log.Printf("Error creating new F5 client, unable to login to F5: %s\n", err.Error())
+		return err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		err = fmt.Errorf("Login returned %s", resp.Status)
+		log.Printf("Error creating new F5 client, unable to login to F5: %s\n", err.Error())
+		return err
+	}
+	defer resp.Body.Close()
+	bodyj, err := simplejson.NewFromReader(resp.Body)
+	if err != nil {
+		log.Printf("Error creating new F5 client, unable to unmarshal response: %s\n", err.Error())
+		return err
+	}
+	token, err := bodyj.Get("token").Get("token").String()
+	if err != nil {
+		log.Printf("Error creating new F5 client, unable to find token field in login response: %s\n", err.Error())
+		return err
+	}
+	f5.Token = token
+	return nil
 }
 
 func NewF5Client(url string, username string, password string) (*F5Client, error) {
@@ -147,7 +198,7 @@ func NewF5Client(url string, username string, password string) (*F5Client, error
 	if password == "" {
 		return nil, fmt.Errorf("F5 password was undefined or blank.")
 	}
-	var f5 F5Client
+	f5 := &F5Client{}
 	f5.mutex = &sync.Mutex{}
 	f5.Debug = os.Getenv("DEBUG_F5") == "true"
 	f5.Username = username
@@ -156,37 +207,11 @@ func NewF5Client(url string, username string, password string) (*F5Client, error
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}}
 	f5.Url = url
-	str, err := json.Marshal(f5creds{Username:username, Password:password, LoginProviderName:"tmos"})
-	if err != nil {
-		log.Printf("Error creating new F5 client, unable to marshal data: %s\n", err.Error())
+	if err := f5.getToken(); err != nil {
+		fmt.Printf("** FATAL ERROR ** Unable to obtain token in NewF5Client: %s\n", err.Error())
 		return nil, err
 	}
-	req, err := http.NewRequest("POST", f5.Url + "/mgmt/shared/authn/login", bytes.NewBuffer([]byte(string(str))))
-	req.Header.Add("Authorization", "Basic " + base64.StdEncoding.EncodeToString([]byte(username + ":" + password)))
-	req.Header.Add("Content-Type", "application/json")
-	resp, err := f5.client.Do(req)
-	if err != nil {
-		log.Printf("Error creating new F5 client, unable to login to F5: %s\n", err.Error())
-		return nil, err
-	}
-	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		err = fmt.Errorf("Login returned %s", resp.Status)
-		log.Printf("Error creating new F5 client, unable to login to F5: %s\n", err.Error())
-		return nil, err
-	}
-	defer resp.Body.Close()
-	bodyj, err := simplejson.NewFromReader(resp.Body)
-	if err != nil {
-		log.Printf("Error creating new F5 client, unable to unmarshal response: %s\n", err.Error())
-		return nil, err
-	}
-	token, err := bodyj.Get("token").Get("token").String()
-	if err != nil {
-		log.Printf("Error creating new F5 client, unable to find token field in login response: %s\n", err.Error())
-		return nil, err
-	}
-	f5.Token = token
-	return &f5, nil
+	return f5, nil
 }
 
 var f5Client *F5Client = nil;
@@ -618,7 +643,7 @@ func getRules(partition string, virtual string) ([]string, error) {
 	}
 	res, err := f5.Request("get", "/mgmt/tm/ltm/rule?$filter=partition+eq+" + partition, nil)
 	if err != nil {
-		log.Printf("Unable to getRlues from F5 (http call failed): %s\n", err.Error())
+		log.Printf("Unable to getRules from F5 (http call failed): %s\n", err.Error())
 		return []string{}, err
 	}
 	type Rulesitems struct {
@@ -627,7 +652,7 @@ func getRules(partition string, virtual string) ([]string, error) {
 	var ruleso Rulesitems
 	err = json.Unmarshal([]byte(res.Body), &ruleso)
 	if err != nil {
-		log.Printf("Unable to getRlues from F5 (marshal failed): %s\n", err.Error())
+		log.Printf("Unable to getRules from F5 (marshal failed): %s\n", err.Error())
 		return []string{}, err
 	}
 	var elements []string
