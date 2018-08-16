@@ -13,6 +13,7 @@ import (
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
 	"github.com/nu7hatch/gouuid"
+	"log"
 )
 
 func DescribeRouters(db *sql.DB, params martini.Params, r render.Render) {
