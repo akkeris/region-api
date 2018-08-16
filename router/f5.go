@@ -400,10 +400,17 @@ func DeleteF5(router structs.Routerspec, db *sql.DB) (m structs.Messagespec, e e
 		log.Printf("Unable to delete F5 router (detachRule failed): %s\n", err.Error())
 		return msg, err
 	}
-	msg, err = deleteRule(rule.Name, partition, virtual)
+	exists, err := ruleExists(router)
 	if err != nil {
-		log.Printf("Unable to delete F5 router (deleteRule failed): %s\n", err.Error())
+		log.Printf("Unable to delete F5 router (ruleExists failed): %s\n", err.Error())
 		return msg, err
+	}
+	if exists {
+		msg, err = deleteRule(rule.Name, partition, virtual)
+		if err != nil {
+			log.Printf("Unable to delete F5 router (deleteRule failed): %s\n", err.Error())
+			return msg, err
+		}
 	}
 	msg.Status = 200
 	msg.Message = "Removed from F5"
