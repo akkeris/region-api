@@ -13,7 +13,6 @@ import (
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
 	"github.com/nu7hatch/gouuid"
-	"log"
 )
 
 func DescribeRouters(db *sql.DB, params martini.Params, r render.Render) {
@@ -265,9 +264,9 @@ func PushRouter(db *sql.DB, params martini.Params, r render.Render) {
 	router.Internal = isinternal
 	if len(pathspecs) == 0 {
 		msg, err := DeleteF5(router, db)
-		// we don't care if we can't delete the f5 route if there are no paths.
-		if err != nil && err.Error() != "404 Not Found (404)" {
-			log.Printf("Warning: Failed to delete F5 router with no paths, %s\n", err)
+		if err != nil {
+			utils.ReportError(err, r)
+			return
 		}
 		msg.Status = 200
 		msg.Message = "Router Updated"
@@ -306,7 +305,7 @@ func DeleteRouter(db *sql.DB, params martini.Params, r render.Render) {
 		return
 	}
 	spec.Internal = isinternal
-	msg, err := deleteRouter(db, spec)
+	msg, err := DeleteF5(spec, db)
 	if err != nil {
 		utils.ReportError(err, r)
 		return
@@ -356,12 +355,6 @@ func deletePaths(db *sql.DB, domain string) (m structs.Messagespec, e error) {
 	return msg, nil
 }
 
-func deleteRouter(db *sql.DB, router structs.Routerspec) (m structs.Messagespec, e error) {
-
-	msg, err := DeleteF5(router, db)
-	return msg, err
-}
-
 func UpdatePath(db *sql.DB, spec structs.Routerpathspec, berr binding.Errors, r render.Render) {
 	if berr != nil {
 		utils.ReportInvalidRequest(berr[0].Message, r)
@@ -394,11 +387,8 @@ func UpdatePath(db *sql.DB, spec structs.Routerpathspec, berr binding.Errors, r 
 }
 
 func updatePath(spec structs.Routerpathspec, db *sql.DB) (m structs.Messagespec, e error) {
-
 	var msg structs.Messagespec
-
 	var path string
-
 	err := db.QueryRow("UPDATE routerpaths set space=$1, app=$2, replacepath=$3  where domain=$4 and path=$5 returning path;", spec.Space, spec.App, spec.ReplacePath, spec.Domain, spec.Path).Scan(&path)
 	if err != nil {
 		fmt.Println(err)
@@ -408,7 +398,6 @@ func updatePath(spec structs.Routerpathspec, db *sql.DB) (m structs.Messagespec,
 	}
 	msg.Status = 201
 	msg.Message = "Path Updated"
-
 	return msg, nil
 }
 
