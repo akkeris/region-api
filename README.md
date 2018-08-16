@@ -84,7 +84,8 @@ Set the following environment variables, if this is first time running it see th
 * S3_BROKER_URL - todo, get brokers to register with alamo-api, otherwise this is the host of the broker
 * ES_BROKER_URL - todo, get brokers to register with alamo-api, otherwise this is the host of the broker
 * POSTGRESONPREM_BROKER_URL - todo, get brokers to register with alamo-api, otherwise this is the host of the broker
-
+* INFLUXDB_URL - The influx DB url to retrieve http metrics and other custom app data
+* PROMETHEUS_URL - The prometheus DB url to retrieve metrics pod data for apps
 
 **Optional Environment Variables:**
 
@@ -97,6 +98,7 @@ Set the following environment variables, if this is first time running it see th
 **Debugging Environment Variables:**
 
 * DEBUG_K8S - print out all k8s calls, set to true
+* DEBUG_F5 - print out all f5 calls, set to true
 * MARTINI_ENV
 
 

@@ -25,49 +25,26 @@ import (
 	"strconv"
 	"strings"
 	"text/template"
+	"sync"
+	"log"
 )
 
-type f5creds struct {
-	Username          string `json:"username"`
-	Password          string `json:"password"`
-	LoginProviderName string `json:"loginProviderName"`
+
+type F5Request struct {
+	Status     string
+	StatusCode int
+	Body       []byte
 }
 
-var creds f5creds
-var Client *http.Client
-var F5url string
-var F5token string
-var f5auth string
 
-func getF5Credentials() (f5creds, error) {
-	var c f5creds
-	f5secret := os.Getenv("F5_SECRET")
-	F5url = vault.GetField(f5secret, "url")
-	vaulttoken := os.Getenv("VAULT_TOKEN")
-	vaultaddr := os.Getenv("VAULT_ADDR")
-	vaultaddruri := vaultaddr + "/v1/" + f5secret
-	vreq, err := http.NewRequest("GET", vaultaddruri, nil)
-	vreq.Header.Add("X-Vault-Token", vaulttoken)
-	vclient := &http.Client{}
-	vresp, err := vclient.Do(vreq)
-	if err != nil {
-		fmt.Println("Unable to get vault secret:")
-		fmt.Println(err)
-		return c, err
-	}
-	defer vresp.Body.Close()
-	bodyj, err := simplejson.NewFromReader(vresp.Body)
-	if err != nil {
-		fmt.Println("Unable to parse vault secret:")
-		fmt.Println(err)
-		return c, err
-	}
-	f5username, _ := bodyj.Get("data").Get("username").String()
-	f5password, _ := bodyj.Get("data").Get("password").String()
-	c.Username = f5username
-	c.Password = f5password
-	c.LoginProviderName = "tmos"
-	return c, nil
+type F5Client struct {
+	Url 		string
+	Token 		string
+	Username    string
+	Password    string
+	Debug		bool
+	mutex       *sync.Mutex
+	client      *http.Client
 }
 
 type LBClientSsl struct {
@@ -94,6 +71,186 @@ func LeadingZero(num int) string {
 	} else {
 		return strconv.Itoa(num)
 	}
+}
+
+
+func (f5 F5Client) Request(method string, path string, payload interface{}) (r *F5Request, err error) {
+	var req *http.Request
+	var body string
+	if payload != nil {
+		body, err := json.Marshal(payload)
+		if err != nil {
+			if f5.Debug {
+				log.Printf("** f5: invalid payload/body supplied: %s %s - %s\n", method, f5.Url + path, err)
+			}
+			return nil, err
+		}
+		body = bytes.Replace(body, []byte("\\u003e"), []byte(">"), -1)
+		req, err = http.NewRequest(strings.ToUpper(method), f5.Url + path, bytes.NewReader(body))
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		req, err = http.NewRequest(strings.ToUpper(method), f5.Url + path, nil)
+		if err != nil {
+			return nil, err
+		}
+	}
+	req.Header.Add("X-F5-Auth-Token", f5.Token)
+	req.Header.Add("Content-Type", "application/json")
+	if f5.Debug {
+		log.Printf("-> f5: %s %s with headers [%s] with payload [%s]\n", method, f5.Url + path, req.Header, body)
+	}
+	f5.mutex.Lock()
+	resp, err := f5.client.Do(req)
+	f5.mutex.Unlock()
+	if err != nil {
+		if f5.Debug {
+			log.Printf("<- f5 ERROR: %s %s - %s\n", method, f5.Url + path, err)
+		}
+		return nil, err
+	}
+	defer resp.Body.Close()
+	respBody, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		if f5.Debug {
+			log.Printf("<- f5 ERROR: %s %s - %s\n", method, f5.Url + path, err)
+		}
+		return nil, err
+	}
+	if resp.StatusCode > 299 || resp.StatusCode < 200 {
+		err = fmt.Errorf("%s (%d)", resp.Status, resp.StatusCode)
+		if f5.Debug {
+			log.Printf("<- f5 ERROR: %s %s - %s\n", method, f5.Url + path, err)
+		}
+		return nil, err
+	}
+	if f5.Debug {
+		log.Printf("<- f5: %s %s - %s\n", method, f5.Url + path, resp.Status)
+	}
+	return &F5Request{Body: respBody, Status: resp.Status, StatusCode: resp.StatusCode}, nil
+}
+
+type f5creds struct {
+	Username          string `json:"username"`
+	Password          string `json:"password"`
+	LoginProviderName string `json:"loginProviderName"`
+}
+
+func NewF5Client(url string, username string, password string) (*F5Client, error) {
+	if url == "" {
+		return nil, fmt.Errorf("F5 url was undefined or blank.")
+	}
+	if username == "" {
+		return nil, fmt.Errorf("F5 username was undefined or blank.")
+	}
+	if password == "" {
+		return nil, fmt.Errorf("F5 password was undefined or blank.")
+	}
+	var f5 F5Client
+	f5.mutex = &sync.Mutex{}
+	f5.Debug = os.Getenv("DEBUG_F5") == "true"
+	f5.Username = username
+	f5.Password = password
+	f5.client = &http.Client{Transport: &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}}
+	f5.Url = url
+	str, err := json.Marshal(f5creds{Username:username, Password:password, LoginProviderName:"tmos"})
+	if err != nil {
+		log.Printf("Error creating new F5 client, unable to marshal data: %s\n", err.Error())
+		return nil, err
+	}
+	req, err := http.NewRequest("POST", f5.Url + "/mgmt/shared/authn/login", bytes.NewBuffer([]byte(string(str))))
+	req.Header.Add("Authorization", "Basic " + base64.StdEncoding.EncodeToString([]byte(username + ":" + password)))
+	req.Header.Add("Content-Type", "application/json")
+	resp, err := f5.client.Do(req)
+	if err != nil {
+		log.Printf("Error creating new F5 client, unable to login to F5: %s\n", err.Error())
+		return nil, err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		err = fmt.Errorf("Login returned %s", resp.Status)
+		log.Printf("Error creating new F5 client, unable to login to F5: %s\n", err.Error())
+		return nil, err
+	}
+	defer resp.Body.Close()
+	bodyj, err := simplejson.NewFromReader(resp.Body)
+	if err != nil {
+		log.Printf("Error creating new F5 client, unable to unmarshal response: %s\n", err.Error())
+		return nil, err
+	}
+	token, err := bodyj.Get("token").Get("token").String()
+	if err != nil {
+		log.Printf("Error creating new F5 client, unable to find token field in login response: %s\n", err.Error())
+		return nil, err
+	}
+	f5.Token = token
+	return &f5, nil
+}
+
+var f5Client *F5Client = nil;
+
+func GetClient() (*F5Client, error) {
+	if f5Client != nil {
+		return f5Client, nil
+	}
+	f5secret := os.Getenv("F5_SECRET")
+	if f5secret == "" {
+		err := fmt.Errorf("no F5_SECRET was found in environment.")
+		log.Printf("Error initializing F5 client: %s\n", err.Error())
+		return nil, err
+	}
+	f5url := vault.GetField(f5secret, "url")
+	if f5url == "" {
+		err := fmt.Errorf("F5 Url was not in vault or blank.")
+		log.Printf("Error initializing F5 client: %s\n", err.Error())
+		return nil, err
+	}
+	vaulttoken := os.Getenv("VAULT_TOKEN")
+	if vaulttoken == "" {
+		err := fmt.Errorf("VAULT_TOKEN was blank or does not exist")
+		log.Printf("Error initializing F5 client: %s\n", err.Error())
+		return nil, err
+	}
+	vaultaddr := os.Getenv("VAULT_ADDR")
+	if vaulttoken == "" {
+		err := fmt.Errorf("VAULT_ADDR was blank or does not exist")
+		log.Printf("Error initializing F5 client: %s\n", err.Error())
+		return nil, err
+	}
+	vaultaddruri := vaultaddr + "/v1/" + f5secret
+	vreq, err := http.NewRequest("GET", vaultaddruri, nil)
+	vreq.Header.Add("X-Vault-Token", vaulttoken)
+	vclient := &http.Client{}
+	vresp, err := vclient.Do(vreq)
+	if err != nil {
+		log.Printf("Error initializing F5 client, unable to get vault secret: %s\n", err.Error())
+		return nil, err
+	}
+	defer vresp.Body.Close()
+	bodyj, err := simplejson.NewFromReader(vresp.Body)
+	if err != nil {
+		log.Printf("Error initializing F5 client, unable to read vault secret: %s\n", err.Error())
+		return nil, err
+	}
+	f5username, err := bodyj.Get("data").Get("username").String()
+	if err != nil {
+		log.Printf("Error initializing F5 client, unable to read f5 username: %s\n", err.Error())
+		return nil, err
+	}
+	f5password, err := bodyj.Get("data").Get("password").String()
+	if err != nil {
+		log.Printf("Error initializing F5 client, unable to read f5 password: %s\n", err.Error())
+		return nil, err
+	}
+	f5c, err := NewF5Client(f5url, f5username, f5password)
+	if err != nil {
+		log.Printf("Error initializing F5 client: %s\n", err.Error())
+		return nil, err
+	}
+	f5Client = f5c
+	return f5Client, nil
 }
 
 func InstallNewCert(partition string, vip string, pem_cert []byte, pem_key []byte) error {
@@ -134,8 +291,8 @@ func InstallNewCert(partition string, vip string, pem_cert []byte, pem_key []byt
 	main_server_name := strings.Replace(x509_decoded_cert.Subject.CommonName, "*.", "star.", -1)
 	main_certs_name := main_server_name + "_" + LeadingZero(x509_decoded_cert.NotAfter.Year()) + LeadingZero(int(x509_decoded_cert.NotAfter.Month())) + LeadingZero(x509_decoded_cert.NotAfter.Day())
 
-	startClient()
-	device := f5client.New(strings.Replace(F5url, "https://", "", 1), creds.Username, creds.Password, f5client.BASIC_AUTH)
+	f5, err := GetClient()
+	device := f5client.New(strings.Replace(f5.Url, "https://", "", 1), f5.Username, f5.Password, f5client.BASIC_AUTH)
 	//device.SetDebug(true)
 
 	// Upload certificate and key to F5
@@ -228,24 +385,24 @@ func InstallNewCert(partition string, vip string, pem_cert []byte, pem_key []byt
 
 func DeleteF5(router structs.Routerspec, db *sql.DB) (m structs.Messagespec, e error) {
 	var msg structs.Messagespec
-	startClient()
 	partition, virtual, err := getF5pv(router)
-	fmt.Println("Partition: " + partition)
-	fmt.Println("Virtual:" + virtual)
-
 	if err != nil {
-		fmt.Println(err)
+		log.Printf("Unable to delete F5 router (getF5pv failed): %s\n", err.Error())
 		return msg, err
 	}
-	rule := buildRule(router, partition, virtual, db)
+	rule, err := buildRule(router, partition, virtual, db)
+	if err != nil {
+		log.Printf("Unable to delete F5 router (buildRule failed): %s\n", err.Error())
+		return msg, err
+	}
 	msg, err = detachRule(rule.Name, partition, virtual)
 	if err != nil {
-		fmt.Println(err)
+		log.Printf("Unable to delete F5 router (detachRule failed): %s\n", err.Error())
 		return msg, err
 	}
 	msg, err = deleteRule(rule.Name, partition, virtual)
 	if err != nil {
-		fmt.Println(err)
+		log.Printf("Unable to delete F5 router (deleteRule failed): %s\n", err.Error())
 		return msg, err
 	}
 	msg.Status = 200
@@ -254,204 +411,150 @@ func DeleteF5(router structs.Routerspec, db *sql.DB) (m structs.Messagespec, e e
 }
 
 func UpdateF5(router structs.Routerspec, db *sql.DB) (m structs.Messagespec, e error) {
-	fmt.Println(router.Domain)
-	fmt.Println(router.Paths)
 	var msg structs.Messagespec
-	startClient()
 	partition, virtual, err := getF5pv(router)
-	fmt.Println("THIS IS THE PARITION: " + partition)
-	fmt.Println("THIS IS THE VIRTUAL: " + virtual)
 	if err != nil {
-		fmt.Println(err)
+		log.Printf("Unable to update F5 router (getF5pv failed): %s\n", err.Error())
 		return msg, err
 	}
-	rule := buildRule(router, partition, virtual, db)
-	ruleexists := ruleExists(router)
+	rule, err := buildRule(router, partition, virtual, db)
+	if err != nil {
+		log.Printf("Unable to update F5 router (buildRule failed): %s\n", err.Error())
+		return msg, err	
+	}
+	ruleexists, err := ruleExists(router)
+	if err != nil {
+		log.Printf("Unable to update F5 router (ruleExists failed): %s\n", err.Error())
+		return msg, err	
+	}
 	if ruleexists {
-		updateRule(rule)
+		err = updateRule(rule)
+		if err != nil {
+			log.Printf("Unable to update F5 router (updateRule failed): %s\n", err.Error())
+			return msg, err	
+		}
+	} else {
+		err = addRule(rule)
+		if err != nil {
+			log.Printf("Unable to update F5 router (addRule failed): %s\n", err.Error())
+			return msg, err	
+		}
 	}
-	if !ruleexists {
-		addRule(rule)
+	ruleattached, err := ruleAttached(router, partition, virtual)
+	if err != nil {
+		log.Printf("Unable to update F5 router (ruleAttached failed): %s\n", err.Error())
+		return msg, err
 	}
-	ruleattached := ruleAttached(router, partition, virtual)
 	if !ruleattached {
-		attachRule(rule, partition, virtual)
+		err = attachRule(rule, partition, virtual)
+		if err != nil {
+			log.Printf("Unable to update F5 router (attachRule failed): %s\n", err.Error())
+			return msg, err
+		}
 	}
 	return msg, nil
 }
 
-func startClient() {
-	var err error
-	creds, err = getF5Credentials()
+func addRule(rule structs.Rulespec) (error) {
+	f5, err := GetClient()
 	if err != nil {
-		// error already reported.
-		return
+		log.Printf("Unable to addRule F5 router (GetClient failed): %s\n", err.Error())
+		return err
 	}
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	Client = &http.Client{Transport: tr}
-	data := []byte(creds.Username + ":" + creds.Password)
-	dstr := base64.StdEncoding.EncodeToString(data)
-	f5auth = "Basic " + dstr
-	str, err := json.Marshal(creds)
+	_, err = f5.Request("post", "/mgmt/tm/ltm/rule", rule)
 	if err != nil {
-		fmt.Println("Error preparing request for f5:")
-		fmt.Println(err)
-		return
+		log.Printf("Unable to addRule to the F5 (http call failed): %s\n", err.Error())
+		return err
 	}
-	jsonStr := []byte(string(str))
-	urlStr := F5url + "/mgmt/shared/authn/login"
-	req, err := http.NewRequest("POST", urlStr, bytes.NewBuffer(jsonStr))
-	req.Header.Add("Authorization", f5auth)
-	req.Header.Add("Content-Type", "application/json")
-	resp, err := Client.Do(req)
-	if err != nil {
-		fmt.Println("Unable to make f5 login request:")
-		fmt.Println(err)
-	}
-	defer resp.Body.Close()
-	bodyj, _ := simplejson.NewFromReader(resp.Body)
-	F5token, _ = bodyj.Get("token").Get("token").String()
+	return nil
 }
 
-func addRule(rule structs.Rulespec) {
-	fmt.Println(rule.Name)
-	fmt.Println(rule.Partition)
-	fmt.Println(rule.ApiAnonymous)
-
-	str, err := json.Marshal(rule)
+func updateRule(rule structs.Rulespec) (error) {
+	f5, err := GetClient()
 	if err != nil {
-		fmt.Println("Error preparing request")
+		log.Printf("Unable to updateRule F5 router (GetClient failed): %s\n", err.Error())
+		return err
 	}
-	str = bytes.Replace(str, []byte("\\u003e"), []byte(">"), -1)
-	jsonStr := []byte(string(str))
-	fmt.Println(string(str))
-	urlStr := F5url + "/mgmt/tm/ltm/rule"
-	req, _ := http.NewRequest("POST", urlStr, bytes.NewBuffer(jsonStr))
-	req.Header.Add("X-F5-Auth-Token", F5token)
-	req.Header.Add("Content-Type", "application/json")
-	resp, err := Client.Do(req)
+	_, err = f5.Request("patch", "/mgmt/tm/ltm/rule/~" + rule.Partition + "~" + rule.Name, rule)
 	if err != nil {
-		fmt.Println(err)
+		log.Printf("Unable to addRule to the F5 (http call failed): %s\n", err.Error())
+		return err
 	}
-	defer resp.Body.Close()
-	fmt.Println(resp)
-	bodyj, _ := simplejson.NewFromReader(resp.Body)
-	fmt.Println(bodyj)
+	return nil
 }
 
-func updateRule(rule structs.Rulespec) {
-
-	fmt.Println(rule.Name)
-	fmt.Println(rule.Partition)
-	fmt.Println(rule.ApiAnonymous)
-
-	str, err := json.Marshal(rule)
+func attachRule(rule structs.Rulespec, partition string, virtual string) (error) {
+	f5, err := GetClient()
 	if err != nil {
-		fmt.Println("Error preparing request")
+		log.Printf("Unable to attachRule to the F5 router (GetClient failed): %s\n", err.Error())
+		return err
 	}
-	str = bytes.Replace(str, []byte("\\u003e"), []byte(">"), -1)
-	jsonStr := []byte(string(str))
-	fmt.Println(string(str))
-	urlStr := F5url + "/mgmt/tm/ltm/rule/~" + rule.Partition + "~" + rule.Name
-	req, _ := http.NewRequest("PATCH", urlStr, bytes.NewBuffer(jsonStr))
-	req.Header.Add("X-F5-Auth-Token", F5token)
-	req.Header.Add("Content-Type", "application/json")
-	resp, err := Client.Do(req)
+	rules, err := getRulesAttached(partition, virtual)
 	if err != nil {
-		fmt.Println(err)
+		log.Printf("Unable to attachRule to the F5 (getRulesAttached failed): %s\n", err.Error())
+		return err
 	}
-	defer resp.Body.Close()
-	fmt.Println(resp)
-	bodyj, _ := simplejson.NewFromReader(resp.Body)
-	fmt.Println(bodyj)
-
+	rules = append(rules, "/" + partition + "/" + rule.Name)
+	_, err = f5.Request("patch", "/mgmt/tm/ltm/virtual/~" + partition + "~" + virtual, structs.Virtualspec{Rules:rules})
+	if err != nil {
+		log.Printf("Unable to addRule to the F5 (http call failed): %s\n", err.Error())
+		return err
+	}
+	return nil
 }
 
-func attachRule(rule structs.Rulespec, partition string, virtual string) {
-	rules := getRulesAttached(partition, virtual)
-	rules = append(rules, "/"+partition+"/"+rule.Name)
-	fmt.Println(rules)
-	var virtualo structs.Virtualspec
-	virtualo.Rules = rules
-	fmt.Println(virtualo)
-
-	str, err := json.Marshal(virtualo)
-	if err != nil {
-		fmt.Println("Error preparing request")
-	}
-	jsonStr := []byte(string(str))
-	fmt.Println(string(str))
-	urlStr := F5url + "/mgmt/tm/ltm/virtual/~" + partition + "~" + virtual
-	req, _ := http.NewRequest("PATCH", urlStr, bytes.NewBuffer(jsonStr))
-	req.Header.Add("X-F5-Auth-Token", F5token)
-	req.Header.Add("Content-Type", "application/json")
-	resp, err := Client.Do(req)
-	if err != nil {
-		fmt.Println(err)
-	}
-	defer resp.Body.Close()
-	fmt.Println(resp)
-	bodyj, _ := simplejson.NewFromReader(resp.Body)
-	fmt.Println(bodyj)
-
-}
-
-func ruleExists(router structs.Routerspec) bool {
-	var toreturn bool
-	toreturn = false
+func ruleExists(router structs.Routerspec) (bool, error) {
+	var exists bool = false
 	partition, virtual, err := getF5pv(router)
 	if err != nil {
-		toreturn = false
+		log.Printf("Unable to run ruleExists to the F5 (getF5pv failed): %s\n", err.Error())
+		return false, err
 	}
-	rules := getRules(partition, virtual)
-	for _, element := range rules {
-		fmt.Println(element)
-		if element == router.Domain+"-rule" {
-			toreturn = true
-		}
-
+	rules, err := getRules(partition, virtual)
+	if err != nil {
+		log.Printf("Unable to run ruleExists to the F5 (getRules failed): %s\n", err.Error())
+		return false, err
 	}
-
-	return toreturn
-}
-
-func ruleAttached(router structs.Routerspec, partition string, virtual string) bool {
-
-	rules := getRulesAttached(partition, virtual)
-	fmt.Println(rules)
-	var toreturn bool
-	toreturn = false
 	for _, element := range rules {
-		if element == "/"+partition+"/"+router.Domain+"-rule" {
-			toreturn = true
+		if element == router.Domain + "-rule" {
+			exists = true
 		}
 	}
-	return toreturn
+	return exists, nil
 }
 
-func buildRule(router structs.Routerspec, partition string, virtual string, db *sql.DB) structs.Rulespec {
-	var rule structs.Rulespec
-	rule.Name = router.Domain + "-rule"
-	rule.Partition = partition
-	var ruleinfo structs.RuleInfo
-	ruleinfo.Domain = router.Domain
+func ruleAttached(router structs.Routerspec, partition string, virtual string) (bool, error) {
+	rules, err := getRulesAttached(partition, virtual)
+	if err != nil {
+		log.Printf("Unable to get ruleAttached to the F5 (http call failed): %s\n", err.Error())
+		return false, err
+	}
+	var isRuleAttached bool = false
+	for _, element := range rules {
+		if element == "/" + partition + "/" + router.Domain + "-rule" {
+			isRuleAttached = true
+		}
+	}
+	return isRuleAttached, nil
+}
+
+func buildRule(router structs.Routerspec, partition string, virtual string, db *sql.DB) (structs.Rulespec, error) {
+	var rule = structs.Rulespec{Name:router.Domain + "-rule", Partition:partition}
+	var ruleinfo = structs.RuleInfo{Domain:router.Domain}
 	var switches []structs.Switch
 	for _, element := range router.Paths {
 		var sw structs.Switch
 		if element.Space != "default" {
 			sw.Pool = element.App + "-" + element.Space + "-pool"
-		}
-		if element.Space == "default" {
+		} else {
 			sw.Pool = element.App + "-pool"
 		}
 		sw.Path = element.Path
 		sw.ReplacePath = element.ReplacePath
 		appurl, err := getAppUrl(element.App, element.Space, db)
 		if err != nil {
-			fmt.Println(err)
-			return rule
+			log.Printf("Unable to get app url while building rule: %s\n", err.Error())
+			return rule, err
 		}
 		sw.NewHost = appurl
 		switches = append(switches, sw)
@@ -463,134 +566,94 @@ func buildRule(router structs.Routerspec, partition string, virtual string, db *
 	wr := bufio.NewWriter(&b)
 	err := t.Execute(wr, ruleinfo)
 	if err != nil {
-		fmt.Println(err)
+		log.Printf("Unable to build rule from template: %s\n", err.Error())
+		return rule, err
 	}
 	wr.Flush()
-	fmt.Println(string(b.Bytes()))
-
-	/*
-		var pathswitches string
-		for _, element := range router.Paths {
-			if element.Space != "default" {
-				pathswitches = pathswitches + "\"" + element.Path + "*\"\n{\nHTTP::uri [string map -nocase {\"" + element.Path + "\" \"" + element.ReplacePath + "\"} [HTTP::uri]]\npool " + element.App + "-" + element.Space + "-pool}\n"
-
-				//       pathswitches = pathswitches+"\""+element.Path+"*\"\n{\nHTTP::uri [string map -nocase {\""+element.Path+"/\" \"/\" \""+element.Path+"\" \"/\"} [HTTP::uri]]\npool "+element.App+"-"+element.Space+"-pool}\n"
-			}
-			if element.Space == "default" {
-				pathswitches = pathswitches + "\"" + element.Path + "*\"\n{\nHTTP::uri [string map -nocase {\"" + element.Path + "\" \"" + element.ReplacePath + "\"} [HTTP::uri]]\npool " + element.App + "-pool}\n"
-				//        pathswitches = pathswitches+"\""+element.Path+"*\"\n{\nHTTP::uri [string map -nocase {\""+element.Path+"/\" \"/\" \""+element.Path+"\" \"/\"} [HTTP::uri]]\npool "+element.App+"-pool}\n"
-			}
-		}
-
-		rule.ApiAnonymous = "when HTTP_REQUEST {\nswitch [string tolower [HTTP::host]] {\n\"" + router.Domain + "\" {\nswitch -glob [string tolower [HTTP::uri]]\n{\n" + pathswitches + "}\n}\n}\n}"
-	*/
 	rule.ApiAnonymous = string(b.Bytes())
-	fmt.Println(rule.ApiAnonymous)
-	fmt.Println(rule.Name)
-	return rule
+	return rule, nil
 }
 
-func getRulesAttached(partition string, virtual string) []string {
-	fmt.Println("getRulesAttached virutal " + virtual)
-	urlStr := F5url + "/mgmt/tm/ltm/virtual/~" + partition + "~" + virtual
-	req, _ := http.NewRequest("GET", urlStr, nil)
-	req.Header.Add("X-F5-Auth-Token", F5token)
-	req.Header.Add("Content-Type", "application/json")
-	resp, err := Client.Do(req)
+func getRulesAttached(partition string, virtual string) ([]string, error) {
+	f5, err := GetClient()
 	if err != nil {
-		fmt.Println(err)
+		log.Printf("Unable to getRulesAttached to the F5 router (GetClient failed): %s\n", err.Error())
+		return []string{}, err
 	}
-	defer resp.Body.Close()
-	fmt.Println(resp)
-	bodyj, _ := simplejson.NewFromReader(resp.Body)
-	fmt.Println(bodyj)
+	res, err := f5.Request("get", "/mgmt/tm/ltm/virtual/~" + partition + "~" + virtual, nil)
+	if err != nil {
+		log.Printf("Unable to getRulesAttached from the F5 (http call to F5 failed): %s\n", err.Error())
+		return []string{}, err
+	}
+	bodyj, err := simplejson.NewJson(res.Body)
+	if err != nil {
+		log.Printf("Unable to getRulesAttached from the F5 (response could not marshal): %s\n", err.Error())
+		return []string{}, err
+	}
 	var rulesa []string
-	rules, _ := bodyj.Get("rules").Array()
-	fmt.Println(rules)
+	rules, err := bodyj.Get("rules").Array()
+	if err != nil {
+		log.Printf("Unable to getRulesAttached from the F5 (response did not have rules): %s\n", err.Error())
+		return []string{}, err
+	}
 	for index, _ := range rules {
 		value := rules[index]
 		rulesa = append(rulesa, value.(string))
 	}
-	fmt.Println("finishing getRulesAttached")
-	return rulesa
-
+	return rulesa, nil
 }
 
-func getRules(partition string, virtual string) []string {
-	urlStr := F5url + "/mgmt/tm/ltm/rule?$filter=partition+eq+" + partition
-	req, _ := http.NewRequest("GET", urlStr, nil)
-	req.Header.Add("X-F5-Auth-Token", F5token)
-	req.Header.Add("Content-Type", "application/json")
-	resp, err := Client.Do(req)
+func getRules(partition string, virtual string) ([]string, error) {
+	f5, err := GetClient()
 	if err != nil {
-		fmt.Println(err)
+		log.Printf("Unable to getRules to the F5 router (GetClient failed): %s\n", err.Error())
+		return []string{}, err
 	}
-	defer resp.Body.Close()
-	fmt.Println(resp)
+	res, err := f5.Request("get", "/mgmt/tm/ltm/rule?$filter=partition+eq+" + partition, nil)
+	if err != nil {
+		log.Printf("Unable to getRlues from F5 (http call failed): %s\n", err.Error())
+		return []string{}, err
+	}
 	type Rulesitems struct {
 		Items []structs.Rulespec `json:"items"`
 	}
 	var ruleso Rulesitems
-	bodybytes, _ := ioutil.ReadAll(resp.Body)
-	err = json.Unmarshal(bodybytes, &ruleso)
+	err = json.Unmarshal([]byte(res.Body), &ruleso)
 	if err != nil {
-		fmt.Println(err)
+		log.Printf("Unable to getRlues from F5 (marshal failed): %s\n", err.Error())
+		return []string{}, err
 	}
-	fmt.Println(string(bodybytes))
-	fmt.Println(ruleso)
-	var toreturn []string
+	var elements []string
 	for _, element := range ruleso.Items {
-		toreturn = append(toreturn, element.Name)
+		elements = append(elements, element.Name)
 	}
-	return toreturn
+	return elements, nil
 
 }
 
 func detachRule(rule string, partition string, virtual string) (m structs.Messagespec, e error) {
 	var msg structs.Messagespec
-	rules := getRulesAttached(partition, virtual)
-	//    fmt.Println(rules)
+	rules, err := getRulesAttached(partition, virtual)
+	if err != nil {
+		log.Printf("Unable to detachRule from F5 (getRulesAttached failed): %s\n", err.Error())
+		return msg, err
+	}
+	f5, err := GetClient()
+	if err != nil {
+		log.Printf("Unable to detachRule to the F5 router (GetClient failed): %s\n", err.Error())
+		return msg, err
+	}
 	var newrules []string
 	for _, element := range rules {
 		if element != "/"+partition+"/"+rule {
 			newrules = append(newrules, element)
 		}
 	}
-	//    fmt.Println(newrules)
-	var virtualo structs.Virtualspec
-	virtualo.Rules = newrules
-	//    fmt.Println(virtualo)
-
-	str, err := json.Marshal(virtualo)
+	_, err = f5.Request("patch", "/mgmt/tm/ltm/virtual/~" + partition + "~" + virtual, structs.Virtualspec{Rules:newrules})
 	if err != nil {
-		fmt.Println("Error preparing request")
+		log.Printf("Untable to detachRule, http call to F5 failed: %s\n", err.Error())
 		return msg, err
 	}
-	jsonStr := []byte(string(str))
-	//    fmt.Println(string(str))
-	urlStr := F5url + "/mgmt/tm/ltm/virtual/~" + partition + "~" + virtual
-
-	req, _ := http.NewRequest("PATCH", urlStr, bytes.NewBuffer(jsonStr))
-	req.Header.Add("X-F5-Auth-Token", F5token)
-	req.Header.Add("Content-Type", "application/json")
-	resp, err := Client.Do(req)
-	if err != nil {
-		fmt.Println(err)
-		return msg, err
-	}
-	if resp.StatusCode == 200 {
-		fmt.Println("rule detached")
-	}
-	if resp.StatusCode != 200 {
-		output, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			fmt.Println(err)
-			return msg, err
-		}
-		fmt.Printf("%s", output)
-	}
-
-	resp.Body.Close()
 	msg.Status = 200
 	msg.Message = "Rule detached"
 	return msg, nil
@@ -598,31 +661,30 @@ func detachRule(rule string, partition string, virtual string) (m structs.Messag
 
 func deleteRule(rulename string, partition string, virtual string) (m structs.Messagespec, e error) {
 	var msg structs.Messagespec
-	newrulename := strings.Replace(rulename, "/", "~", -1)
-	newpartition := "~" + strings.Replace(partition, "/", "~", -1)
-	urlStr := F5url + "/mgmt/tm/ltm/rule/" + newpartition + "~" + newrulename
-	fmt.Println(urlStr)
-	req, _ := http.NewRequest("DELETE", urlStr, nil)
-	req.Header.Add("X-F5-Auth-Token", F5token)
-	req.Header.Add("Content-Type", "application/json")
-	resp, err := Client.Do(req)
+	f5, err := GetClient()
 	if err != nil {
-		fmt.Println(err)
+		log.Printf("Unable to detachRule to the F5 router (GetClient failed): %s\n", err.Error())
 		return msg, err
 	}
-	defer resp.Body.Close()
-	fmt.Println(resp)
-	if resp.StatusCode == 200 {
-		fmt.Println("Rule deleted")
-		msg.Status = 200
-		msg.Message = "Rule Deleted"
-	}
-	return msg, nil
 
+	newrulename := strings.Replace(rulename, "/", "~", -1)
+	newpartition := "~" + strings.Replace(partition, "/", "~", -1)
+
+	_, err = f5.Request("delete", "/mgmt/tm/ltm/rule/" + newpartition + "~" + newrulename, nil)
+	if err != nil {
+		log.Printf("Unable to deleteRule to the F5 router (http request failed): %s\n", err.Error())
+		return msg, err
+	}
+	msg.Status = 200
+	msg.Message = "Rule Deleted"
+	return msg, nil
 }
 
 func Octhc(params martini.Params, r render.Render) {
-	startClient()
+	_, err := GetClient()
+	if err != nil {
+		r.Text(200, "ERROR")
+	}
 	r.Text(200, "OK")
 }
 
@@ -637,28 +699,36 @@ func getF5pv(router structs.Routerspec) (p string, v string, e error) {
 		partition = os.Getenv("F5_PARTITION")
 		virtual = os.Getenv("F5_VIRTUAL")
 	}
+	if partition == "" {
+		return "", "", fmt.Errorf("Unable to find partition in environment.")
+	}
+	if virtual == "" {
+		return "", "", fmt.Errorf("Unable to find VIP (virtual) in environment.")
+	}
 	return partition, virtual, nil
 }
 
 func getAppUrl(app string, space string, db *sql.DB) (u string, e error) {
-	var toreturn string
 	externaldomain := os.Getenv("EXTERNAL_DOMAIN")
+	if externaldomain == "" {
+		log.Printf("Error getting app url for app %s and space %s because no EXTERNAL_DOMAIN was defined\n", app, space)
+		return "", fmt.Errorf("No EXTERNAL_DOMAIN was defined")
+	}
 	internaldomain := os.Getenv("INTERNAL_DOMAIN")
+	if externaldomain == "" {
+		log.Printf("Error getting app url for app %s and space %s because no INTERNAL_DOMAIN was defined\n", app, space)
+		return "", fmt.Errorf("No INTERNAL_DOMAIN was defined")
+	}
 	internal, err := spacepack.IsInternalSpace(db, space)
 	if err != nil {
-		fmt.Println(err)
-		return toreturn, err
+		log.Printf("Error getting app url for app %s and space %s becuase %s\n", app, space, err.Error())
+		return "", err
 	}
-
 	if internal {
-		toreturn = app + "-" + space + "." + internaldomain
+		return app + "-" + space + "." + internaldomain, nil
+	} else if space == "default" {
+		return app + "." + externaldomain, nil
+	} else {
+		return app + "-" + space + "." + externaldomain, nil
 	}
-	if !internal {
-
-		toreturn = app + "-" + space + "." + externaldomain
-		if space == "default" {
-			toreturn = app + "." + externaldomain
-		}
-	}
-	return toreturn, nil
 }

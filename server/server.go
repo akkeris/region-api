@@ -310,6 +310,10 @@ func Server() *martini.ClassicMartini {
 		m.Post("/apps/:app_key/log-drains", ProxyToShuttle)
 		m.Delete("/apps/:app_key/log-drains/:id", ProxyToShuttle)
 		m.Get("/apps/:app_key/log-drains/:id", ProxyToShuttle)
+		m.Get("/sites/:app_key/log-drains", ProxyToShuttle)
+		m.Post("/sites/:app_key/log-drains", ProxyToShuttle)
+		m.Delete("/sites/:app_key/log-drains/:id", ProxyToShuttle)
+		m.Get("/sites/:app_key/log-drains/:id", ProxyToShuttle)
 		m.Post("/log-events", ProxyToShuttle)
 	} else {
 		log.Println("No LOGSHUTTLE_SERVICE_HOST and LOGSHUTTLE_SERVICE_PORT environment variables found, log shuttle functionality was disabled.")
