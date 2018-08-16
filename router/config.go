@@ -13,6 +13,7 @@ import (
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
 	"github.com/nu7hatch/gouuid"
+	"log"
 )
 
 func DescribeRouters(db *sql.DB, params martini.Params, r render.Render) {
@@ -264,8 +265,9 @@ func PushRouter(db *sql.DB, params martini.Params, r render.Render) {
 	router.Internal = isinternal
 	if len(pathspecs) == 0 {
 		msg, err := DeleteF5(router, db)
-		if err != nil {
-			utils.ReportError(err, r)
+		// we don't care if we can't delete the f5 route if there are no paths.
+		if err != nil && err.Error() != "404 Not Found (404)" {
+			log.Printf("Warning: Failed to delete F5 router with no paths, %s\n", err)
 		}
 		msg.Status = 200
 		msg.Message = "Router Updated"
