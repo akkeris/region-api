@@ -3,7 +3,6 @@ package jobs
 import (
 	"database/sql"
 	"net/http"
-	"os"
 	app "region-api/app"
 	config "region-api/config"
 	runtime "region-api/runtime"
@@ -249,8 +248,6 @@ func DeployCronJob(db *sql.DB, params martini.Params, req structs.JobDeploy, ber
 		cmd      string
 		plan     string
 		schedule string
-		secrets  []structs.Namespec
-		secret   structs.Namespec
 	)
 
 	if berr != nil {
@@ -312,9 +309,6 @@ func DeployCronJob(db *sql.DB, params martini.Params, req structs.JobDeploy, ber
 		elist = append(elist, e)
 	}
 
-	// Image Secret
-	secret.Name = os.Getenv("KUBERNETES_IMAGE_PULL_SECRET")
-	secrets = append(secrets, secret)
 
 	// Create deployment
 	var deployment structs.Deployment
@@ -322,7 +316,6 @@ func DeployCronJob(db *sql.DB, params martini.Params, req structs.JobDeploy, ber
 	deployment.App = jobName
 	deployment.Amount = 1
 	deployment.ConfigVars = elist
-	deployment.Secrets = secrets
 	deployment.MemoryRequest = memoryRequest
 	deployment.MemoryLimit = memoryLimit
 	deployment.Image = repo
@@ -345,8 +338,6 @@ func UpdatedDeployedCronJob(db *sql.DB, params martini.Params, req structs.JobDe
 		cmd      string
 		plan     string
 		schedule string
-		secrets  []structs.Namespec
-		secret   structs.Namespec
 	)
 
 	if berr != nil {
@@ -411,17 +402,12 @@ func UpdatedDeployedCronJob(db *sql.DB, params martini.Params, req structs.JobDe
 		elist = append(elist, e)
 	}
 
-	// Image Secret
-	secret.Name = os.Getenv("KUBERNETES_IMAGE_PULL_SECRET")
-	secrets = append(secrets, secret)
-
 	// Create deployment
 	var deployment structs.Deployment
 	deployment.Space = space
 	deployment.App = jobName
 	deployment.Amount = 1
 	deployment.ConfigVars = elist
-	deployment.Secrets = secrets
 	deployment.MemoryRequest = memoryRequest
 	deployment.MemoryLimit = memoryLimit
 	deployment.Image = repo

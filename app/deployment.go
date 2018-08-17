@@ -148,12 +148,6 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 		elist = append(elist, e)
 	}
 
-	// Assemble secrets
-	var secrets []structs.Namespec
-	var secret structs.Namespec
-	secret.Name = os.Getenv("KUBERNETES_IMAGE_PULL_SECRET")
-	secrets = append(secrets, secret)
-
 	// Set revision history limit
 	var revisionhistorylimit int
 	revisionhistorylimit = 10
@@ -173,7 +167,6 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 	deployment.Port = finalport
 	deployment.Amount = instances
 	deployment.ConfigVars = elist
-	deployment.Secrets = secrets
 	deployment.HealthCheck = healthcheck
 	deployment.MemoryRequest = memoryrequest
 	deployment.MemoryLimit = memorylimit

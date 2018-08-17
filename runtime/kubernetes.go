@@ -369,6 +369,10 @@ func (rt Kubernetes) UpdateDeployment(deployment *structs.Deployment) (err error
 	if deployment.App == "" {
 		return errors.New("FATAL ERROR: Unable to update deployment, the app is blank.")
 	}
+
+	// Assemble secrets
+	deployment.Secrets = append(deployment.Secrets, structs.Namespec{Name:rt.imagePullSecret})
+
 	resp, err := rt.k8sRequest("PUT", "/apis/extensions/v1beta1/namespaces/"+deployment.Space+"/deployments/"+deployment.App,
 		deploymentToDeploymentSpec(deployment))
 	if err != nil {
@@ -381,8 +385,10 @@ func (rt Kubernetes) UpdateDeployment(deployment *structs.Deployment) (err error
 }
 
 func (rt Kubernetes) CreateDeployment(deployment *structs.Deployment) (err error) {
-	var dp Deploymentspec = deploymentToDeploymentSpec(deployment)
-	resp, err := rt.k8sRequest("POST", "/apis/extensions/v1beta1/namespaces/"+deployment.Space+"/deployments", dp)
+
+	// Assemble secrets
+	deployment.Secrets = append(deployment.Secrets, structs.Namespec{Name:rt.imagePullSecret})
+	resp, err := rt.k8sRequest("POST", "/apis/extensions/v1beta1/namespaces/"+deployment.Space+"/deployments", deploymentToDeploymentSpec(deployment))
 	if err != nil {
 		return err
 	}
@@ -580,6 +586,9 @@ func (rt Kubernetes) CreateOneOffPod(deployment *structs.Deployment) (e error) {
 	if deployment.App == "" {
 		return errors.New("FATAL ERROR: Unable to create one off deployment, the app is blank.")
 	}
+	// Assemble secrets
+	deployment.Secrets = append(deployment.Secrets, structs.Namespec{Name:rt.imagePullSecret})
+
 	var koneoff OneOffPod
 	koneoff.Metadata.Name = deployment.App
 	koneoff.Metadata.Namespace = deployment.Space
@@ -1047,6 +1056,10 @@ func (rt Kubernetes) CreateCronJob(deployment *structs.Deployment) (*structs.Cro
 	if deployment.Space == "" {
 		return nil, errors.New("FATAL ERROR: Unable to create cronjob, space is blank.")
 	}
+
+	// Image Secret
+	deployment.Secrets = append(deployment.Secrets, structs.Namespec{Name:rt.imagePullSecret})
+
 	// Update or Create Job
 	resp, err := rt.k8sRequest("post", "/apis/batch/v2alpha1/namespaces/"+deployment.Space+"/cronjobs", deploymentToCronJob(deployment))
 	if err != nil {
@@ -1070,6 +1083,10 @@ func (rt Kubernetes) UpdateCronJob(deployment *structs.Deployment) (*structs.Cro
 	if deployment.App == "" {
 		return nil, errors.New("FATAL ERROR: Unable to update cron job, the app is blank.")
 	}
+	
+	// Image Secret
+	deployment.Secrets = append(deployment.Secrets, structs.Namespec{Name:rt.imagePullSecret})
+
 	resp, err := rt.k8sRequest("put", "/apis/batch/v2alpha1/namespaces/"+deployment.Space+"/cronjobs/"+deployment.App, deploymentToCronJob(deployment))
 	if err != nil {
 		return nil, err
@@ -1092,6 +1109,10 @@ func (rt Kubernetes) CreateJob(deployment *structs.Deployment) (*structs.JobStat
 	if deployment.App == "" {
 		return nil, errors.New("FATAL ERROR: Unable to create job, the job name is blank.")
 	}
+	
+	// Image Secret
+	deployment.Secrets = append(deployment.Secrets, structs.Namespec{Name:rt.imagePullSecret})
+
 	var resources structs.ResourceSpec
 	resources.Requests.Memory = deployment.MemoryRequest
 	resources.Limits.Memory = deployment.MemoryLimit
