@@ -121,10 +121,10 @@ func GetConfigVars(db *sql.DB, configset string) (map[string]string, error) {
 	return dump, nil
 }
 
-func GetBindings(db *sql.DB, space string, app string) (configset string, services []string, err error) {
+func GetBindings(db *sql.DB, space string, app string) (configset string, services []structs.Bindspec, err error) {
 	rows, err := db.Query("select bindtype, bindname from appbindings where appname = $1 and space = $2 and bindtype != 'build'", app, space)
 	if err != nil {
-		return "", []string{}, err
+		return "", []structs.Bindspec{}, err
 	}
 	defer rows.Close()
 	configset = ""
@@ -133,18 +133,18 @@ func GetBindings(db *sql.DB, space string, app string) (configset string, servic
 		var bindname string
 		err = rows.Scan(&bindtype, &bindname)
 		if err != nil {
-			return "", []string{}, err
+			return "", []structs.Bindspec{}, err
 		}
 		if bindtype == "config" {
 			configset = bindname
 		}
 		if bindtype != "config" {
-			services = append(services, bindtype+":"+bindname)
+			services = append(services, structs.Bindspec{App:app, Space:space, Bindtype:bindtype, Bindname:bindname})
 		}
 	}
 	err = rows.Err()
 	if err != nil {
-		return "", []string{}, err
+		return "", []structs.Bindspec{}, err
 	}
 
 	return configset, services, nil

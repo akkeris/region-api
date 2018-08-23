@@ -116,6 +116,18 @@ type Bindspec struct {
 	Bindname string `json:"bindname"`
 }
 
+//Bindspec bind spec
+type Bindmapspec struct {
+	Id       string `json:"id",omitempty`
+	App      string `json:"appname"`
+	Space    string `json:"space"`
+	Bindtype string `json:"bindtype"`
+	Bindname string `json:"bindname"`
+	VarName  string `json:"varname"`
+	NewName  string `json:"newname",omitempty`
+	Action   string `json:"action"`
+}
+
 //Planspec  plans spec
 type Planspec struct {
 	Size        string `json:"size"`

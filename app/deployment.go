@@ -138,7 +138,7 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 		elist = append(elist, structs.EnvVar{Name: n, Value: v})
 	}
 	// add service vars
-	err, servicevars := service.GetServiceConfigVars(appbindings)
+	err, servicevars := service.GetServiceConfigVars(db, appbindings)
 	if err != nil {
 		utils.ReportError(err, r)
 		return

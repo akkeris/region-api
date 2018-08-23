@@ -215,6 +215,10 @@ func Server() *martini.ClassicMartini {
 
 	m.Post("/v1/space/:space/app/:appname/bind", binding.Json(structs.Bindspec{}), app.Createbind)
 	m.Delete("/v1/space/:space/app/:appname/bind/**", app.Unbindapp)
+	
+	m.Post("/v1/space/:space/app/:appname/bindmap/:bindtype/:bindname", binding.Json(structs.Bindmapspec{}), app.Createbindmap)
+	m.Get("/v1/space/:space/app/:appname/bindmap/:bindtype/:bindname", app.Getbindmaps)
+	m.Delete("/v1/space/:space/app/:appname/bindmap/:bindtype/:bindname/:mapid", app.Deletebindmap)
 
 	m.Get("/v1/spaces", space.Listspaces)
 	m.Get("/v1/space/:space/apps", app.Describespace)
