@@ -92,7 +92,7 @@ func OneOffDeployment(db *sql.DB, oneoff1 structs.OneOffSpec, berr binding.Error
 		elist = append(elist, structs.EnvVar{Name: n, Value: v})
 	}
 	// add service vars
-	err, servicevars := service.GetServiceConfigVars(appbindings)
+	err, servicevars := service.GetServiceConfigVars(db, appname, space, appbindings)
 	if err != nil {
 		utils.ReportError(err, r)
 		return

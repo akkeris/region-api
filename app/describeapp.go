@@ -8,7 +8,39 @@ import (
 	runtime "region-api/runtime"
 	structs "region-api/structs"
 	utils "region-api/utils"
+	"fmt"
 )
+
+func Getbindmaps(db *sql.DB, params martini.Params, r render.Render) {
+	appname := params["appname"]
+	space := params["space"]
+	bindtype := params["bindtype"]
+	bindname := params["bindname"]
+	if appname == "" || space == "" || bindtype == "" || bindname == "" {
+		utils.ReportError(fmt.Errorf("Invalid parameter specified in delete bind map."), r)
+		return
+	}
+	rows, err := db.Query("select action,varname,newname,mapid from configvarmaps where appname=$1 and space=$2 and bindtype=$3 and bindname=$4", appname, space, bindtype, bindname)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	defer rows.Close()
+	configvarmaps := []structs.Bindmapspec{}
+	for rows.Next() {
+		var action string
+		var varname string
+		var newname string
+		var mapid string
+		err = rows.Scan(&action, &varname, &newname, &mapid)
+		if err != nil {
+			utils.ReportError(err, r)
+			return
+		}
+		configvarmaps = append(configvarmaps, structs.Bindmapspec{App:appname, Space:space, Bindtype:bindtype, Bindname:bindname, Action:action, VarName:varname, NewName:newname, Id:mapid})
+	}
+	r.JSON(http.StatusOK, configvarmaps)
+}
 
 //Describeapp centralized
 func Describeapp(db *sql.DB, params martini.Params, r render.Render) {
