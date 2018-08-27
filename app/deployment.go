@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
+	"github.com/go-martini/martini"
 	"log"
 	"os"
 	config "region-api/config"
@@ -39,6 +40,69 @@ func GetMemoryLimits(db *sql.DB, plan string) (memorylimit string, memoryrequest
 		return "", "", e
 	}
 	return memorylimit, memoryrequest, nil
+}
+
+func GetServiceConfigVars(db *sql.DB, params martini.Params, r render.Render) {
+	space := params["space"]
+	appname := params["appname"]
+	bindtype := params["bindtype"]
+	bindname := params["bindname"]
+	
+	// add service vars
+	err, servicevars := service.GetServiceConfigVars(db, appname, space, []structs.Bindspec{structs.Bindspec{App:appname, Space:space, Bindtype:bindtype, Bindname:bindname}})
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+
+	}
+	r.JSON(201, servicevars)
+}
+
+func GetAllConfigVars(db *sql.DB, params martini.Params, r render.Render) {
+	space := params["space"]
+	appname := params["appname"]
+	
+	var (
+		appport     int
+		instances   int
+		plan        string
+		healthcheck string
+	)
+
+	err := db.QueryRow("SELECT apps.port,spacesapps.instances,COALESCE(spacesapps.plan,'noplan') AS plan,COALESCE(spacesapps.healthcheck,'tcp') AS healthcheck from apps,spacesapps where apps.name=$1 and apps.name=spacesapps.appname and spacesapps.space=$2", appname, space).Scan(&appport, &instances, &plan, &healthcheck)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+
+	// Get bindings
+	appconfigset, appbindings, err := config.GetBindings(db, space, appname)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	// Get user defined config vars
+	configvars, err := config.GetConfigVars(db, appconfigset)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	// Assemble config -- alamo "built in config", "user defined config vars", "service configvars"
+	elist := AddAlamoConfigVars(appname, space)
+	for n, v := range configvars {
+		elist = append(elist, structs.EnvVar{Name: n, Value: v})
+	}
+	// add service vars
+	err, servicevars := service.GetServiceConfigVars(db, appname, space, appbindings)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+
+	}
+	for _, e := range servicevars {
+		elist = append(elist, e)
+	}
+	r.JSON(201, elist)
 }
 
 //Deployment centralized
@@ -138,7 +202,7 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 		elist = append(elist, structs.EnvVar{Name: n, Value: v})
 	}
 	// add service vars
-	err, servicevars := service.GetServiceConfigVars(db, appbindings)
+	err, servicevars := service.GetServiceConfigVars(db, appname, space, appbindings)
 	if err != nil {
 		utils.ReportError(err, r)
 		return

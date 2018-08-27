@@ -294,7 +294,7 @@ func DeployJob(db *sql.DB, params martini.Params, req structs.JobDeploy, berr bi
 		elist = append(elist, structs.EnvVar{Name: n, Value: v})
 	}
 	// add service vars
-	err, servicevars := service.GetServiceConfigVars(db, appbindings)
+	err, servicevars := service.GetServiceConfigVars(db, jobName, space, appbindings)
 	if err != nil {
 		utils.ReportError(err, r)
 		return

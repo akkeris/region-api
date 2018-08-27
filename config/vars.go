@@ -66,7 +66,7 @@ func Addvars(db *sql.DB, specs []structs.Varspec, berr binding.Errors, r render.
 		if err != nil {
 			rollbackerr := tx.Rollback()
 			if rollbackerr != nil {
-				fmt.Println("FATAL: Cannot rollback: %s", rollbackerr)
+				fmt.Printf("FATAL: Cannot rollback: %s\n", rollbackerr)
 			}
 			utils.ReportError(err, r)
 			return

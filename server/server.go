@@ -225,6 +225,8 @@ func Server() *martini.ClassicMartini {
 	m.Get("/v1/space/:space/app/:appname", app.DescribeappInSpace)
 
 	m.Get("/v1/space/:space/app/:appname/deployments", app.GetDeployments)
+	m.Get("/v1/space/:space/app/:appname/configvars", app.GetAllConfigVars)
+	m.Get("/v1/space/:space/app/:appname/configvars/:bindtype/:bindname", app.GetServiceConfigVars)
 	m.Post("/v1/space/:space/app/:appname/restart", app.Restart)
 	m.Get("/v1/space/:space/app/:app/status", app.Spaceappstatus)
 	m.Get("/v1/kube/podstatus/:space/:app", app.PodStatus)

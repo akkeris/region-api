@@ -9,7 +9,7 @@ begin
         CONSTRAINT appbindings_pkey PRIMARY KEY (appname, bindtype, bindname, space)
     );
 
-    create table if not exists configvarsmap {
+    create table if not exists configvarsmap (
         appname TEXT NOT NULL,
         bindtype TEXT NOT NULL,
         bindname TEXT NOT NULL,
@@ -18,7 +18,7 @@ begin
         varname text not null,
         newname text not null,
         action text not null -- delete, rename, copy
-    }
+    );
 
     create unique index if not exists appbindings_appname_bindtype_bindname_space_key ON appbindings (appname, bindtype, bindname, space);
 

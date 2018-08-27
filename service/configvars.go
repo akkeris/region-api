@@ -7,7 +7,7 @@ import (
 	"fmt"
 )
 
-func GetServiceConfigVars(db *sql.DB, appbindings []structs.Bindspec) (error, []structs.EnvVar) {
+func GetServiceConfigVars(db *sql.DB, appname string, space string, appbindings []structs.Bindspec) (error, []structs.EnvVar) {
 	elist := []structs.EnvVar{}
 	for _, element := range appbindings {
 		servicetype := element.Bindtype
@@ -94,17 +94,14 @@ func GetServiceConfigVars(db *sql.DB, appbindings []structs.Bindspec) (error, []
 			}
 		}
 
-		rows, err := db.Query("select action, varname, newname from configvarsmap where space=$1 and appname=$2 and bindtype=$3 and bindname=$4")
-		if err != nil {
-			return err, elist
-		} else {
-			return fmt.Errorf("Invalid service type %s", servicetype), elist
-		}
-
 		newvars := []structs.EnvVar{}
 		removevars := []structs.EnvVar{}
 
 		for _, servicevar := range servicevars {
+			rows, err := db.Query("select action, varname, newname from configvarsmap where space=$1 and appname=$2 and bindtype=$3 and bindname=$4", space, appname, servicetype, servicename)
+			if err != nil {
+				return err, elist
+			}
 			for rows.Next() {
 				var action string
 			    var varname string
@@ -119,6 +116,7 @@ func GetServiceConfigVars(db *sql.DB, appbindings []structs.Bindspec) (error, []
 				} else if varname == servicevar.Name && action == "delete" {
 					removevars = append(removevars, structs.EnvVar{Name: servicevar.Name, Value: servicevar.Value})
 				} else if varname == servicevar.Name && action == "rename" {
+
 					removevars = append(removevars, structs.EnvVar{Name: servicevar.Name, Value: servicevar.Value})
 					newvars = append(newvars, structs.EnvVar{Name: newname, Value: servicevar.Value})
 				} else {
@@ -126,6 +124,7 @@ func GetServiceConfigVars(db *sql.DB, appbindings []structs.Bindspec) (error, []
 					return fmt.Errorf("Invalid command in config var %s", action), elist
 				}
 			}
+			rows.Close()
 		}
 
 		for _, svar := range servicevars {

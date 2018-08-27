@@ -61,7 +61,7 @@ func Createbindmap(db *sql.DB, spec structs.Bindmapspec, berr binding.Errors, r 
 		utils.ReportInvalidRequest("Bind Name can not be blank", r)
 		return
 	}
-	if spec.Action != "delete" || spec.Action != "rename" || spec.Action != "copy" {
+	if spec.Action != "delete" && spec.Action != "rename" && spec.Action != "copy" {
 		utils.ReportInvalidRequest("Action was an invalid value, only delete, rename or copy are allowed.", r)
 		return
 	}
@@ -80,11 +80,11 @@ func Createbindmap(db *sql.DB, spec structs.Bindmapspec, berr binding.Errors, r 
 		return
 	}
 
-	_, inserterr := db.Exec("INSERT INTO configvarmaps (appname,space,bindtype,bindname,action,varname,newname,mapid) VALUES($1,$2,$3,$4,$5,$6,$7,$8)", spec.App, spec.Space, spec.Bindtype, spec.Bindname, spec.Action, spec.VarName, spec.NewName, mapid.String())
+	_, inserterr := db.Exec("INSERT INTO configvarsmap (appname,space,bindtype,bindname,action,varname,newname,mapid) VALUES($1,$2,$3,$4,$5,$6,$7,$8)", spec.App, spec.Space, spec.Bindtype, spec.Bindname, spec.Action, spec.VarName, spec.NewName, mapid.String())
 	if inserterr != nil {
 		utils.ReportError(inserterr, r)
 		return
 	}
 
-	r.JSON(http.StatusCreated, structs.Messagespec{Status: http.StatusCreated, Message: "added " + spec.App + " bound to " + spec.Bindname + " in space " + spec.Space})
+	r.JSON(http.StatusCreated, structs.Messagespec{Status: http.StatusCreated, Message: mapid.String()})
 }
