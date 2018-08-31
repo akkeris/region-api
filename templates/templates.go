@@ -47,7 +47,7 @@ when HTTP_REQUEST {
 			    binary scan [md5 "[IP::client_addr][TCP::client_port][IP::local_addr][TCP::local_port][string range [AES::key 256] 8 end]"] H* xri junk
 			}
 			set LogString "timestamp=$hrt fwd=[IP::client_addr] method=[HTTP::method] path=[HTTP::uri] request_id=$xri site_domain={{$domain}} "
-		    HTTP::header insert x-request-id $xri	
+		    HTTP::header insert x-request-id $xri
 			HTTP::header insert X-Orig-Proto [HTTP::header "X-Forwarded-Proto"]
 			HTTP::header insert X-Orig-Host [HTTP::header "Host"]
 			HTTP::header insert X-Orig-Port [TCP::local_port]
