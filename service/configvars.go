@@ -98,7 +98,12 @@ func GetServiceConfigVars(db *sql.DB, appname string, space string, appbindings 
 		removevars := []structs.EnvVar{}
 
 		for _, servicevar := range servicevars {
-			rows, err := db.Query("select action, varname, newname from configvarsmap where space=$1 and appname=$2 and bindtype=$3 and bindname=$4", space, appname, servicetype, servicename)
+			var appkey string 
+			err := db.QueryRow("'", space, appname).Scan(&appkey)
+			if err != nil {
+				return err, elist
+			}
+			rows, err := db.Query("select cvm.action, cvm.varname, cvm.newname from configvarsmap cvm where (cvm.appname || '-' || cvm.space) in (select ab.bindname from appbindings ab where ab.space=$1 and ab.appname=$2 and ab.bindtype='config) and cvm.bindtype=$3 and cvm.bindname=$4", space, appname, servicetype, servicename)
 			if err != nil {
 				return err, elist
 			}
