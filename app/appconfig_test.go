@@ -32,7 +32,10 @@ func ServerAppConfig() *martini.ClassicMartini {
 	m.Get("/v1/app/:appname", Describeapp)                         //describeapp.go
 	m.Delete("/v1/app/:appname", Deleteapp)                        //deleteapp.go
 	m.Get("/v1/apps/plans", GetPlans)                              //plan.go
-
+	
+	m.Post("/v1/config/set", binding.Json(structs.Setspec{}), config.Createset)
+	m.Delete("/v1/config/set/:setname", config.Deleteset)
+	
 	m.Post("/v1/app/deploy", binding.Json(structs.Deployspec{}), Deployment) //deployment.go
 
 	m.Post("/v1/app/bind", binding.Json(structs.Bindspec{}), Createbind)                       //createbind.go
@@ -139,21 +142,28 @@ func TestConfigVarMappings(t *testing.T) {
 		res, err = Request("PUT", "/v1/space/" + space + "/app/" + appname, structs.Spaceappspec{Appname: appname, Space: space, Instances: 1, Plan: "scout"})
 		So(err, ShouldEqual, nil)
 		So(res.StatusCode, ShouldEqual, http.StatusCreated)
+		res, err = Request("POST", "/v1/config/set", structs.Setspec{Setname: appname + "-" + space, Settype: "config"})
+		So(err, ShouldEqual, nil)
+		So(res.StatusCode, ShouldEqual, http.StatusCreated)
+		res, err = Request("POST", "/v1/space/" + space + "/app/" + appname +"/bind", structs.Bindspec{Bindname: appname + "-" + space, Bindtype: "config", Space: space, App: appname})
+		So(err, ShouldEqual, nil)
+		So(res.StatusCode, ShouldEqual, http.StatusCreated)
 		res, err = Request("POST", "/v1/app/deploy", structs.Deployspec{AppName: appname, Space: space, Image: "docker.io/akkeris/apachetest:latest"})
 		So(err, ShouldEqual, nil)
 		So(res.StatusCode, ShouldEqual, http.StatusCreated)
+
 		res, err = Request("POST", "/v2/services/postgres", structs.Provisionspec{Plan: "micro", Billingcode: "test"})
 		So(err, ShouldEqual, nil)
 		So(res.StatusCode, ShouldEqual, http.StatusCreated)
 		dbinstance := structs.Postgresspec{}
 		err = json.Unmarshal([]byte(res.Body), &dbinstance)
 		So(err, ShouldEqual, nil)
-
 		spec := strings.Split(dbinstance.Spec, ":")
 		So(len(spec), ShouldEqual, 2)
 		res, err = Request("POST", "/v1/space/" + space + "/app/" + appname +"/bind", structs.Bindspec{Bindname: spec[1], Bindtype: "postgres", Space: space, App: appname})
 		So(err, ShouldEqual, nil)
 		So(res.StatusCode, ShouldEqual, http.StatusCreated)
+
 
 		rename_map_id := ""
 		copy_map_id := ""
@@ -228,6 +238,8 @@ func TestConfigVarMappings(t *testing.T) {
 		})
 
 		Reset(func() {
+			Request("DELETE", "/v1/space/" + space + "/app/" + appname + "/bind/config:" + appname + "-" + space, nil)
+			Request("DELETE", "/v1/config/set/" + appname + "-" + space, nil)
 			Request("DELETE", "/v1/space/" + space + "/app/" + appname + "/bind/" + dbinstance.Spec, nil)
 			Request("DELETE", "/v2/services/postgres/" + spec[1], nil)
 			Request("DELETE", "/v1/space/" + space + "/app/" + appname, nil)
