@@ -90,6 +90,7 @@ func Init() *martini.ClassicMartini {
 	return m
 }
 
+
 func TestAppHandlers(t *testing.T) {
 	testAppName := "gotest"
 	m := Init() // intialize handlers (could pass in a mock db ind the future)

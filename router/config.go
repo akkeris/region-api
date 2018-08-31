@@ -24,8 +24,6 @@ func DescribeRouters(db *sql.DB, params martini.Params, r render.Render) {
 	}
 	var routers []structs.Routerspec
 	for _, element := range list {
-		fmt.Println(element)
-
 		var spec structs.Routerspec
 		spec.Domain = element
 		internal, err := IsInternalRouter(db, element)
@@ -138,10 +136,6 @@ func AddPath(db *sql.DB, spec structs.Routerpathspec, berr binding.Errors, r ren
 	}
 
 	var msg structs.Messagespec
-	fmt.Println(spec.Path)
-	fmt.Println(spec.Space)
-	fmt.Println(spec.App)
-	fmt.Println(spec.ReplacePath)
 	spec.App = strings.Replace(spec.App, "-"+spec.Space, "", -1)
 	msg, err = addPath(spec, db)
 	if err != nil {
@@ -184,9 +178,6 @@ func DeletePath(db *sql.DB, params martini.Params, spec structs.Routerpathspec, 
 	}
 
 	var msg structs.Messagespec
-	fmt.Println(path)
-	fmt.Println(domain)
-
 	msg, err := deletePath(domain, path, db)
 	if err != nil {
 		fmt.Println(err)
@@ -231,7 +222,6 @@ func CreateRouter(db *sql.DB, spec structs.Routerspec, berr binding.Errors, r re
 		spec.Internal = false
 	}
 	var msg structs.Messagespec
-	fmt.Println(spec.Domain)
 	msg, err := createRouter(spec, db)
 	if err != nil {
 		fmt.Println(err)
@@ -243,8 +233,6 @@ func CreateRouter(db *sql.DB, spec structs.Routerspec, berr binding.Errors, r re
 
 func createRouter(spec structs.Routerspec, db *sql.DB) (m structs.Messagespec, err error) {
 	var msg structs.Messagespec
-	fmt.Println(spec.Domain)
-
 	newrouteriduuid, _ := uuid.NewV4()
 	newrouterid := newrouteriduuid.String()
 
@@ -278,6 +266,7 @@ func PushRouter(db *sql.DB, params martini.Params, r render.Render) {
 		msg, err := DeleteF5(router, db)
 		if err != nil {
 			utils.ReportError(err, r)
+			return
 		}
 		msg.Status = 200
 		msg.Message = "Router Updated"
@@ -298,7 +287,6 @@ func PushRouter(db *sql.DB, params martini.Params, r render.Render) {
 func pushRouter(db *sql.DB, r structs.Routerspec) (m structs.Messagespec, e error) {
 	msg, err := UpdateF5(r, db)
 	return msg, err
-
 }
 
 func DeleteRouter(db *sql.DB, params martini.Params, r render.Render) {
@@ -317,7 +305,7 @@ func DeleteRouter(db *sql.DB, params martini.Params, r render.Render) {
 		return
 	}
 	spec.Internal = isinternal
-	msg, err := deleteRouter(db, spec)
+	msg, err := DeleteF5(spec, db)
 	if err != nil {
 		utils.ReportError(err, r)
 		return
@@ -327,11 +315,15 @@ func DeleteRouter(db *sql.DB, params martini.Params, r render.Render) {
 		utils.ReportError(err, r)
 		return
 	}
+
+        removeDNSRecord(db, domain)
+
 	msg, err = deleteRouterBase(db, domain)
 	if err != nil {
 		utils.ReportError(err, r)
 		return
 	}
+
 	msg.Status = 200
 	msg.Message = "Router Deleted"
 	r.JSON(msg.Status, msg)
@@ -367,12 +359,6 @@ func deletePaths(db *sql.DB, domain string) (m structs.Messagespec, e error) {
 	return msg, nil
 }
 
-func deleteRouter(db *sql.DB, router structs.Routerspec) (m structs.Messagespec, e error) {
-
-	msg, err := DeleteF5(router, db)
-	return msg, err
-}
-
 func UpdatePath(db *sql.DB, spec structs.Routerpathspec, berr binding.Errors, r render.Render) {
 	if berr != nil {
 		utils.ReportInvalidRequest(berr[0].Message, r)
@@ -395,11 +381,6 @@ func UpdatePath(db *sql.DB, spec structs.Routerpathspec, berr binding.Errors, r 
 		return
 	}
 	var msg structs.Messagespec
-	fmt.Println(spec.Path)
-	fmt.Println(spec.Space)
-	fmt.Println(spec.App)
-	fmt.Println(spec.ReplacePath)
-
 	msg, err := updatePath(spec, db)
 	if err != nil {
 		fmt.Println(err)
@@ -410,11 +391,8 @@ func UpdatePath(db *sql.DB, spec structs.Routerpathspec, berr binding.Errors, r 
 }
 
 func updatePath(spec structs.Routerpathspec, db *sql.DB) (m structs.Messagespec, e error) {
-
 	var msg structs.Messagespec
-
 	var path string
-
 	err := db.QueryRow("UPDATE routerpaths set space=$1, app=$2, replacepath=$3  where domain=$4 and path=$5 returning path;", spec.Space, spec.App, spec.ReplacePath, spec.Domain, spec.Path).Scan(&path)
 	if err != nil {
 		fmt.Println(err)
@@ -424,7 +402,6 @@ func updatePath(spec structs.Routerpathspec, db *sql.DB) (m structs.Messagespec,
 	}
 	msg.Status = 201
 	msg.Message = "Path Updated"
-
 	return msg, nil
 }
 

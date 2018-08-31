@@ -52,6 +52,33 @@ func ProxyToSession(res http.ResponseWriter, req *http.Request) {
 	rp.ServeHTTP(res, req)
 }
 
+
+func ProxyToInfluxDb(res http.ResponseWriter, req *http.Request) {
+	uri, err := url.Parse(os.Getenv("INFLUXDB_URL"))
+	if err != nil {
+		log.Println("Error: Unable to proxy to influxdb")
+		log.Println(err)
+		return
+	}
+	log.Println("Proxying influxdb to", uri)
+	rp := httputil.NewSingleHostReverseProxy(uri)
+	rp.FlushInterval = time.Duration(200) * time.Millisecond
+	rp.ServeHTTP(res, req)
+}
+
+func ProxyToPrometheus(res http.ResponseWriter, req *http.Request) {
+	uri, err := url.Parse(os.Getenv("PROMETHEUS_URL"))
+	if err != nil {
+		log.Println("Error: Unable to proxy to influxdb")
+		log.Println(err)
+		return
+	}
+	log.Println("Proxying prometheus metrics to", uri)
+	rp := httputil.NewSingleHostReverseProxy(uri)
+	rp.FlushInterval = time.Duration(200) * time.Millisecond
+	rp.ServeHTTP(res, req)
+}
+
 func Server() *martini.ClassicMartini {
 	m := martini.Classic()
 	m.Use(render.Renderer())
@@ -188,12 +215,18 @@ func Server() *martini.ClassicMartini {
 
 	m.Post("/v1/space/:space/app/:appname/bind", binding.Json(structs.Bindspec{}), app.Createbind)
 	m.Delete("/v1/space/:space/app/:appname/bind/**", app.Unbindapp)
+	
+	m.Post("/v1/space/:space/app/:appname/bindmap/:bindtype/:bindname", binding.Json(structs.Bindmapspec{}), app.Createbindmap)
+	m.Get("/v1/space/:space/app/:appname/bindmap/:bindtype/:bindname", app.Getbindmaps)
+	m.Delete("/v1/space/:space/app/:appname/bindmap/:bindtype/:bindname/:mapid", app.Deletebindmap)
 
 	m.Get("/v1/spaces", space.Listspaces)
 	m.Get("/v1/space/:space/apps", app.Describespace)
 	m.Get("/v1/space/:space/app/:appname", app.DescribeappInSpace)
 
 	m.Get("/v1/space/:space/app/:appname/deployments", app.GetDeployments)
+	m.Get("/v1/space/:space/app/:appname/configvars", app.GetAllConfigVars)
+	m.Get("/v1/space/:space/app/:appname/configvars/:bindtype/:bindname", app.GetServiceConfigVars)
 	m.Post("/v1/space/:space/app/:appname/restart", app.Restart)
 	m.Get("/v1/space/:space/app/:app/status", app.Spaceappstatus)
 	m.Get("/v1/kube/podstatus/:space/:app", app.PodStatus)
@@ -283,6 +316,10 @@ func Server() *martini.ClassicMartini {
 		m.Post("/apps/:app_key/log-drains", ProxyToShuttle)
 		m.Delete("/apps/:app_key/log-drains/:id", ProxyToShuttle)
 		m.Get("/apps/:app_key/log-drains/:id", ProxyToShuttle)
+		m.Get("/sites/:app_key/log-drains", ProxyToShuttle)
+		m.Post("/sites/:app_key/log-drains", ProxyToShuttle)
+		m.Delete("/sites/:app_key/log-drains/:id", ProxyToShuttle)
+		m.Get("/sites/:app_key/log-drains/:id", ProxyToShuttle)
 		m.Post("/log-events", ProxyToShuttle)
 	} else {
 		log.Println("No LOGSHUTTLE_SERVICE_HOST and LOGSHUTTLE_SERVICE_PORT environment variables found, log shuttle functionality was disabled.")
@@ -293,6 +330,18 @@ func Server() *martini.ClassicMartini {
 		m.Get("/log-sessions/:id", ProxyToSession)
 	} else {
 		log.Println("No LOGSESSION_SERVICE_HOST and LOGSESSION_SERVICE_PORT environment variables found, log session functionality was disabled.")
+	}
+	// proxy influxdb
+	if os.Getenv("INFLUXDB_URL") != "" {
+		m.Get("/query**", ProxyToInfluxDb)
+	} else {
+		log.Println("No INFLUXDB_URL environment variables found, influx metrics functionality was disabled.")
+	}
+	// proxy prometheus
+	if os.Getenv("PROMETHEUS_URL") != "" {
+		m.Get("/api/v1/query_range**", ProxyToPrometheus)
+	} else {
+		log.Println("No PROMETHEUS_URL environment variables found, prometheus metrics functionality was disabled.")
 	}
 
 	if os.Getenv("ENABLE_AUTH") == "true" {
