@@ -187,7 +187,7 @@ func TagNeptune(spec structs.Tagspec, berr binding.Errors, r render.Render) {
 	}
 }
 
-func GetNeptuneVars(servicename string) map[string]interface{} {
+func GetNeptuneVars(servicename string) (map[string]interface{}, error) {
 	config := make(map[string]interface{})
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", "http://"+os.Getenv("NEPTUNE_BROKER_URL")+"/v1/neptune/url/"+servicename, nil)
@@ -199,11 +199,10 @@ func GetNeptuneVars(servicename string) map[string]interface{} {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		utils.ReportError(errors.New(resp.Status), r)
-		return nil
+		return nil, errors.New(resp.Status)
 	}
 
 	bodyj, _ := simplejson.NewFromReader(resp.Body)
 	config, _ = bodyj.Map()
-	return config
+	return config, nil
 }
