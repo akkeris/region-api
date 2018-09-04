@@ -3,6 +3,7 @@ package service
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -26,7 +27,14 @@ func GetNeptunePlans(params martini.Params, r render.Render) {
 		utils.ReportError(err, r)
 		return
 	}
+
 	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		utils.ReportError(errors.New(resp.Status), r)
+		return
+	}
+
 	bodyj, _ := simplejson.NewFromReader(resp.Body)
 
 	bodymap, maperr := bodyj.Map()
@@ -53,7 +61,14 @@ func GetNeptuneURL(params martini.Params, r render.Render) {
 		utils.ReportError(err, r)
 		return
 	}
+
 	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		utils.ReportError(errors.New(resp.Status), r)
+		return
+	}
+
 	bodyj, _ := simplejson.NewFromReader(resp.Body)
 	databaseurl, _ := bodyj.Get("NEPTUNE_DATABASE_URL").String()
 	accesskey, _ := bodyj.Get("NEPTUNE_ACCESS_KEY").String()
@@ -88,7 +103,14 @@ func ProvisionNeptune(spec structs.Provisionspec, berr binding.Errors, r render.
 		utils.ReportError(err, r)
 		return
 	}
+
 	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		utils.ReportError(errors.New(resp.Status), r)
+		return
+	}
+
 	bodyj, _ := simplejson.NewFromReader(resp.Body)
 	databaseurl, _ := bodyj.Get("NEPTUNE_DATABASE_URL").String()
 	accesskey, _ := bodyj.Get("NEPTUNE_ACCESS_KEY").String()
@@ -115,7 +137,14 @@ func DeleteNeptune(params martini.Params, r render.Render) {
 		utils.ReportError(err, r)
 		return
 	}
+
 	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		utils.ReportError(errors.New(resp.Status), r)
+		return
+	}
+
 	bodyj, _ := simplejson.NewFromReader(resp.Body)
 	r.JSON(200, bodyj)
 }
@@ -140,7 +169,14 @@ func TagNeptune(spec structs.Tagspec, berr binding.Errors, r render.Render) {
 		utils.ReportError(err, r)
 		return
 	}
+
 	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		utils.ReportError(errors.New(resp.Status), r)
+		return
+	}
+
 	var brokerresponse structs.Brokerresponse
 	if resp.StatusCode == 200 || resp.StatusCode == 201 {
 		bb, _ := ioutil.ReadAll(resp.Body)
@@ -161,6 +197,12 @@ func GetNeptuneVars(servicename string) map[string]interface{} {
 		fmt.Println(err)
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		utils.ReportError(errors.New(resp.Status), r)
+		return nil
+	}
+
 	bodyj, _ := simplejson.NewFromReader(resp.Body)
 	config, _ = bodyj.Map()
 	return config
