@@ -2,10 +2,6 @@ package server
 
 import (
 	"database/sql"
-	"github.com/go-martini/martini"
-	"github.com/martini-contrib/auth"
-	"github.com/martini-contrib/binding"
-	"github.com/martini-contrib/render"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -27,6 +23,11 @@ import (
 	"region-api/utils"
 	"region-api/vault"
 	"time"
+
+	"github.com/go-martini/martini"
+	"github.com/martini-contrib/auth"
+	"github.com/martini-contrib/binding"
+	"github.com/martini-contrib/render"
 )
 
 func ProxyToShuttle(res http.ResponseWriter, req *http.Request) {
@@ -51,7 +52,6 @@ func ProxyToSession(res http.ResponseWriter, req *http.Request) {
 	rp.FlushInterval = time.Duration(200) * time.Millisecond
 	rp.ServeHTTP(res, req)
 }
-
 
 func ProxyToInfluxDb(res http.ResponseWriter, req *http.Request) {
 	uri, err := url.Parse(os.Getenv("INFLUXDB_URL"))
@@ -116,6 +116,12 @@ func Server() *martini.ClassicMartini {
 	m.Post("/v1/service/memcached/instance/tag", binding.Json(structs.Tagspec{}), service.Tagmemcached)
 	m.Get("/v1/service/memcached/operations/stats/:name", service.GetMemcachedStats)
 	m.Delete("/v1/service/memcached/operations/cache/:name", service.FlushMemcached)
+
+	m.Get("/v1/service/neptune/plans", service.GetNeptunePlans)
+	m.Get("/v1/service/neptune/url/:servicename", service.GetNeptuneURL)
+	m.Post("/v1/service/neptune/instance", binding.Json(structs.Provisionspec{}), service.ProvisionNeptune)
+	m.Delete("/v1/service/neptune/instance/:servicename", service.DeleteNeptune)
+	m.Post("/v1/service/neptune/instance/tag", binding.Json(structs.Tagspec{}), service.TagNeptune)
 
 	m.Get("/v1/service/rabbitmq/plans", service.Getrabbitmqplans)
 	m.Post("/v1/service/rabbitmq/instance", binding.Json(structs.Provisionspec{}), service.Provisionrabbitmq)
@@ -215,7 +221,7 @@ func Server() *martini.ClassicMartini {
 
 	m.Post("/v1/space/:space/app/:appname/bind", binding.Json(structs.Bindspec{}), app.Createbind)
 	m.Delete("/v1/space/:space/app/:appname/bind/**", app.Unbindapp)
-	
+
 	m.Post("/v1/space/:space/app/:appname/bindmap/:bindtype/:bindname", binding.Json(structs.Bindmapspec{}), app.Createbindmap)
 	m.Get("/v1/space/:space/app/:appname/bindmap/:bindtype/:bindname", app.Getbindmaps)
 	m.Delete("/v1/space/:space/app/:appname/bindmap/:bindtype/:bindname/:mapid", app.Deletebindmap)

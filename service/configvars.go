@@ -2,9 +2,9 @@ package service
 
 import (
 	"database/sql"
+	"fmt"
 	structs "region-api/structs"
 	vault "region-api/vault"
-	"fmt"
 )
 
 func GetServiceConfigVars(db *sql.DB, appname string, space string, appbindings []structs.Bindspec) (error, []structs.EnvVar) {
@@ -92,6 +92,14 @@ func GetServiceConfigVars(db *sql.DB, appname string, space string, appbindings 
 			for _, value := range vars {
 				servicevars = append(servicevars, structs.EnvVar{Name: value.Key, Value: value.Value})
 			}
+		} else if servicetype == "neptune" {
+			vars, err := GetNeptuneVars(servicename)
+			if err != nil {
+				return err, elist
+			}
+			for key, value := range vars {
+				servicevars = append(servicevars, structs.EnvVar{Name: key, Value: value.(string)})
+			}
 		}
 
 		newvars := []structs.EnvVar{}
@@ -104,11 +112,11 @@ func GetServiceConfigVars(db *sql.DB, appname string, space string, appbindings 
 			}
 			for rows.Next() {
 				var action string
-			    var varname string
-			    var newname string
-			    err = rows.Scan(&action, &varname, &newname)
-			    if err != nil {
-			    	rows.Close()
+				var varname string
+				var newname string
+				err = rows.Scan(&action, &varname, &newname)
+				if err != nil {
+					rows.Close()
 					return err, elist
 				}
 				if varname == servicevar.Name && action == "copy" {

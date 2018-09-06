@@ -165,7 +165,7 @@ type S3spec struct {
 	S3bucket    string `json:"S3_BUCKET"`
 	S3accesskey string `json:"S3_ACCESS_KEY"`
 	S3secretkey string `json:"S3_SECRET_KEY"`
-	S3region string `json:"S3_REGION"`
+	S3region    string `json:"S3_REGION"`
 	Spec        string `json:"spec"`
 }
 
@@ -186,6 +186,15 @@ type Auroramysqlspec struct {
 	DatabaseUrl         string `json:"DATABASE_URL"`
 	DatabaseReadonlyUrl string `json:"DATABASE_READONLY_URL"`
 	Spec                string `json:"spec"`
+}
+
+//Neptunespec Neptune db spec
+type Neptunespec struct {
+	NeptuneDatabaseURL string `json:"NEPTUNE_DATABASE_URL"`
+	NeptuneAccessKey   string `json:"NEPTUNE_ACCESS_KEY"`
+	NeptuneSecretKey   string `json:"NEPTUNE_SECRET_KEY"`
+	NeptuneRegion      string `json:"NEPTUNE_REGION"`
+	Spec               string `json:"spec"`
 }
 
 type Deployment struct {
