@@ -30,7 +30,7 @@ func GetNeptunePlans(params martini.Params, r render.Render) {
 
 	defer resp.Body.Close()
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode > 299 || resp.StatusCode < 200 {
 		utils.ReportError(errors.New(resp.Status), r)
 		return
 	}
@@ -64,7 +64,7 @@ func GetNeptuneURL(params martini.Params, r render.Render) {
 
 	defer resp.Body.Close()
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode > 299 || resp.StatusCode < 200 {
 		utils.ReportError(errors.New(resp.Status), r)
 		return
 	}
@@ -106,7 +106,7 @@ func ProvisionNeptune(spec structs.Provisionspec, berr binding.Errors, r render.
 
 	defer resp.Body.Close()
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode > 299 || resp.StatusCode < 200 {
 		utils.ReportError(errors.New(resp.Status), r)
 		return
 	}
@@ -140,7 +140,7 @@ func DeleteNeptune(params martini.Params, r render.Render) {
 
 	defer resp.Body.Close()
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode > 299 || resp.StatusCode < 200 {
 		utils.ReportError(errors.New(resp.Status), r)
 		return
 	}
@@ -172,18 +172,17 @@ func TagNeptune(spec structs.Tagspec, berr binding.Errors, r render.Render) {
 
 	defer resp.Body.Close()
 
-	if resp.StatusCode != 200 {
-		utils.ReportError(errors.New(resp.Status), r)
-		return
-	}
-
 	var brokerresponse structs.Brokerresponse
-	if resp.StatusCode == 200 || resp.StatusCode == 201 {
+
+	// Broker should return a 2xx response, otherwise something bad happened
+	if resp.StatusCode > 299 || resp.StatusCode < 200 {
 		bb, _ := ioutil.ReadAll(resp.Body)
 		_ = json.Unmarshal(bb, &brokerresponse)
 		message.Status = 201
 		message.Message = brokerresponse.Response
 		r.JSON(message.Status, message)
+	} else {
+		utils.ReportError(errors.New(resp.Status), r)
 	}
 }
 
@@ -198,7 +197,7 @@ func GetNeptuneVars(servicename string) (map[string]interface{}, error) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode > 299 || resp.StatusCode < 200 {
 		return nil, errors.New(resp.Status)
 	}
 
