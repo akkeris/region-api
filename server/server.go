@@ -117,6 +117,18 @@ func Server() *martini.ClassicMartini {
 	m.Get("/v1/service/memcached/operations/stats/:name", service.GetMemcachedStats)
 	m.Delete("/v1/service/memcached/operations/cache/:name", service.FlushMemcached)
 
+        m.Get("/v1/service/influxdb/plans", service.GetInfluxdbPlans)
+        m.Get("/v1/service/influxdb/url/:servicename", service.GetInfluxdbURL)
+        m.Post("/v1/service/influxdb/instance", binding.Json(structs.Provisionspec{}), service.ProvisionInfluxdb)
+        m.Delete("/v1/service/influxdb/instance/:servicename", service.DeleteInfluxdb)
+
+
+        m.Get("/v1/service/cassandra/plans", service.GetCassandraPlans)
+        m.Get("/v1/service/cassandra/url/:servicename", service.GetCassandraURL)
+        m.Post("/v1/service/cassandra/instance", binding.Json(structs.Provisionspec{}), service.ProvisionCassandra)
+        m.Delete("/v1/service/cassandra/instance/:servicename", service.DeleteCassandra)
+
+
 	m.Get("/v1/service/neptune/plans", service.GetNeptunePlans)
 	m.Get("/v1/service/neptune/url/:servicename", service.GetNeptuneURL)
 	m.Post("/v1/service/neptune/instance", binding.Json(structs.Provisionspec{}), service.ProvisionNeptune)

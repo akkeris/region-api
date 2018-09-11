@@ -197,6 +197,23 @@ type Neptunespec struct {
 	Spec               string `json:"spec"`
 }
 
+type Influxdbspec struct {
+        Name  string `json:"INFLUX_DB"`
+        Url   string `json:"INFLUX_URL"`
+        Username    string `json:"INFLUX_USERNAME"`
+        Password string `json:"INFLUX_PASSWORD"`
+        Spec               string `json:"spec"`
+
+}
+
+type Cassandraspec struct {
+        Keyspace string `json:"CASSANDRA_KEYSPACE"`
+        Location string `json:"CASSANDRA_LOCATION"`
+        Password string `json:"CASSANDRA_PASSWORD"`
+        Username string `json:"CASSANDRA_USERNAME"`
+        Spec     string `json:"spec"`
+}
+
 type Deployment struct {
 	Space                string
 	App                  string
