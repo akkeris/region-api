@@ -106,6 +106,13 @@ func ProvisionNeptune(spec structs.Provisionspec, berr binding.Errors, r render.
 
 	defer resp.Body.Close()
 
+	if resp.StatusCode == 503 {
+		body, _ := simplejson.NewFromReader(resp.Body)
+		msg, _ := body.Get("error").String()
+		utils.ReportError(errors.New(msg), r)
+		return
+	}
+
 	if resp.StatusCode > 299 || resp.StatusCode < 200 {
 		utils.ReportError(errors.New(resp.Status), r)
 		return
