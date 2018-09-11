@@ -40,7 +40,7 @@ func InitInflux() *martini.ClassicMartini {
 	return m
 }
 
-func TestPostgresonpremService(t *testing.T) {
+func TestInfluxService(t *testing.T) {
 	m := InitInflux()
 
 	var influxdb structs.Influxdbspec
@@ -80,7 +80,7 @@ func TestPostgresonpremService(t *testing.T) {
 				So(w.Body.String(), ShouldContainSubstring, "INFLUX_URL")
 				So(w.Body.String(), ShouldContainSubstring, influxdb.Url)
 				Convey("When we want to make sure we can get to the new db\n", func() {
-					results, err := hitDB(influxdb.Url, influxdb.Name, influxdb.Username, influxdb.Password)
+					results, err := hitInfluxDB(influxdb.Url, influxdb.Name, influxdb.Username, influxdb.Password)
 					fmt.Println(err)
 					fmt.Println(results)
                                         So(err, ShouldBeNil)
@@ -97,7 +97,7 @@ func TestPostgresonpremService(t *testing.T) {
 	})
 }
 
-func hitDB(endpoint string, db string, username string, password string) (r string, e error) {
+func hitInfluxDB(endpoint string, db string, username string, password string) (r string, e error) {
 	var toreturn string
 	t := url.URL{Path: "q=show measurements"}
 	estring := t.String()

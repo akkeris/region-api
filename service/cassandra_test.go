@@ -19,7 +19,7 @@ import (
 	"time"
 )
 
-func ServerInflux() *martini.ClassicMartini {
+func ServerCassandra() *martini.ClassicMartini {
 	m := martini.Classic()
 	m.Use(render.Renderer())
 
@@ -31,17 +31,17 @@ func ServerInflux() *martini.ClassicMartini {
 	return m
 }
 
-func InitInflux() *martini.ClassicMartini {
+func InitCassandra() *martini.ClassicMartini {
 	pitdb := os.Getenv("PITDB")
 	pool := utils.GetDB(pitdb)
 	utils.InitAuth()
-	m := ServerInflux()
+	m := ServerCassandra()
 	m.Map(pool)
 	return m
 }
 
-func TestPostgresonpremService(t *testing.T) {
-	m := InitInflux()
+func TestCassandraService(t *testing.T) {
+	m := InitCassandra()
 
 	var cassandra structs.Cassandraspec
 	var cassandraname string
@@ -80,7 +80,7 @@ func TestPostgresonpremService(t *testing.T) {
 				So(w.Body.String(), ShouldContainSubstring, "CASSANDRA_LOCATION")
 				So(w.Body.String(), ShouldContainSubstring, cassandra.Keyspace)
 				Convey("When we want to make sure we can get to the new db\n", func() {
-					results, err := hitDB(cassandra.Location, cassandra.Keyspace, cassandra.Username, cassandra.Password)
+					results, err := hitCassandraDB(cassandra.Location, cassandra.Keyspace, cassandra.Username, cassandra.Password)
 					fmt.Println(err)
 					fmt.Println(results)
 					So(err, ShouldBeNil)
@@ -97,7 +97,7 @@ func TestPostgresonpremService(t *testing.T) {
 	})
 }
 
-func hitDB(cassandra_url string, keyspace string, username string, password string) (r string, e error) {
+func hitCassandraDB(cassandra_url string, keyspace string, username string, password string) (r string, e error) {
 	cluster := gocql.NewCluster(cassandra_url)
 	pass := gocql.PasswordAuthenticator{username, password}
 	cluster.IgnorePeerAddr = true
