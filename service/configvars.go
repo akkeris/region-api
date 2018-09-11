@@ -92,6 +92,22 @@ func GetServiceConfigVars(db *sql.DB, appname string, space string, appbindings 
 			for _, value := range vars {
 				servicevars = append(servicevars, structs.EnvVar{Name: value.Key, Value: value.Value})
 			}
+                } else if servicetype == "influxdb" {
+                        vars,err := GetInfluxdbVars(servicename)
+                        if err != nil {
+                                return err, elist
+                        }
+                        for key, value := range vars {
+                                servicevars = append(servicevars, structs.EnvVar{Name: key, Value: value.(string)})
+                        }
+                } else if servicetype == "cassandra" {
+                        vars,err := GetCassandraVars(servicename)
+                        if err != nil {
+                                return err, elist
+                        }
+                        for key, value := range vars {
+                                servicevars = append(servicevars, structs.EnvVar{Name: key, Value: value.(string)})
+                        }
 		} else if servicetype == "neptune" {
 			vars, err := GetNeptuneVars(servicename)
 			if err != nil {
