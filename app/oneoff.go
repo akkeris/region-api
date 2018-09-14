@@ -6,7 +6,6 @@ import (
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
 	"net/http"
-	"os"
 	config "region-api/config"
 	runtime "region-api/runtime"
 	service "region-api/service"
@@ -93,7 +92,7 @@ func OneOffDeployment(db *sql.DB, oneoff1 structs.OneOffSpec, berr binding.Error
 		elist = append(elist, structs.EnvVar{Name: n, Value: v})
 	}
 	// add service vars
-	err, servicevars := service.GetServiceConfigVars(appbindings)
+	err, servicevars := service.GetServiceConfigVars(db, appname, space, appbindings)
 	if err != nil {
 		utils.ReportError(err, r)
 		return
@@ -101,19 +100,12 @@ func OneOffDeployment(db *sql.DB, oneoff1 structs.OneOffSpec, berr binding.Error
 	for _, e := range servicevars {
 		elist = append(elist, e)
 	}
-	// create secrets
-	var secrets []structs.Namespec
-	var secret structs.Namespec
-	secret.Name = os.Getenv("KUBERNETES_IMAGE_PULL_SECRET")
-	secrets = append(secrets, secret)
-
 	// Create deployment
 	var deployment structs.Deployment
 	deployment.Space = space
 	deployment.App = appname
 	deployment.Amount = instances
 	deployment.ConfigVars = elist
-	deployment.Secrets = secrets
 	deployment.HealthCheck = healthcheck
 	deployment.MemoryRequest = memoryrequest
 	deployment.MemoryLimit = memorylimit

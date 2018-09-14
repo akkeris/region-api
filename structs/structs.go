@@ -116,6 +116,18 @@ type Bindspec struct {
 	Bindname string `json:"bindname"`
 }
 
+//Bindspec bind spec
+type Bindmapspec struct {
+	Id       string `json:"id",omitempty`
+	App      string `json:"appname"`
+	Space    string `json:"space"`
+	Bindtype string `json:"bindtype"`
+	Bindname string `json:"bindname"`
+	VarName  string `json:"varname"`
+	NewName  string `json:"newname",omitempty`
+	Action   string `json:"action"`
+}
+
 //Planspec  plans spec
 type Planspec struct {
 	Size        string `json:"size"`
@@ -153,7 +165,7 @@ type S3spec struct {
 	S3bucket    string `json:"S3_BUCKET"`
 	S3accesskey string `json:"S3_ACCESS_KEY"`
 	S3secretkey string `json:"S3_SECRET_KEY"`
-	S3region string `json:"S3_REGION"`
+	S3region    string `json:"S3_REGION"`
 	Spec        string `json:"spec"`
 }
 
@@ -174,6 +186,32 @@ type Auroramysqlspec struct {
 	DatabaseUrl         string `json:"DATABASE_URL"`
 	DatabaseReadonlyUrl string `json:"DATABASE_READONLY_URL"`
 	Spec                string `json:"spec"`
+}
+
+//Neptunespec Neptune db spec
+type Neptunespec struct {
+	NeptuneDatabaseURL string `json:"NEPTUNE_DATABASE_URL"`
+	NeptuneAccessKey   string `json:"NEPTUNE_ACCESS_KEY"`
+	NeptuneSecretKey   string `json:"NEPTUNE_SECRET_KEY"`
+	NeptuneRegion      string `json:"NEPTUNE_REGION"`
+	Spec               string `json:"spec"`
+}
+
+type Influxdbspec struct {
+        Name  string `json:"INFLUX_DB"`
+        Url   string `json:"INFLUX_URL"`
+        Username    string `json:"INFLUX_USERNAME"`
+        Password string `json:"INFLUX_PASSWORD"`
+        Spec               string `json:"spec"`
+
+}
+
+type Cassandraspec struct {
+        Keyspace string `json:"CASSANDRA_KEYSPACE"`
+        Location string `json:"CASSANDRA_LOCATION"`
+        Password string `json:"CASSANDRA_PASSWORD"`
+        Username string `json:"CASSANDRA_USERNAME"`
+        Spec     string `json:"spec"`
 }
 
 type Deployment struct {

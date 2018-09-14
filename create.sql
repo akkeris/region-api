@@ -9,6 +9,17 @@ begin
         CONSTRAINT appbindings_pkey PRIMARY KEY (appname, bindtype, bindname, space)
     );
 
+    create table if not exists configvarsmap (
+        appname TEXT NOT NULL,
+        bindtype TEXT NOT NULL,
+        bindname TEXT NOT NULL,
+        space TEXT NOT NULL,
+        mapid UUID primary key not null,
+        varname text not null,
+        newname text not null,
+        action text not null -- delete, rename, copy
+    );
+
     create unique index if not exists appbindings_appname_bindtype_bindname_space_key ON appbindings (appname, bindtype, bindname, space);
 
     create table if not exists appfeature
@@ -187,10 +198,6 @@ begin
         INSERT INTO public.plans (name, memrequest, memlimit, price) VALUES ('constellation', '256Mi', '512Mi', 20);
         INSERT INTO public.plans (name, memrequest, memlimit, price) VALUES ('galaxy-prod', '1536Mi', '1536Mi', 45);
         INSERT INTO public.plans (name, memrequest, memlimit, price) VALUES ('constellation-prod', '512Mi', '512Mi', 25);
-        INSERT INTO public.plans (name, memrequest, memlimit, price) VALUES ('phoenix', '2560Mi', '3072Mi', 75);
-        INSERT INTO public.plans (name, memrequest, memlimit, price) VALUES ('phoenix-prod', '3072Mi', '3072Mi', 80);
-        INSERT INTO public.plans (name, memrequest, memlimit, price) VALUES ('valdore-prod', '4096Mi', '4096Mi', 120);
-        INSERT INTO public.plans (name, memrequest, memlimit, price) VALUES ('valdore', '3072Mi', '4096Mi', 100);
     end if;
 
     if (select count(*) from sets where name='oct-apitest-cs') = 0 then

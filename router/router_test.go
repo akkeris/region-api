@@ -3,7 +3,6 @@ package router
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
@@ -142,11 +141,9 @@ func TestHandlers(t *testing.T) {
 							if err := json.NewEncoder(b).Encode(testPath); err != nil {
 								panic(err)
 							}
-							fmt.Println(string(b.Bytes()))
 							r, _ := http.NewRequest("DELETE", "/v1/router/"+testDomain+"/path", b)
 							w := httptest.NewRecorder()
 							m.ServeHTTP(w, r)
-							fmt.Println(w)
 							So(w.Code, ShouldEqual, http.StatusOK)
 						})
 					})
