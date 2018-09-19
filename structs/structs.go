@@ -865,3 +865,18 @@ type URLTemplates struct {
 	Internal string `json:"internal"`
 	External string `json:"external"`
 }
+
+
+type KafkaTopic struct {
+	Topic struct {
+		Name         string `json:"name"`
+		Description  string `json:"description"`
+		Organization string `json:"organization"`
+		Config       struct {
+			Cleanuppolicy string `json:"cleanup.policy"`
+			Partitions    int    `json:"partitions"`
+			Retentionms   int    `json:"retention.ms"`
+			Replicas      int    `json:"replicas"`
+		} `json:"config"`
+	} `json:"topic"`
+}
