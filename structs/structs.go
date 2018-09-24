@@ -870,13 +870,12 @@ type URLTemplates struct {
 type KafkaTopic struct {
 	Topic struct {
 		Name         string `json:"name"`
-		Description  string `json:"description"`
-		Organization string `json:"organization"`
 		Config       struct {
-			Cleanuppolicy string `json:"cleanup.policy"`
-			Partitions    int    `json:"partitions"`
-			Retentionms   int    `json:"retention.ms"`
-			Replicas      int    `json:"replicas"`
+		    Name          string `json:"name"`
+			Cleanuppolicy string `json:"cleanup.policy,omitempty"` //opt
+			Partitions    *int    `json:"partitions,omitempty"` //opt
+			Retentionms   *int    `json:"retention.ms,omitempty"` //opt
+			Replicas      *int    `json:"replicas,omitempty"` //opt
 		} `json:"config"`
 	} `json:"topic"`
 }
