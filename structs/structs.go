@@ -872,10 +872,10 @@ type KafkaTopic struct {
 		Name         string `json:"name"`
 		Config       struct {
 		    Name          string `json:"name"`
-			Cleanuppolicy string `json:"cleanup.policy,omitempty"` //opt
-			Partitions    *int    `json:"partitions,omitempty"` //opt
-			Retentionms   *int    `json:"retention.ms,omitempty"` //opt
-			Replicas      *int    `json:"replicas,omitempty"` //opt
+			Cleanuppolicy string `json:"cleanup.policy,omitempty"`
+			Partitions    *int    `json:"partitions,omitempty"`
+			Retentionms   *int    `json:"retention.ms,omitempty"`
+			Replicas      *int    `json:"replicas,omitempty"`
 		} `json:"config"`
 	} `json:"topic"`
 }
