@@ -331,6 +331,8 @@ func Server() *martini.ClassicMartini {
 	m.Post("/v1/service/kafka/cluster/:cluster/topic", binding.Json(structs.KafkaTopic{}), service.ProvisionTopicV1)
 	m.Get("/v1/service/kafka/topics", service.GetTopicsV1)
 	m.Get("/v1/service/kafka/topics/:topic", service.GetTopicV1)
+	m.Get("/v1/service/kafka/cluster/:cluster/configs", service.GetConfigsV1)
+	m.Get("/v1/service/kafka/cluster/:cluster/configs/:name", service.GetConfigV1)
 
 	// proxy to log shuttle
 	if os.Getenv("LOGSHUTTLE_SERVICE_HOST") != "" && os.Getenv("LOGSHUTTLE_SERVICE_PORT") != "" {

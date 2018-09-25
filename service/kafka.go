@@ -72,3 +72,36 @@ func GetTopicV1(params martini.Params, r render.Render) {
     bodyj, _ := simplejson.NewFromReader(resp.Body)
     r.JSON(resp.StatusCode, bodyj)
 }
+
+func GetConfigsV1(params martini.Params, r render.Render) {
+    cluster := params["cluster"]
+
+    client := &http.Client{}
+    req, err := http.NewRequest("GET", os.Getenv("KAFKA_BROKER_URL")+"/v1/kafka/cluster/"+cluster+"/configs", nil)
+    resp, err := client.Do(req)
+    if err != nil {
+        utils.ReportError(err, r)
+        return
+    }
+
+    defer resp.Body.Close()
+    bodyj, _ := simplejson.NewFromReader(resp.Body)
+    r.JSON(resp.StatusCode, bodyj)
+}
+
+func GetConfigV1(params martini.Params, r render.Render) {
+    cluster := params["cluster"]
+    name := params["name"]
+
+    client := &http.Client{}
+    req, err := http.NewRequest("GET", os.Getenv("KAFKA_BROKER_URL")+"/v1/kafka/cluster/"+cluster+"/configs/"+name, nil)
+    resp, err := client.Do(req)
+    if err != nil {
+        utils.ReportError(err, r)
+        return
+    }
+
+    defer resp.Body.Close()
+    bodyj, _ := simplejson.NewFromReader(resp.Body)
+    r.JSON(resp.StatusCode, bodyj)
+}
