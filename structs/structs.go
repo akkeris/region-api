@@ -879,3 +879,13 @@ type KafkaTopic struct {
 		} `json:"config"`
 	} `json:"topic"`
 }
+
+type KafkaAclCredentials struct {
+    AclCredentials struct {
+        Username string `json:"username"`
+    } `json:"aclCredentials"`
+}
+
+type Kafkaspec struct {
+    Spec string `json:"spec"`
+}

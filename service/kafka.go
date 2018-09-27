@@ -9,9 +9,43 @@ import (
 	"github.com/martini-contrib/render"
 	"net/http"
 	"os"
+    "io/ioutil"
 	structs "region-api/structs"
 	utils "region-api/utils"
 )
+
+func ProvisionKafkaV1(spec structs.Provisionspec, berr binding.Errors, r render.Render) {
+    if berr != nil {
+        utils.ReportInvalidRequest(berr[0].Message, r)
+        return
+    }
+
+    client := &http.Client{}
+    req, err := http.NewRequest("POST", os.Getenv("KAFKA_BROKER_URL")+"/v1/kafka/cluster/"+spec.Plan +"/user", nil)
+    resp, err := client.Do(req)
+    if err != nil {
+        utils.ReportError(err, r)
+        return
+    }
+    defer resp.Body.Close()
+
+    var kafka structs.Kafkaspec
+    var creds structs.KafkaAclCredentials
+
+    bodybytes, err := ioutil.ReadAll(resp.Body)
+    if err != nil {
+        utils.ReportError(err, r)
+        return
+    }
+
+    err = json.Unmarshal(bodybytes, &creds)
+    if err != nil {
+        utils.ReportError(err, r)
+        return
+    }
+    kafka.Spec = "kafka:" + creds.AclCredentials.Username
+    r.JSON(201, kafka)
+}
 
 func ProvisionTopicV1(spec structs.KafkaTopic, params martini.Params, berr binding.Errors, r render.Render) {
     cluster := params["cluster"]
