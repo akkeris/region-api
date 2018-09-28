@@ -882,10 +882,25 @@ type KafkaTopic struct {
 
 type KafkaAclCredentials struct {
     AclCredentials struct {
-        Username string `json:"username"`
+        Username   string `json:"username"`
     } `json:"aclCredentials"`
 }
 
 type Kafkaspec struct {
     Spec string `json:"spec"`
+}
+
+type TopicSchemaMapping struct {
+    Topic         string `json:"topic"`
+    Schema        struct {
+        Name      string `json:"name"`
+    } `json:"schema"`
+}
+
+type TopicKeyMapping struct {
+    Topic         string `json:"topic"`
+    KeyType       string `json:"keyType"`
+    Schema        *struct {
+        Name      string `json:"name"`
+    } `json:"schema,omitempty"`
 }

@@ -139,3 +139,96 @@ func GetConfigV1(params martini.Params, r render.Render) {
     bodyj, _ := simplejson.NewFromReader(resp.Body)
     r.JSON(resp.StatusCode, bodyj)
 }
+
+
+func GetSchemasV1(params martini.Params, r render.Render) {
+    cluster := params["cluster"]
+
+    client := &http.Client{}
+    req, err := http.NewRequest("GET", os.Getenv("KAFKA_BROKER_URL")+"/v1/kafka/cluster/"+cluster+"/schemas", nil)
+    resp, err := client.Do(req)
+    if err != nil {
+        utils.ReportError(err, r)
+        return
+    }
+
+    defer resp.Body.Close()
+    bodyj, _ := simplejson.NewFromReader(resp.Body)
+    r.JSON(resp.StatusCode, bodyj)
+}
+
+func GetSchemaV1(params martini.Params, r render.Render) {
+    cluster := params["cluster"]
+    schema := params["schema"]
+
+    client := &http.Client{}
+    req, err := http.NewRequest("GET", os.Getenv("KAFKA_BROKER_URL")+"/v1/kafka/cluster/"+cluster+"/schemas/"+schema, nil)
+    resp, err := client.Do(req)
+    if err != nil {
+        utils.ReportError(err, r)
+        return
+    }
+
+    defer resp.Body.Close()
+    bodyj, _ := simplejson.NewFromReader(resp.Body)
+    r.JSON(resp.StatusCode, bodyj)
+}
+
+func CreateTopicKeyMappingV1(spec structs.TopicKeyMapping, params martini.Params, berr binding.Errors, r render.Render) {
+    cluster := params["cluster"]
+
+    if berr != nil {
+        utils.ReportInvalidRequest(berr[0].Message, r)
+        return
+    }
+
+    client := &http.Client{}
+    str, err := json.Marshal(spec)
+    if err != nil {
+        utils.ReportError(err, r)
+        return
+    }
+
+    jsonStr := []byte(string(str))
+    req, err := http.NewRequest("POST", os.Getenv("KAFKA_BROKER_URL")+"/v1/kafka/cluster/"+cluster+"/topic-key-mapping", bytes.NewBuffer(jsonStr))
+    req.Header.Set("Content-Type", "application/json")
+
+    resp, err := client.Do(req)
+    if err != nil {
+        utils.ReportError(err, r)
+        return
+    }
+    defer resp.Body.Close()
+
+    bodyj, _ := simplejson.NewFromReader(resp.Body)
+    r.JSON(resp.StatusCode, bodyj)
+}
+
+func CreateTopicSchemaMappingV1(spec structs.TopicSchemaMapping, params martini.Params, berr binding.Errors, r render.Render) {
+    cluster := params["cluster"]
+    if berr != nil {
+        utils.ReportInvalidRequest(berr[0].Message, r)
+        return
+    }
+
+    client := &http.Client{}
+    str, err := json.Marshal(spec)
+    if err != nil {
+        utils.ReportError(err, r)
+        return
+    }
+
+    jsonStr := []byte(string(str))
+    req, err := http.NewRequest("POST", os.Getenv("KAFKA_BROKER_URL")+"/v1/kafka/cluster/"+cluster+"/topic-schema-mapping", bytes.NewBuffer(jsonStr))
+    req.Header.Set("Content-Type", "application/json")
+
+    resp, err := client.Do(req)
+    if err != nil {
+        utils.ReportError(err, r)
+        return
+    }
+    defer resp.Body.Close()
+
+    bodyj, _ := simplejson.NewFromReader(resp.Body)
+    r.JSON(resp.StatusCode, bodyj)
+}
