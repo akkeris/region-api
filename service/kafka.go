@@ -2,6 +2,7 @@ package service
 
 import (
     "database/sql"
+    "github.com/lib/pq"
 	"bytes"
 	"encoding/json"
 	"github.com/bitly/go-simplejson"
@@ -330,7 +331,7 @@ func DeleteAclV1(params martini.Params, r render.Render) {
     r.JSON(resp.StatusCode, bodyj)
 }
 
-func GetAclsV1(request *http.Request, params martini.Params, r render.Render) {
+func GetAclsV1(db *sql.DB, request *http.Request, params martini.Params, r render.Render) {
     cluster := params["cluster"]
     topic := request.URL.Query().Get("topic")
     var aclsResponse AclsResponse
@@ -361,13 +362,48 @@ func GetAclsV1(request *http.Request, params martini.Params, r render.Render) {
         utils.ReportError(err, r)
         return
     }
-
+    getAppBindings(db, aclsResponse.Acls)
     r.JSON(resp.StatusCode, aclsResponse)
 }
 
 func getAppBindings(db *sql.DB, acls []Acl) {
-    aclMap := make(map[string]Acl)
+    aclIndexMap := make(map[string]int)
+    users := make([]string, len(acls))
+
     for i := 0; i < len(acls); i +=1 {
-        aclMap[acls[i].User] = acls[i]
+        aclIndexMap[acls[i].User] = i
+        users[i] = acls[i].User
     }
+
+    stmt, dberr := db.Prepare("select bindname, appname, space from appbindings where bindtype = $1 and bindname = Any($2)")
+    if dberr != nil {
+        fmt.Println(dberr)
+        return
+    }
+    defer stmt.Close()
+    rows, err := stmt.Query("kafka", pq.Array(users))
+    if err != nil {
+        fmt.Println(err)
+        return
+    }
+
+    defer rows.Close()
+
+    for rows.Next() {
+        var user string
+        var appname string
+        var space string
+        err := rows.Scan(&user, &appname, &space)
+        if err != nil {
+            fmt.Println(err)
+            return
+        }
+
+        if(appname != "") {
+            i := aclIndexMap[user]
+            acls[i].Appname = appname
+            acls[i].Space = space
+        }
+    }
+
 }
