@@ -328,7 +328,7 @@ func Server() *martini.ClassicMartini {
 	m.Get("/v1/utils/nodes", utils.GetNodes)
 	m.Get("/v1/utils/urltemplates", templates.GetURLTemplates)
 
-    m.Post("/v1/service/kafka/instance", binding.Json(structs.Provisionspec{}), service.ProvisionKafkaV1)
+	m.Post("/v1/service/kafka/instance", binding.Json(structs.Provisionspec{}), service.ProvisionKafkaV1)
 	m.Post("/v1/service/kafka/cluster/:cluster/topic", binding.Json(structs.KafkaTopic{}), service.ProvisionTopicV1)
 	m.Get("/v1/service/kafka/topics", service.GetTopicsV1)
 	m.Get("/v1/service/kafka/topics/:topic", service.GetTopicV1)
@@ -338,6 +338,9 @@ func Server() *martini.ClassicMartini {
 	m.Get("/v1/service/kafka/cluster/:cluster/schemas/:schema", service.GetSchemaV1)
 	m.Post("/v1/service/kafka/cluster/:cluster/topic-key-mapping", binding.Json(structs.TopicKeyMapping{}), service.CreateTopicKeyMappingV1)
 	m.Post("/v1/service/kafka/cluster/:cluster/topic-schema-mapping", binding.Json(structs.TopicSchemaMapping{}), service.CreateTopicSchemaMappingV1)
+	m.Get("/v1/service/kafka/cluster/:cluster/acls", service.GetAclsV1)
+	m.Post("/v1/service/kafka/cluster/:cluster/acls", binding.Json(structs.AclRequest{}), service.CreateAclV1)
+	m.Delete("/v1/service/kafka/acls/:id", service.DeleteAclV1)
 
 	// proxy to log shuttle
 	if os.Getenv("LOGSHUTTLE_SERVICE_HOST") != "" && os.Getenv("LOGSHUTTLE_SERVICE_PORT") != "" {

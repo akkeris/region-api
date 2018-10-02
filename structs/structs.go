@@ -904,3 +904,11 @@ type TopicKeyMapping struct {
         Name      string `json:"name"`
     } `json:"schema,omitempty"`
 }
+
+type AclRequest struct {
+    Topic         string `json:"topic"`
+    User          string `json:"user,omitempty"`
+    Space         string `json:"space"`
+    Appname       string `json:"app"`
+    Role          string `json:"role"`
+}
