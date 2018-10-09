@@ -328,9 +328,11 @@ func Server() *martini.ClassicMartini {
 	m.Get("/v1/utils/nodes", utils.GetNodes)
 	m.Get("/v1/utils/urltemplates", templates.GetURLTemplates)
 
+	m.Get("/v1/service/kafka/plans", service.GetKafkaPlansV1)
 	m.Post("/v1/service/kafka/instance", binding.Json(structs.Provisionspec{}), service.ProvisionKafkaV1)
 	m.Post("/v1/service/kafka/cluster/:cluster/topic", binding.Json(structs.KafkaTopic{}), service.ProvisionTopicV1)
 	m.Get("/v1/service/kafka/topics", service.GetTopicsV1)
+	m.Delete("/v1/service/kafka/cluster/:cluster/topics/:topic", service.DeleteTopicV1)
 	m.Get("/v1/service/kafka/topics/:topic", service.GetTopicV1)
 	m.Get("/v1/service/kafka/cluster/:cluster/configs", service.GetConfigsV1)
 	m.Get("/v1/service/kafka/cluster/:cluster/configs/:name", service.GetConfigV1)

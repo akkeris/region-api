@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"fmt"
+	"errors"
     "io/ioutil"
 	structs "region-api/structs"
 	utils "region-api/utils"
@@ -406,4 +407,58 @@ func getAppBindings(db *sql.DB, acls []Acl) {
         }
     }
 
+}
+
+func GetKafkaPlansV1(params martini.Params, r render.Render) {
+    client := &http.Client{}
+    req, err := http.NewRequest("GET", os.Getenv("KAFKA_BROKER_URL")+"/v1/kafka/clusters", nil)
+    resp, err := client.Do(req)
+    if err != nil {
+        utils.ReportError(err, r)
+        return
+    }
+
+    defer resp.Body.Close()
+    bodyj, _ := simplejson.NewFromReader(resp.Body)
+    r.JSON(resp.StatusCode, bodyj)
+}
+
+func DeleteTopicV1(params martini.Params, r render.Render) {
+    cluster := params["cluster"]
+    topic := params["topic"]
+
+    client := &http.Client{}
+    req, err := http.NewRequest("DELETE", os.Getenv("KAFKA_BROKER_URL")+"/v1/kafka/cluster/"+cluster+"/topics/"+topic, nil)
+    resp, err := client.Do(req)
+    if err != nil {
+        utils.ReportError(err, r)
+        return
+    }
+
+    defer resp.Body.Close()
+    bodyj, _ := simplejson.NewFromReader(resp.Body)
+    r.JSON(resp.StatusCode, bodyj)
+}
+
+//Getkafkavars  centralized
+func Getkafkavars(db *sql.DB, appname string, space string) (error, map[string]interface{}) {
+    username := getUserName(db, appname, space)
+    config := make(map[string]interface{})
+    if(username == "") {
+        return errors.New("Failure to obtain kafka username binding"), config
+    }
+
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", os.Getenv("KAFKA_BROKER_URL")+"/v1/kafka/credentials/"+username, nil)
+	resp, err := client.Do(req)
+	if err != nil {
+		return err, config
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode > 299 {
+		return errors.New("Failure to obtain kafka URL"), config
+	}
+	bodyj, _ := simplejson.NewFromReader(resp.Body)
+	config, _ = bodyj.Map()
+	return nil, config
 }
