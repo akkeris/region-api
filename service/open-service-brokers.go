@@ -59,11 +59,6 @@ func NewOSBClientServices(serviceUrls []string, db *sql.DB) (*OSBClientServices,
 	return &osbClientServices, nil
 }
 
-// TODO: Create/update task worker
-// TODO: ReportError should maybe be cognizant of osb protocol.
-// TODO: Fix instance exists
-// TODO: handle returning creds when still being created.
-
 func (cserv *OSBClientServices) init() {
 	go (func() {
 		t := time.NewTicker(time.Minute * 30)
