@@ -31,6 +31,16 @@ begin
         CONSTRAINT appfeature_pkey PRIMARY KEY (space, app, optionkey)
     );
 
+    create table if not exists service_instances
+    (
+        instance_id varchar(1024) not null primary key,
+        service_id varchar(1024) not null,
+        plan_id varchar(1024) not null,
+        operation_key varchar(1024) null,
+        status varchar(1024) not null default '',
+        metadata text default ''
+    );
+
     create table if not exists appopsgenie
     (
         space TEXT NOT NULL,

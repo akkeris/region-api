@@ -21,7 +21,7 @@ func main() {
 	if os.Getenv("STACKIMPACT") != "" {
 		stackimpact.Start(stackimpact.Options{
 			AgentKey: os.Getenv("STACKIMPACT"),
-			AppName:  "Alamo API",
+			AppName:  "Region API",
 		})
 	}
 	utils.InitAuth()
