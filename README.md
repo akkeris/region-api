@@ -2,27 +2,7 @@
 
 HTTP API for regional akkeris actions, it integrates with kubernetes, and service brokers in addition to the ingress.
 
-
 ## Installation
-
-### Dependencies
-
-* github.com/bitly/go-simplejson
-* github.com/go-martini/martini
-* github.com/martini-contrib/binding
-* github.com/martini-contrib/render
-* github.com/lib/pq
-* github.com/nu7hatch/gouuid
-* github.com/martini-contrib/auth
-* github.com/aws/aws-sdk-go/aws
-* github.com/aws/aws-sdk-go/aws/session
-* github.com/aws/aws-sdk-go/service/route53
-* github.com/robfig/cron
-* gopkg.in/mgo.v2
-* gopkg.in/mgo.v2/bson
-* gopkg.in/Shopify/sarama.v1
-* github.com/octanner/f5er/f5
-* github.com/akkeris/vault-client
 
 ### Setup
 
@@ -50,6 +30,7 @@ Set the following environment variables, if this is first time running it see th
 * NAGIOS_ADDRESS
 * SUBSCRIPTION_URL
 * SECRETS - A comma delimited list of vault paths where shared credentials are stored
+* SERVICES - A comma delimited list of urls for open service brokers to use
 * ALAMO_API_AUTH_SECRET
 * F5_SECRET - The path to the token or password in vault
 * F5_URL - The https URL of the F5 
@@ -102,8 +83,9 @@ Set the following environment variables, if this is first time running it see th
 * DEBUG_F5 - print out all f5 calls, set to true
 * MARTINI_ENV
 
+Note that dependencies are managed via `dep` command line tool, run `dep ensure` before building.
 
 ```sh
-$ docker build -t alamo-api .
-$ docker run -p 3000:3000 -e <see below> alamo-api
+$ docker build -t region-api .
+$ docker run -p 3000:3000 -e <see below> region-api
 ```
