@@ -83,6 +83,22 @@ func ProxyToPrometheus(res http.ResponseWriter, req *http.Request) {
 func InitOldServiceEndpoints(m *martini.ClassicMartini) {
 	// While moving over to the open service broker api spec
 	// these old end points formats should no longer be used.
+	m.Get("/v1/service/kafka/plans", service.GetKafkaPlansV1)
+	m.Post("/v1/service/kafka/instance", binding.Json(structs.Provisionspec{}), service.ProvisionKafkaV1)
+	m.Post("/v1/service/kafka/cluster/:cluster/topic", binding.Json(structs.KafkaTopic{}), service.ProvisionTopicV1)
+	m.Get("/v1/service/kafka/topics", service.GetTopicsV1)
+	m.Delete("/v1/service/kafka/cluster/:cluster/topics/:topic", service.DeleteTopicV1)
+	m.Get("/v1/service/kafka/topics/:topic", service.GetTopicV1)
+	m.Get("/v1/service/kafka/cluster/:cluster/configs", service.GetConfigsV1)
+	m.Get("/v1/service/kafka/cluster/:cluster/configs/:name", service.GetConfigV1)
+	m.Get("/v1/service/kafka/cluster/:cluster/schemas", service.GetSchemasV1)
+	m.Get("/v1/service/kafka/cluster/:cluster/schemas/:schema", service.GetSchemaV1)
+	m.Post("/v1/service/kafka/cluster/:cluster/topic-key-mapping", binding.Json(structs.TopicKeyMapping{}), service.CreateTopicKeyMappingV1)
+	m.Post("/v1/service/kafka/cluster/:cluster/topic-schema-mapping", binding.Json(structs.TopicSchemaMapping{}), service.CreateTopicSchemaMappingV1)
+	m.Get("/v1/service/kafka/cluster/:cluster/acls", service.GetAclsV1)
+	m.Post("/v1/service/kafka/cluster/:cluster/acls", binding.Json(structs.AclRequest{}), service.CreateAclV1)
+	m.Delete("/v1/service/kafka/acls/:id", service.DeleteAclV1)
+  
 	m.Get("/v1/service/redis/plans", service.Getredisplans)
 	m.Get("/v1/service/redis/url/:servicename", service.Getredisurl)
 	m.Post("/v1/service/redis/instance", binding.Json(structs.Provisionspec{}), service.Provisionredis)
