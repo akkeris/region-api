@@ -12,7 +12,7 @@ func GetServiceConfigVars(db *sql.DB, appname string, space string, appbindings 
 	for _, element := range appbindings {
 		servicetype := element.Bindtype
 		servicename := element.Bindname
-		servicevars := []structs.EnvVar{}
+		servicevars := []structs.EnvVar{}		
 
 		if servicetype == "redis" {
 			err, vars := Getredisvars(servicename)
@@ -110,6 +110,17 @@ func GetServiceConfigVars(db *sql.DB, appname string, space string, appbindings 
                         }
 		} else if servicetype == "neptune" {
 			vars, err := GetNeptuneVars(servicename)
+			if err != nil {
+				return err, elist
+			}
+			for key, value := range vars {
+				servicevars = append(servicevars, structs.EnvVar{Name: key, Value: value.(string)})
+			}
+
+		// if nothing else matches see if we match an
+		// open service broker that dynamically registered.
+		} else if IsOSBService(servicetype) {
+			vars, err := GetOSBBindingCredentials(servicetype, servicename, appname + "-" + space)
 			if err != nil {
 				return err, elist
 			}
