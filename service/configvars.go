@@ -86,6 +86,14 @@ func GetServiceConfigVars(db *sql.DB, appname string, space string, appbindings 
 			for key, value := range vars {
 				servicevars = append(servicevars, structs.EnvVar{Name: key, Value: value})
 			}
+		} else if servicetype == "kafka" {
+			err, vars := Getkafkavars(db, appname, space)
+			if err != nil {
+				return err, elist
+			}
+			for key, value := range vars {
+				servicevars = append(servicevars, structs.EnvVar{Name: key, Value: value.(string)})
+			}
 		} else if servicetype == "vault" {
 			// vault panics if we cannot reach it, just crash the entire API (apparently)
 			vars := vault.GetVaultVariables(servicename)
