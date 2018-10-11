@@ -30,7 +30,7 @@ Set the following environment variables, if this is first time running it see th
 * NAGIOS_ADDRESS
 * SUBSCRIPTION_URL
 * SECRETS - A comma delimited list of vault paths where shared credentials are stored
-* SERVICES - A comma delimited list of urls for open service brokers to use
+* SERVICES - A comma delimited list of urls for open service brokers to use e.g., (https://user:pass@hostname/,https://:token@hostname/)
 * ALAMO_API_AUTH_SECRET
 * F5_SECRET - The path to the token or password in vault
 * F5_URL - The https URL of the F5 
