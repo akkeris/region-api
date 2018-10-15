@@ -260,11 +260,11 @@ func (cserv *OSBClientServices) Provision(instanceId string, service *osb.Servic
 			opkey = &tmpkey
 		}
 		if err = cserv.InsertInstanceInfo(instanceId, service.ID, plan.ID, opkey, osb.StateInProgress); err != nil {
-			log.Printf("ERROR: Cannot record instance %s %s %s %s because %s\n", instanceId, service.ID, plan.ID, opkey, err.Error())
+			log.Printf("ERROR: Cannot record instance %s %s %s because %s\n", instanceId, service.ID, plan.ID, err.Error())
 		}
 	} else {
 		if err = cserv.InsertInstanceInfo(instanceId, service.ID, plan.ID, nil, osb.StateInProgress); err != nil {
-			log.Printf("ERROR: Cannot record instance %s %s %s %s because %s\n", instanceId, service.ID, plan.ID, nil, err.Error())
+			log.Printf("ERROR: Cannot record instance %s %s %s because %s\n", instanceId, service.ID, plan.ID, err.Error())
 		}
 	}
 
