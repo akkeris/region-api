@@ -185,8 +185,8 @@ type Deploymentspec struct {
 		Strategy struct {
 			Type          string `json:"type,omitempty"`
 			RollingUpdate struct {
-				MaxUnavailable int `json:"maxUnavailable"`
-				MaxSurge       int `json:"maxSurge,omitempty"`
+				MaxUnavailable interface{} `json:"maxUnavailable"`
+				MaxSurge       interface{} `json:"maxSurge,omitempty"`
 			} `json:"rollingUpdate"`
 		} `json:"strategy"`
 		Selector struct {
