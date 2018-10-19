@@ -158,8 +158,7 @@ func GetServiceConfigVars(db *sql.DB, appname string, space string, appbindings 
 					newvars = append(newvars, structs.EnvVar{Name: newname, Value: servicevar.Value})
 				} else if varname == servicevar.Name && action == "delete" {
 					removevars = append(removevars, structs.EnvVar{Name: servicevar.Name, Value: servicevar.Value})
-				} else if varname == servicevar.Name && action == "rename" {
-
+				} else if (varname == servicevar.Name || varname == "*") && action == "rename" {
 					removevars = append(removevars, structs.EnvVar{Name: servicevar.Name, Value: servicevar.Value})
 					newvars = append(newvars, structs.EnvVar{Name: newname, Value: servicevar.Value})
 				} else {
