@@ -222,7 +222,7 @@ func InitOpenServiceBrokerEndpoints(db *sql.DB, m *martini.ClassicMartini) {
 	m.Get("/v2/service_instances/:instance_id/last_operation", catalogOSBProvider.HttpGetLastOperation)
 	m.Put("/v2/service_instances/:instance_id", binding.Json(service.ProvisionRequestBody{}), catalogOSBProvider.HttpGetCreateOrUpdateInstance)
 	m.Delete("/v2/service_instances/:instance_id", catalogOSBProvider.HttpDeleteInstance)
-	m.Patch("/v2/service_instances/:instance_id", catalogOSBProvider.HttpPartialUpdateInstance)
+	m.Patch("/v2/service_instances/:instance_id", binding.Json(service.UpdateRequestBody{}), catalogOSBProvider.HttpPartialUpdateInstance)
 	m.Put("/v2/service_instances/:instance_id/service_bindings/:binding_id",  binding.Json(service.BindRequestBody{}), catalogOSBProvider.HttpCreateOrUpdateBinding)
 	m.Get("/v2/service_instances/:instance_id/service_bindings/:binding_id", catalogOSBProvider.HttpGetBinding)
 	m.Get("/v2/service_instances/:instance_id/service_bindings/:binding_id/last_operation", catalogOSBProvider.HttpGetBindingLastOperation)
