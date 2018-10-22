@@ -47,6 +47,27 @@ type ProvisionRequestBody struct {
 	Parameters       map[string]interface{} `json:"parameters,omitempty"`
 	Context          map[string]interface{} `json:"context,omitempty"`
 }
+
+type PreviousValues struct {
+	PlanID string `json:"plan_id,omitempty"`
+	ServiceID string `json:"service_id,omitempty"`
+	OrgID string `json:"organization_id,omitempty"`
+	SpaceID string `json:"space_id,omitempty"`
+}
+
+type UpdateRequestBody struct {
+	ServiceID      string                 `json:"service_id"`
+	PlanID         *string                `json:"plan_id,omitempty"`
+	Parameters     map[string]interface{} `json:"parameters,omitempty"`
+	Context        map[string]interface{} `json:"context,omitempty"`
+	PreviousValues *PreviousValues        `json:"previous_values,omitempty"`
+}
+
+type updateInstanceResponseBody struct {
+	DashboardURL *string `json:"dashboard_url"`
+	Operation    *osb.OperationKey `json:"operation"`
+}
+
 type provisionSuccessResponseBody struct {
 	DashboardURL *string `json:"dashboard_url"`
 	Operation    *osb.OperationKey `json:"operation"`
@@ -433,6 +454,53 @@ func (cserv *OSBClientServices) HttpGetLastOperation(params martini.Params, r re
 	}
 	r.JSON(http.StatusOK, resp)
 }
+
+func (cserv *OSBClientServices) HttpPartialUpdateInstance(params martini.Params, spec UpdateRequestBody, berr binding.Errors, r render.Render) {
+	if berr != nil {
+		log.Println("Failed to unserialize request")
+		utils.ReportInvalidRequest(berr[0].Message, r)
+		return
+	}
+
+	instanceId := params["instance_id"]
+	service, err := cserv.GetServiceByID(spec.ServiceID)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	if spec.PlanID == nil {
+		r.JSON(http.StatusNotFound, map[string]interface{}{"error":"PlanNotFound", "description":"The specified plan was not found."})
+		return
+	}
+	plan, err := cserv.GetPlanByID(spec.ServiceID, *spec.PlanID)
+	if err != nil && err.Error() == "Unable to find service" {
+		r.JSON(http.StatusNotFound, map[string]interface{}{"error":"ServiceNotFound", "description":"The specified service was not found."})
+		return
+	} else if err != nil && err.Error() == "Unable to find plan" {
+		r.JSON(http.StatusNotFound, map[string]interface{}{"error":"PlanNotFound", "description":"The specified plan was not found."})
+		return
+	} else if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+
+	_, _, _, status, err := cserv.GetInstanceInfoByID(instanceId)
+
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	} else if status != string(osb.StateInProgress) {
+		resp, err := cserv.Update(instanceId, service, plan)
+		if err != nil {
+			utils.ReportError(err, r)
+			return
+		}
+		r.JSON(http.StatusOK, updateInstanceResponseBody{DashboardURL:nil, Operation:resp.OperationKey})
+	} else {
+		r.JSON(http.StatusConflict, map[string]interface{}{"error":"ProvisionInProgress", "description":"This instance cannot be provisioned or updated because a provision is already in progress."})
+	}
+}
+
 
 func (cserv *OSBClientServices) HttpGetCreateOrUpdateInstance(params martini.Params, spec ProvisionRequestBody, berr binding.Errors, r render.Render) {
 	if berr != nil {
