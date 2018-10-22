@@ -65,7 +65,7 @@ type UpdateRequestBody struct {
 
 type updateInstanceResponseBody struct {
 	DashboardURL *string `json:"dashboard_url"`
-	Operation    *string `json:"operation"`
+	Operation    *osb.OperationKey `json:"operation"`
 }
 
 type provisionSuccessResponseBody struct {
@@ -495,7 +495,7 @@ func (cserv *OSBClientServices) HttpPartialUpdateInstance(params martini.Params,
 			utils.ReportError(err, r)
 			return
 		}
-		r.JSON(http.StatusOK, provisionSuccessResponseBody{DashboardURL:nil, Operation:resp.OperationKey})
+		r.JSON(http.StatusOK, updateInstanceResponseBody{DashboardURL:nil, Operation:resp.OperationKey})
 	} else {
 		r.JSON(http.StatusConflict, map[string]interface{}{"error":"ProvisionInProgress", "description":"This instance cannot be provisioned or updated because a provision is already in progress."})
 	}
