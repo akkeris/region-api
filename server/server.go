@@ -233,6 +233,11 @@ func InitOpenServiceBrokerEndpoints(db *sql.DB, m *martini.ClassicMartini) {
 	m.Patch("/v2/service_instances/:instance_id/actions/:action_id", catalogOSBProvider.HttpForwardAction)
 	m.Put("/v2/service_instances/:instance_id/actions/:action_id", catalogOSBProvider.HttpForwardAction)
 	m.Post("/v2/service_instances/:instance_id/actions/:action_id", catalogOSBProvider.HttpForwardAction)
+	m.Delete("/v2/service_instances/:instance_id/actions/:action_id/:action_subject", catalogOSBProvider.HttpForwardAction)
+	m.Get("/v2/service_instances/:instance_id/actions/:action_id/:action_subject", catalogOSBProvider.HttpForwardAction)
+	m.Patch("/v2/service_instances/:instance_id/actions/:action_id/:action_subject", catalogOSBProvider.HttpForwardAction)
+	m.Put("/v2/service_instances/:instance_id/actions/:action_id/:action_subject", catalogOSBProvider.HttpForwardAction)
+	m.Post("/v2/service_instances/:instance_id/actions/:action_id/:action_subject", catalogOSBProvider.HttpForwardAction)
 }
 
 func Server(db *sql.DB) *martini.ClassicMartini {

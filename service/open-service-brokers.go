@@ -606,6 +606,7 @@ func (cserv *OSBClientServices) HttpForwardAction(params martini.Params, res htt
 		return
 	}
 	rp := httputil.NewSingleHostReverseProxy(uri)
+	req.Host = uri.Host
 	rp.FlushInterval = time.Duration(200) * time.Millisecond
 	rp.ServeHTTP(res, req)
 }
