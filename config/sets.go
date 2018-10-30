@@ -36,6 +36,9 @@ func Createset(db *sql.DB, spec structs.Setspec, berr binding.Errors, r render.R
 	var setid string
 
 	err := db.QueryRow("INSERT INTO sets(setid,name,type) VALUES($1,$2,$3) returning setid;", newsetid, setname, settype).Scan(&setid)
+	if err != nil && err.Error() == "pq: duplicate key value violates unique constraint \"unique_name\"" {
+		err = db.QueryRow("SELECT setid from sets where name = $1 and type = $2", setname, settype).Scan(&setid)
+	}
 	if err != nil {
 		utils.ReportError(err, r)
 		return
