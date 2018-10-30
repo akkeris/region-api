@@ -245,8 +245,12 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 	if (structs.Features{}) != deploy1.Features {
 		deployment.Features = deploy1.Features
 	}
-	newDeployment := !rt.DeploymentExists(space, appname)
-	if newDeployment {
+	deploymentExists, err := rt.DeploymentExists(space, appname)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	if !deploymentExists {
 		err = rt.CreateDeployment(&deployment)
 		if err != nil {
 			fmt.Println(err)
@@ -263,7 +267,7 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 
 	// Create/update service
 	if finalport != -1 {
-		if newDeployment {
+		if !deploymentExists {
 			_, err := rt.CreateService(space, appname, finalport)
 			if err != nil {
 				utils.ReportError(err, r)
@@ -280,7 +284,7 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 
 	// Prepare the response back
 	var deployresponse structs.Deployresponse
-	if newDeployment {
+	if !deploymentExists {
 		if finalport != -1 {
 			deployresponse.Service = "Service Created"
 		}
