@@ -431,6 +431,9 @@ func (rt Kubernetes) DeploymentExists(space string, app string) (bool, error) {
 	if e != nil {
 		return false, e
 	}
+	if resp.StatusCode == 404 {
+		return false, nil
+	}
 	if resp.StatusCode > 399 || resp.StatusCode < 200 {
 		return false, errors.New("Cannot determine if deployment exists for " + app + "-" + space + " received: " + resp.Status + " " + string(resp.Body))
 	}
