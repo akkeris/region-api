@@ -911,4 +911,5 @@ type AclRequest struct {
     Space         string `json:"space"`
     Appname       string `json:"app"`
     Role          string `json:"role"`
+    ConsumerGroupName string `json:"consumerGroupName,omitempty"`
 }
