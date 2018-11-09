@@ -73,6 +73,19 @@ type provisionSuccessResponseBody struct {
 	Operation    *osb.OperationKey `json:"operation"`
 }
 
+type osbErrors struct {
+	ErrorMessage *string `json:"error"`
+	Description *string `json:"description"`
+}
+
+func ProcessErrors(err error, r render.Render) {
+	if herr, is_http := osb.IsHTTPError(err); is_http {
+		r.JSON(herr.StatusCode, osbErrors{ErrorMessage:herr.ErrorMessage, Description:herr.Description})
+	} else {
+		utils.ReportError(err,r)		
+	}
+}
+
 func NewOSBClientServices(serviceUrls []string, db *sql.DB) (*OSBClientServices, error) {
 	var osbClientServices OSBClientServices = OSBClientServices{serviceUrls:serviceUrls, db:db}
 	osbClientServices.init()
@@ -440,7 +453,7 @@ func (cserv *OSBClientServices) GetInstanceStatus(instanceId string) (*osb.LastO
 func (cserv *OSBClientServices) HttpGetCatalog(params martini.Params, r render.Render) {
 	catalog, err := cserv.GetOSBServices()
 	if err != nil {
-		utils.ReportError(err, r)
+		ProcessErrors(err, r)
 		return
 	}
 	r.JSON(http.StatusOK, catalog)
@@ -449,7 +462,7 @@ func (cserv *OSBClientServices) HttpGetCatalog(params martini.Params, r render.R
 func (cserv *OSBClientServices) HttpGetLastOperation(params martini.Params, r render.Render) {
 	resp, err := cserv.GetInstanceStatus(params["instance_id"])
 	if err != nil {
-		utils.ReportError(err, r)
+		ProcessErrors(err, r)
 		return
 	}
 	r.JSON(http.StatusOK, resp)
@@ -465,7 +478,7 @@ func (cserv *OSBClientServices) HttpPartialUpdateInstance(params martini.Params,
 	instanceId := params["instance_id"]
 	service, err := cserv.GetServiceByID(spec.ServiceID)
 	if err != nil {
-		utils.ReportError(err, r)
+		ProcessErrors(err, r)
 		return
 	}
 	if spec.PlanID == nil {
@@ -480,19 +493,19 @@ func (cserv *OSBClientServices) HttpPartialUpdateInstance(params martini.Params,
 		r.JSON(http.StatusNotFound, map[string]interface{}{"error":"PlanNotFound", "description":"The specified plan was not found."})
 		return
 	} else if err != nil {
-		utils.ReportError(err, r)
+		ProcessErrors(err, r)
 		return
 	}
 
 	_, _, _, status, err := cserv.GetInstanceInfoByID(instanceId)
 
 	if err != nil {
-		utils.ReportError(err, r)
+		ProcessErrors(err, r)
 		return
 	} else if status != string(osb.StateInProgress) {
 		resp, err := cserv.Update(instanceId, service, plan)
 		if err != nil {
-			utils.ReportError(err, r)
+			ProcessErrors(err, r)
 			return
 		}
 		r.JSON(http.StatusOK, updateInstanceResponseBody{DashboardURL:nil, Operation:resp.OperationKey})
@@ -520,7 +533,7 @@ func (cserv *OSBClientServices) HttpGetCreateOrUpdateInstance(params martini.Par
 	
 	service, err := cserv.GetServiceByID(spec.ServiceID)
 	if err != nil {
-		utils.ReportError(err, r)
+		ProcessErrors(err, r)
 		return
 	}
 
@@ -532,7 +545,7 @@ func (cserv *OSBClientServices) HttpGetCreateOrUpdateInstance(params martini.Par
 		r.JSON(http.StatusNotFound, map[string]interface{}{"error":"PlanNotFound", "description":"The specified plan was not found."})
 		return
 	} else if err != nil {
-		utils.ReportError(err, r)
+		ProcessErrors(err, r)
 		return
 	}
 
@@ -542,7 +555,7 @@ func (cserv *OSBClientServices) HttpGetCreateOrUpdateInstance(params martini.Par
 		// The instance does not exist
 		resp, err := cserv.Provision(instanceId, service, plan, spec.OrganizationGUID, spec.SpaceGUID)
 		if err != nil {
-			utils.ReportError(err, r)
+			ProcessErrors(err, r)
 			return
 		}
 
@@ -554,7 +567,7 @@ func (cserv *OSBClientServices) HttpGetCreateOrUpdateInstance(params martini.Par
 	} else if status != string(osb.StateInProgress) {
 		resp, err := cserv.Update(instanceId, service, plan)
 		if err != nil {
-			utils.ReportError(err, r)
+			ProcessErrors(err, r)
 			return
 		}
 		r.JSON(http.StatusOK, provisionSuccessResponseBody{DashboardURL:nil, Operation:resp.OperationKey})
@@ -566,25 +579,25 @@ func (cserv *OSBClientServices) HttpGetCreateOrUpdateInstance(params martini.Par
 func (cserv *OSBClientServices) HttpDeleteInstance(params martini.Params, r render.Render) {
 	serviceId, planId, _, _, err := cserv.GetInstanceInfoByID(params["instance_id"])
 	if err != nil {
-		utils.ReportError(err, r)
+		ProcessErrors(err, r)
 		return
 	}
 
 	service, err := cserv.GetServiceByID(serviceId)
 	if err != nil {
-		utils.ReportError(err, r)
+		ProcessErrors(err, r)
 		return
 	}
 
 	plan, err := cserv.GetPlanByID(serviceId, planId)
 	if err != nil {
-		utils.ReportError(err, r)
+		ProcessErrors(err, r)
 		return
 	}
 
 	resp, err := cserv.Deprovision(params["instance_id"], service, plan)
 	if err != nil {
-		utils.ReportError(err, r)
+		ProcessErrors(err, r)
 		return
 	}
 
@@ -602,7 +615,7 @@ func (cserv *OSBClientServices) HttpCreateOrUpdateBinding(params martini.Params,
 	}
 	resp, err := cserv.CreateBinding(params["binding_id"], params["instance_id"], spec.ServiceID, spec.PlanID, appGuid)
 	if err != nil {
-		utils.ReportError(err, r)
+		ProcessErrors(err, r)
 		return
 	}
 
@@ -616,13 +629,13 @@ func (cserv *OSBClientServices) HttpGetBinding(params martini.Params, r render.R
 		return
 	}
 	if err != nil {
-		utils.ReportError(err, r)
+		ProcessErrors(err, r)
 		return
 	}
 
 	resp, err := cserv.GetBinding(params["binding_id"], params["instance_id"], serviceId)
 	if err != nil {
-		utils.ReportError(err, r)
+		ProcessErrors(err, r)
 		return
 	}
 
@@ -637,13 +650,13 @@ func (cserv *OSBClientServices) HttpGetBindingLastOperation(params martini.Param
 func (cserv *OSBClientServices) HttpRemoveBinding(params martini.Params, r render.Render) {
 	serviceId, planId, _, _, err := cserv.GetInstanceInfoByID(params["instance_id"])
 	if err != nil {
-		utils.ReportError(err, r)
+		ProcessErrors(err, r)
 		return
 	}
 
 	resp, err := cserv.RemoveBinding(params["binding_id"], params["instance_id"], serviceId, planId)
 	if err != nil {
-		utils.ReportError(err, r)
+		ProcessErrors(err, r)
 		return
 	}
 
