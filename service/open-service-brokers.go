@@ -402,7 +402,7 @@ func (cserv *OSBClientServices) RemoveBinding(bindingId string, instanceId strin
 	return svc.client.Unbind(request)
 }
 
-func (cserv *OSBClientServices) GetInstanceStatus(instanceId string) (*osb.LastOperationState, error) {
+func (cserv *OSBClientServices) GetInstanceStatus(instanceId string) (*osb.LastOperationResponse, error) {
 	serviceId, planId, operationKey, _, err := cserv.GetInstanceInfoByID(instanceId)
 	if err != nil {
 		return nil, err
@@ -434,7 +434,7 @@ func (cserv *OSBClientServices) GetInstanceStatus(instanceId string) (*osb.LastO
 		return nil, err
 	}
 
-	return &response.State, nil
+	return response, nil
 }
 
 func (cserv *OSBClientServices) HttpGetCatalog(params martini.Params, r render.Render) {

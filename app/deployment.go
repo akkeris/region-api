@@ -2,7 +2,6 @@ package app
 
 import (
 	"database/sql"
-	"fmt"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
 	"github.com/go-martini/martini"
@@ -251,15 +250,12 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 		return
 	}
 	if !deploymentExists {
-		err = rt.CreateDeployment(&deployment)
-		if err != nil {
-			fmt.Println(err)
+		if err = rt.CreateDeployment(&deployment); err != nil {
 			utils.ReportError(err, r)
 			return
 		}
 	} else {
-		err = rt.UpdateDeployment(&deployment)
-		if err != nil {
+		if err = rt.UpdateDeployment(&deployment); err != nil {
 			utils.ReportError(err, r)
 			return
 		}
@@ -268,14 +264,12 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 	// Create/update service
 	if finalport != -1 {
 		if !deploymentExists {
-			_, err := rt.CreateService(space, appname, finalport)
-			if err != nil {
+			if _, err := rt.CreateService(space, appname, finalport); err != nil {
 				utils.ReportError(err, r)
 				return
 			}
 		} else {
-			_, err := rt.UpdateService(space, appname, finalport)
-			if err != nil {
+			if _, err := rt.UpdateService(space, appname, finalport); err != nil {
 				utils.ReportError(err, r)
 				return
 			}
