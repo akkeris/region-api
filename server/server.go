@@ -30,52 +30,79 @@ import (
 	"github.com/martini-contrib/render"
 )
 
-func ProxyToShuttle(res http.ResponseWriter, req *http.Request) {
-	uri, err := url.Parse("http://" + os.Getenv("LOGSHUTTLE_SERVICE_HOST") + ":" + os.Getenv("LOGSHUTTLE_SERVICE_PORT"))
+func singleJoiningSlash(a, b string) string {
+	aslash := strings.HasSuffix(a, "/")
+	bslash := strings.HasPrefix(b, "/")
+	switch {
+		case aslash && bslash:
+			return a + b[1:]
+		case !aslash && !bslash:
+			return a + "/" + b
+	}
+	return a + b
+}
+
+func Proxy(uri string, message string) *httputil.ReverseProxy {
+	target, err := url.Parse(uri)
 	if err != nil {
-		log.Println("Error: Unable to proxy to log shuttle")
+		log.Println("Error: Unable to proxy to " + message)
 		log.Println(err)
+		return nil
+	}
+	log.Println("Proxying to", target)
+	targetQuery := target.RawQuery
+   	director := func(req *http.Request) {
+		req.URL.Scheme = target.Scheme
+		req.URL.Host = target.Host
+		req.Host = target.Host
+		req.URL.Path = singleJoiningSlash(target.Path, req.URL.Path)
+		if targetQuery == "" || req.URL.RawQuery == "" {
+			req.URL.RawQuery = targetQuery + req.URL.RawQuery
+		} else {
+			req.URL.RawQuery = targetQuery + "&" + req.URL.RawQuery
+		}
+		if _, ok := req.Header["User-Agent"]; !ok {
+			// explicitly disable User-Agent so it's not set to default value
+			req.Header.Set("User-Agent", "")
+		}
+		req.Header.Set("Host", target.Host)
+	}
+	return &httputil.ReverseProxy{Director: director}
+}
+
+func ProxyToShuttle(res http.ResponseWriter, req *http.Request) {
+	logshuttle_url := "http://" + os.Getenv("LOGSHUTTLE_SERVICE_HOST") + ":" + os.Getenv("LOGSHUTTLE_SERVICE_PORT")
+	rp := Proxy(logshuttle_url, "logshuttle")
+	if rp == nil {
 		return
 	}
-	log.Println("Proxying to", uri)
-	httputil.NewSingleHostReverseProxy(uri).ServeHTTP(res, req)
+	rp.ServeHTTP(res, req)
 }
 
 func ProxyToSession(res http.ResponseWriter, req *http.Request) {
-	uri, err := url.Parse("http://" + os.Getenv("LOGSESSION_SERVICE_HOST") + ":" + os.Getenv("LOGSESSION_SERVICE_PORT"))
-	if err != nil {
-		log.Println("Error: Unable to proxy to log session")
-		log.Println(err)
+	logsession_url := "http://" + os.Getenv("LOGSESSION_SERVICE_HOST") + ":" + os.Getenv("LOGSESSION_SERVICE_PORT")
+	rp := Proxy(logsession_url, "logsession")
+	if rp == nil {
 		return
 	}
-	log.Println("Proxying to", uri)
-	rp := httputil.NewSingleHostReverseProxy(uri)
 	rp.FlushInterval = time.Duration(200) * time.Millisecond
 	rp.ServeHTTP(res, req)
 }
 
 func ProxyToInfluxDb(res http.ResponseWriter, req *http.Request) {
-	uri, err := url.Parse(os.Getenv("INFLUXDB_URL"))
-	if err != nil {
-		log.Println("Error: Unable to proxy to influxdb")
-		log.Println(err)
+	rp := Proxy(os.Getenv("INFLUXDB_URL"), "influxdb")
+	if rp == nil {
 		return
 	}
-	log.Println("Proxying influxdb to", uri)
-	rp := httputil.NewSingleHostReverseProxy(uri)
 	rp.FlushInterval = time.Duration(200) * time.Millisecond
 	rp.ServeHTTP(res, req)
 }
 
 func ProxyToPrometheus(res http.ResponseWriter, req *http.Request) {
-	uri, err := url.Parse(os.Getenv("PROMETHEUS_URL"))
-	if err != nil {
-		log.Println("Error: Unable to proxy to influxdb")
-		log.Println(err)
+	rp := Proxy(os.Getenv("PROMETHEUS_URL"), "prometheus")
+	if rp == nil {
 		return
 	}
-	log.Println("Proxying prometheus metrics to", uri)
-	rp := httputil.NewSingleHostReverseProxy(uri)
 	rp.FlushInterval = time.Duration(200) * time.Millisecond
 	rp.ServeHTTP(res, req)
 }
