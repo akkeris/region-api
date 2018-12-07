@@ -112,6 +112,7 @@ func InitOldServiceEndpoints(m *martini.ClassicMartini) {
 	// these old end points formats should no longer be used.
 	m.Get("/v1/service/kafka/plans", service.GetKafkaPlansV1)
 	m.Post("/v1/service/kafka/instance", binding.Json(structs.Provisionspec{}), service.ProvisionKafkaV1)
+	m.Delete("/v1/service/kafka/instance/:servicename", service.DeleteKafkaV1)
 	m.Post("/v1/service/kafka/cluster/:cluster/topic", binding.Json(structs.KafkaTopic{}), service.ProvisionTopicV1)
 	m.Get("/v1/service/kafka/topics", service.GetTopicsV1)
 	m.Delete("/v1/service/kafka/cluster/:cluster/topics/:topic", service.DeleteTopicV1)
