@@ -440,6 +440,21 @@ func DeleteTopicV1(params martini.Params, r render.Render) {
     r.JSON(resp.StatusCode, bodyj)
 }
 
+func DeleteKafkaV1(params martini.Params, r render.Render) {
+    servicename := params["servicename"]
+    client := &http.Client{}
+    req, err := http.NewRequest("DELETE", os.Getenv("KAFKA_BROKER_URL")+"/v1/kafka/user/"+servicename, nil)
+    resp, err := client.Do(req)
+    if err != nil {
+        utils.ReportError(err, r)
+        return
+    }
+
+    defer resp.Body.Close()
+    bodyj, _ := simplejson.NewFromReader(resp.Body)
+    r.JSON(resp.StatusCode, bodyj)
+}
+
 //Getkafkavars  centralized
 func Getkafkavars(db *sql.DB, appname string, space string) (error, map[string]interface{}) {
     username := getUserName(db, appname, space)
