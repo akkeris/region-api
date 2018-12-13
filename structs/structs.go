@@ -913,3 +913,10 @@ type AclRequest struct {
     Role          string `json:"role"`
     ConsumerGroupName string `json:"consumerGroupName,omitempty"`
 }
+
+type KafkaConsumerGroupSeekRequest struct {
+    Topic         string `json:"topic"`
+    Partitions    []int  `json:"partitions,omitempty"`
+    SeekTo        string `json:"seekTo"`
+    AllPartitions bool   `json:"allPartitions,omitempty"`
+}

@@ -477,3 +477,83 @@ func Getkafkavars(db *sql.DB, appname string, space string) (error, map[string]i
 	config, _ = bodyj.Map()
 	return nil, config
 }
+
+func GetConsumerGroupsV1(params martini.Params, r render.Render) {
+    cluster := params["cluster"]
+    client := &http.Client{}
+    req, err := http.NewRequest("GET", os.Getenv("KAFKA_BROKER_URL")+"/v1/kafka/cluster/"+cluster+"/consumer-groups", nil)
+    resp, err := client.Do(req)
+    if err != nil {
+        utils.ReportError(err, r)
+        return
+    }
+
+    defer resp.Body.Close()
+    bodyj, _ := simplejson.NewFromReader(resp.Body)
+    r.JSON(resp.StatusCode, bodyj)
+}
+
+func GetConsumerGroupOffsetsV1(params martini.Params, r render.Render) {
+    cluster := params["cluster"]
+    consumerGroup := params["consumerGroupName"]
+
+    client := &http.Client{}
+    req, err := http.NewRequest("GET", os.Getenv("KAFKA_BROKER_URL")+"/v1/kafka/cluster/"+cluster+"/consumer-groups/"+consumerGroup+"/offsets", nil)
+    resp, err := client.Do(req)
+    if err != nil {
+        utils.ReportError(err, r)
+        return
+    }
+
+    defer resp.Body.Close()
+    bodyj, _ := simplejson.NewFromReader(resp.Body)
+    r.JSON(resp.StatusCode, bodyj)
+}
+
+func GetConsumerGroupMembersV1(params martini.Params, r render.Render) {
+    cluster := params["cluster"]
+    consumerGroup := params["consumerGroupName"]
+
+    client := &http.Client{}
+    req, err := http.NewRequest("GET", os.Getenv("KAFKA_BROKER_URL")+"/v1/kafka/cluster/"+cluster+"/consumer-groups/"+consumerGroup+"/members", nil)
+    resp, err := client.Do(req)
+    if err != nil {
+        utils.ReportError(err, r)
+        return
+    }
+
+    defer resp.Body.Close()
+    bodyj, _ := simplejson.NewFromReader(resp.Body)
+    r.JSON(resp.StatusCode, bodyj)
+}
+
+func SeekConsumerGroupV1(spec structs.KafkaConsumerGroupSeekRequest, params martini.Params, berr binding.Errors, r render.Render) {
+    cluster := params["cluster"]
+    consumerGroup := params["consumerGroupName"]
+
+    if berr != nil {
+        utils.ReportInvalidRequest(berr[0].Message, r)
+        return
+    }
+
+    client := &http.Client{}
+    str, err := json.Marshal(spec)
+    if err != nil {
+        utils.ReportError(err, r)
+        return
+    }
+
+    jsonStr := []byte(string(str))
+    req, err := http.NewRequest("POST", os.Getenv("KAFKA_BROKER_URL")+"/v1/kafka/cluster/"+cluster+"/consumer-groups/"+consumerGroup+"/seek", bytes.NewBuffer(jsonStr))
+    req.Header.Set("Content-Type", "application/json")
+
+    resp, err := client.Do(req)
+    if err != nil {
+        utils.ReportError(err, r)
+        return
+    }
+    defer resp.Body.Close()
+
+    bodyj, _ := simplejson.NewFromReader(resp.Body)
+    r.JSON(resp.StatusCode, bodyj)
+}
