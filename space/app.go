@@ -2,6 +2,7 @@ package space
 
 import (
 	"database/sql"
+        "fmt"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
@@ -113,6 +114,9 @@ func DeleteApp(db *sql.DB, params martini.Params, r render.Render) {
 	// in a previous iteration we ignored the error, i'll do so here
 	// but i need to put an if around it to prevent the nil rslist from
 	// bombing out everything
+        if err != nil {
+            fmt.Println(err)
+        }
 	if err == nil {
 		for _, rs := range rslist {
 			err = rt.DeleteReplica(space, appname, rs)
@@ -126,6 +130,9 @@ func DeleteApp(db *sql.DB, params martini.Params, r render.Render) {
 
 	var podlist []string
 	podlist, err = rt.GetPods(space, appname)
+        if err != nil {
+            fmt.Println(err)
+        }
 	// in a previous iteration we ignored the error, i'll do so here
 	// but i need to put an if around it to prevent the nil podlist from
 	// bombing out everything
