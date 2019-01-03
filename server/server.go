@@ -157,12 +157,10 @@ func InitOldServiceEndpoints(m *martini.ClassicMartini) {
 	m.Post("/v1/service/influxdb/instance", binding.Json(structs.Provisionspec{}), service.ProvisionInfluxdb)
 	m.Delete("/v1/service/influxdb/instance/:servicename", service.DeleteInfluxdb)
 
-
 	m.Get("/v1/service/cassandra/plans", service.GetCassandraPlans)
 	m.Get("/v1/service/cassandra/url/:servicename", service.GetCassandraURL)
 	m.Post("/v1/service/cassandra/instance", binding.Json(structs.Provisionspec{}), service.ProvisionCassandra)
 	m.Delete("/v1/service/cassandra/instance/:servicename", service.DeleteCassandra)
-
 
 	m.Get("/v1/service/neptune/plans", service.GetNeptunePlans)
 	m.Get("/v1/service/neptune/url/:servicename", service.GetNeptuneURL)
@@ -182,12 +180,6 @@ func InitOldServiceEndpoints(m *martini.ClassicMartini) {
 	m.Delete("/v1/service/s3/instance/:servicename", service.Deletes3)
 	m.Post("/v1/service/s3/instance/tag", binding.Json(structs.Tagspec{}), service.Tags3)
 
-	m.Get("/v1/service/postgres/plans", service.GetpostgresplansV1)                                             // deprecated
-	m.Get("/v1/service/postgres/url/:servicename", service.GetpostgresurlV1)                                    // deprecated
-	m.Post("/v1/service/postgres/instance", binding.Json(structs.Provisionspec{}), service.ProvisionpostgresV1) // deprecated
-	m.Delete("/v1/service/postgres/instance/:servicename", service.DeletepostgresV1)                            // deprecated
-	m.Post("/v1/service/postgres/instance/tag", binding.Json(structs.Tagspec{}), service.TagpostgresV1)         // deprecated
-
 	m.Get("/v1/service/postgresonprem/plans", service.GetpostgresonpremplansV1)
 	m.Get("/v1/service/postgresonprem/url/:servicename", service.GetpostgresonpremurlV1)
 	m.Post("/v1/service/postgresonprem/instance", binding.Json(structs.Provisionspec{}), service.ProvisionpostgresonpremV1)
@@ -206,25 +198,6 @@ func InitOldServiceEndpoints(m *martini.ClassicMartini) {
 	m.Get("/v1/service/postgresonprem/:servicename/logs", service.ListPostgresonpremLogsV1)
 	m.Get("/v1/service/postgresonprem/:servicename/logs/:dir/:file", service.GetPostgresonpremLogsV1)
 	m.Put("/v1/service/postgresonprem/:servicename", service.RestartPostgresonpremV1)
-
-	m.Get("/v2/services/postgres/plans", service.GetPostgresPlansV2)
-	m.Get("/v2/services/postgres/:servicename/url", service.GetPostgresUrlV2)
-	m.Post("/v2/services/postgres", binding.Json(structs.Provisionspec{}), service.ProvisionPostgresV2)
-	m.Delete("/v2/services/postgres/:servicename", service.DeletePostgresV2)
-	m.Post("/v2/services/postgres/:servicename/tags", binding.Json(structs.Tagspec{}), service.TagPostgresV2)
-	m.Get("/v2/services/postgres/:servicename/backups", service.ListPostgresBackupsV2)
-	m.Get("/v2/services/postgres/:servicename/backups/:backup", service.GetPostgresBackupV2)
-	m.Put("/v2/services/postgres/:servicename/backups", service.CreatePostgresBackupV2)
-	m.Put("/v2/services/postgres/:servicename/backups/:backup", service.RestorePostgresBackupV2)
-	m.Get("/v2/services/postgres/:servicename/logs", service.ListPostgresLogsV2)
-	m.Get("/v2/services/postgres/:servicename/logs/:dir/:file", service.GetPostgresLogsV2)
-	m.Put("/v2/services/postgres/:servicename", service.RestartPostgresV2)
-	m.Post("/v2/services/postgres/:servicename/roles", service.CreatePostgresRoleV2)
-	m.Delete("/v2/services/postgres/:servicename/roles/:role", service.DeletePostgresRoleV2)
-	m.Get("/v2/services/postgres/:servicename/roles", service.ListPostgresRolesV2)
-	m.Put("/v2/services/postgres/:servicename/roles/:role", service.RotatePostgresRoleV2)
-	m.Get("/v2/services/postgres/:servicename/roles/:role", service.GetPostgresRoleV2)
-	m.Get("/v2/services/postgres/:servicename", service.GetPostgresV2)
 
 	m.Get("/v1/service/mongodb/plans", service.GetmongodbplansV1)
 	m.Post("/v1/service/mongodb/instance", binding.Json(structs.Provisionspec{}), service.ProvisionmongodbV1)
@@ -366,7 +339,6 @@ func Server(db *sql.DB) *martini.ClassicMartini {
 
 	m.Get("/v1/octhc/router", router.Octhc)
 	m.Get("/v1/octhc/kube", utils.Octhc)
-	m.Get("/v1/octhc/service/postgres", service.GetPostgresPlansV2)
 	m.Get("/v1/octhc/service/aurora-mysql", service.Getauroramysqlplans)
 	m.Get("/v1/octhc/service/redis", service.Getredisplans)
 	m.Get("/v1/octhc/service/memcached", service.Getmemcachedplans)
