@@ -30,14 +30,6 @@ func GetServiceConfigVars(db *sql.DB, appname string, space string, appbindings 
 			for key, value := range vars {
 				servicevars = append(servicevars, structs.EnvVar{Name: key, Value: value.(string)})
 			}
-		} else if servicetype == "postgresonprem" {
-			err, vars := GetPostgresonpremVarsV1(servicename)
-			if err != nil {
-				return err, elist
-			}
-			for key, value := range vars {
-				servicevars = append(servicevars, structs.EnvVar{Name: key, Value: value.(string)})
-			}
 		} else if servicetype == "auroramysql" {
 			err, vars := Getauroramysqlvars(servicename)
 			if err != nil {
