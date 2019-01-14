@@ -185,8 +185,8 @@ type Deploymentspec struct {
 		Strategy struct {
 			Type          string `json:"type,omitempty"`
 			RollingUpdate struct {
-				MaxUnavailable int `json:"maxUnavailable"`
-				MaxSurge       int `json:"maxSurge,omitempty"`
+				MaxUnavailable interface{} `json:"maxUnavailable"`
+				MaxSurge       interface{} `json:"maxSurge,omitempty"`
 			} `json:"rollingUpdate"`
 		} `json:"strategy"`
 		Selector struct {
@@ -516,7 +516,7 @@ type Runtime interface {
 	GetDeployments() (*DeploymentCollectionspec, error)
 	GetDeployment(space string, app string) (deployment *Deploymentspec, e error)
 	DeleteDeployment(space string, app string) (e error)
-	DeploymentExists(space string, app string) (exists bool)
+	DeploymentExists(space string, app string) (exists bool, e error)
 	GetReplicas(space string, app string) (rs []string, e error)
 	DeleteReplica(space string, app string, replica string) (e error)
 	CreateOneOffPod(deployment *structs.Deployment) (e error)

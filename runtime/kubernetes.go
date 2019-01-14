@@ -379,7 +379,7 @@ func (rt Kubernetes) UpdateDeployment(deployment *structs.Deployment) (err error
 		return err
 	}
 	if resp.StatusCode > 399 || resp.StatusCode < 200 {
-		return errors.New("Cannot update deployment for " + deployment.App + "-" + deployment.Space + " received: " + resp.Status)
+		return errors.New("Cannot update deployment for " + deployment.App + "-" + deployment.Space + " received: " + resp.Status + " " + string(resp.Body))
 	}
 	return nil
 }
@@ -393,7 +393,7 @@ func (rt Kubernetes) CreateDeployment(deployment *structs.Deployment) (err error
 		return err
 	}
 	if resp.StatusCode > 399 || resp.StatusCode < http.StatusOK {
-		return errors.New("Cannot create deployment for " + deployment.App + "-" + deployment.Space + " received: " + resp.Status)
+		return errors.New("Cannot create deployment for " + deployment.App + "-" + deployment.Space + " received: " + resp.Status + " " + string(resp.Body))
 	}
 	return nil
 }
@@ -420,21 +420,27 @@ func (rt Kubernetes) GetDeployment(space string, app string) (*Deploymentspec, e
 	return &deployment, nil
 }
 
-func (rt Kubernetes) DeploymentExists(space string, app string) (exists bool) {
+func (rt Kubernetes) DeploymentExists(space string, app string) (bool, error) {
 	if space == "" {
-		return false
+		return false, errors.New("The space name was blank.")
 	}
 	if app == "" {
-		return false
+		return false, errors.New("The app name was blank.")
 	}
 	resp, e := rt.k8sRequest("get", "/apis/extensions/v1beta1/namespaces/"+space+"/deployments/"+app, nil)
 	if e != nil {
-		return false
+		return false, e
 	}
-	if resp.StatusCode == http.StatusOK {
-		return true
+	if resp.StatusCode == 404 {
+		return false, nil
 	}
-	return false
+	if resp.StatusCode > 199 && resp.StatusCode < 300 {
+		return true, nil
+	}
+	if resp.StatusCode > 399 || resp.StatusCode < 200 {
+		return false, errors.New("Cannot determine if deployment exists for " + app + "-" + space + " received: " + resp.Status + " " + string(resp.Body))
+	}
+	return false, nil
 }
 
 func (rt Kubernetes) DeleteDeployment(space string, app string) (e error) {

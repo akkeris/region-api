@@ -865,3 +865,58 @@ type URLTemplates struct {
 	Internal string `json:"internal"`
 	External string `json:"external"`
 }
+
+
+type KafkaTopic struct {
+	Topic struct {
+		Name         string `json:"name"`
+		Config       struct {
+		    Name          string `json:"name"`
+			Cleanuppolicy string `json:"cleanup.policy,omitempty"`
+			Partitions    *int    `json:"partitions,omitempty"`
+			Retentionms   *int    `json:"retention.ms,omitempty"`
+			Replicas      *int    `json:"replicas,omitempty"`
+		} `json:"config"`
+	} `json:"topic"`
+}
+
+type KafkaAclCredentials struct {
+    AclCredentials struct {
+        Username   string `json:"username"`
+    } `json:"aclCredentials"`
+}
+
+type Kafkaspec struct {
+    Spec string `json:"spec"`
+}
+
+type TopicSchemaMapping struct {
+    Topic         string `json:"topic"`
+    Schema        struct {
+        Name      string `json:"name"`
+    } `json:"schema"`
+}
+
+type TopicKeyMapping struct {
+    Topic         string `json:"topic"`
+    KeyType       string `json:"keyType"`
+    Schema        *struct {
+        Name      string `json:"name"`
+    } `json:"schema,omitempty"`
+}
+
+type AclRequest struct {
+    Topic         string `json:"topic"`
+    User          string `json:"user,omitempty"`
+    Space         string `json:"space"`
+    Appname       string `json:"app"`
+    Role          string `json:"role"`
+    ConsumerGroupName string `json:"consumerGroupName,omitempty"`
+}
+
+type KafkaConsumerGroupSeekRequest struct {
+    Topic         string `json:"topic"`
+    Partitions    []int  `json:"partitions,omitempty"`
+    SeekTo        string `json:"seekTo"`
+    AllPartitions bool   `json:"allPartitions,omitempty"`
+}

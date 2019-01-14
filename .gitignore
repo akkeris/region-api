@@ -1,5 +1,5 @@
 # Created by https://www.gitignore.io/api/go,visualstudiocode
-
+vendor/
 ### Go ###
 # Binaries for programs and plugins
 *.exe

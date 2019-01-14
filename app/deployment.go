@@ -2,7 +2,6 @@ package app
 
 import (
 	"database/sql"
-	"fmt"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
 	"github.com/go-martini/martini"
@@ -245,17 +244,18 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 	if (structs.Features{}) != deploy1.Features {
 		deployment.Features = deploy1.Features
 	}
-	newDeployment := !rt.DeploymentExists(space, appname)
-	if newDeployment {
-		err = rt.CreateDeployment(&deployment)
-		if err != nil {
-			fmt.Println(err)
+	deploymentExists, err := rt.DeploymentExists(space, appname)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	if !deploymentExists {
+		if err = rt.CreateDeployment(&deployment); err != nil {
 			utils.ReportError(err, r)
 			return
 		}
 	} else {
-		err = rt.UpdateDeployment(&deployment)
-		if err != nil {
+		if err = rt.UpdateDeployment(&deployment); err != nil {
 			utils.ReportError(err, r)
 			return
 		}
@@ -263,15 +263,13 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 
 	// Create/update service
 	if finalport != -1 {
-		if newDeployment {
-			_, err := rt.CreateService(space, appname, finalport)
-			if err != nil {
+		if !deploymentExists {
+			if _, err := rt.CreateService(space, appname, finalport); err != nil {
 				utils.ReportError(err, r)
 				return
 			}
 		} else {
-			_, err := rt.UpdateService(space, appname, finalport)
-			if err != nil {
+			if _, err := rt.UpdateService(space, appname, finalport); err != nil {
 				utils.ReportError(err, r)
 				return
 			}
@@ -280,7 +278,7 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 
 	// Prepare the response back
 	var deployresponse structs.Deployresponse
-	if newDeployment {
+	if !deploymentExists {
 		if finalport != -1 {
 			deployresponse.Service = "Service Created"
 		}

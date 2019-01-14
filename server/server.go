@@ -23,78 +23,113 @@ import (
 	"region-api/utils"
 	"region-api/vault"
 	"time"
-
+	"strings"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/auth"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
 )
 
-func ProxyToShuttle(res http.ResponseWriter, req *http.Request) {
-	uri, err := url.Parse("http://" + os.Getenv("LOGSHUTTLE_SERVICE_HOST") + ":" + os.Getenv("LOGSHUTTLE_SERVICE_PORT"))
-	if err != nil {
-		log.Println("Error: Unable to proxy to log shuttle")
-		log.Println(err)
-		return
+func singleJoiningSlash(a, b string) string {
+	aslash := strings.HasSuffix(a, "/")
+	bslash := strings.HasPrefix(b, "/")
+	switch {
+		case aslash && bslash:
+			return a + b[1:]
+		case !aslash && !bslash:
+			return a + "/" + b
 	}
-	log.Println("Proxying to", uri)
-	httputil.NewSingleHostReverseProxy(uri).ServeHTTP(res, req)
+	return a + b
 }
-func ProxyToSession(res http.ResponseWriter, req *http.Request) {
-	uri, err := url.Parse("http://" + os.Getenv("LOGSESSION_SERVICE_HOST") + ":" + os.Getenv("LOGSESSION_SERVICE_PORT"))
+
+func Proxy(uri string, message string) *httputil.ReverseProxy {
+	target, err := url.Parse(uri)
 	if err != nil {
-		log.Println("Error: Unable to proxy to log session")
+		log.Println("Error: Unable to proxy to " + message)
 		log.Println(err)
+		return nil
+	}
+	log.Println("Proxying to", target)
+	targetQuery := target.RawQuery
+   	director := func(req *http.Request) {
+		req.URL.Scheme = target.Scheme
+		req.URL.Host = target.Host
+		req.Host = target.Host
+		req.URL.Path = singleJoiningSlash(target.Path, req.URL.Path)
+		if targetQuery == "" || req.URL.RawQuery == "" {
+			req.URL.RawQuery = targetQuery + req.URL.RawQuery
+		} else {
+			req.URL.RawQuery = targetQuery + "&" + req.URL.RawQuery
+		}
+		if _, ok := req.Header["User-Agent"]; !ok {
+			// explicitly disable User-Agent so it's not set to default value
+			req.Header.Set("User-Agent", "")
+		}
+		req.Header.Set("Host", target.Host)
+	}
+	return &httputil.ReverseProxy{Director: director}
+}
+
+func ProxyToShuttle(res http.ResponseWriter, req *http.Request) {
+	logshuttle_url := "http://" + os.Getenv("LOGSHUTTLE_SERVICE_HOST") + ":" + os.Getenv("LOGSHUTTLE_SERVICE_PORT")
+	rp := Proxy(logshuttle_url, "logshuttle")
+	if rp == nil {
 		return
 	}
-	log.Println("Proxying to", uri)
-	rp := httputil.NewSingleHostReverseProxy(uri)
+	rp.ServeHTTP(res, req)
+}
+
+func ProxyToSession(res http.ResponseWriter, req *http.Request) {
+	logsession_url := "http://" + os.Getenv("LOGSESSION_SERVICE_HOST") + ":" + os.Getenv("LOGSESSION_SERVICE_PORT")
+	rp := Proxy(logsession_url, "logsession")
+	if rp == nil {
+		return
+	}
 	rp.FlushInterval = time.Duration(200) * time.Millisecond
 	rp.ServeHTTP(res, req)
 }
 
 func ProxyToInfluxDb(res http.ResponseWriter, req *http.Request) {
-	uri, err := url.Parse(os.Getenv("INFLUXDB_URL"))
-	if err != nil {
-		log.Println("Error: Unable to proxy to influxdb")
-		log.Println(err)
+	rp := Proxy(os.Getenv("INFLUXDB_URL"), "influxdb")
+	if rp == nil {
 		return
 	}
-	log.Println("Proxying influxdb to", uri)
-	rp := httputil.NewSingleHostReverseProxy(uri)
 	rp.FlushInterval = time.Duration(200) * time.Millisecond
 	rp.ServeHTTP(res, req)
 }
 
 func ProxyToPrometheus(res http.ResponseWriter, req *http.Request) {
-	uri, err := url.Parse(os.Getenv("PROMETHEUS_URL"))
-	if err != nil {
-		log.Println("Error: Unable to proxy to influxdb")
-		log.Println(err)
+	rp := Proxy(os.Getenv("PROMETHEUS_URL"), "prometheus")
+	if rp == nil {
 		return
 	}
-	log.Println("Proxying prometheus metrics to", uri)
-	rp := httputil.NewSingleHostReverseProxy(uri)
 	rp.FlushInterval = time.Duration(200) * time.Millisecond
 	rp.ServeHTTP(res, req)
 }
 
-func Server() *martini.ClassicMartini {
-	m := martini.Classic()
-	m.Use(render.Renderer())
-
-	m.Post("/v1/app/deploy", binding.Json(structs.Deployspec{}), app.Deployment)
-	m.Post("/v1/app/deploy/oneoff", binding.Json(structs.OneOffSpec{}), app.OneOffDeployment)
-	m.Get("/v1/config/sets", config.Listsets)
-	m.Get("/v1/config/set/:setname", config.Dumpset)
-	m.Delete("/v1/config/set/:setname", config.Deleteset)
-	m.Post("/v1/config/set/:parent/include/:child", config.Includeset)
-	m.Delete("/v1/config/set/:parent/include/:child", config.Deleteinclude)
-	m.Post("/v1/config/set", binding.Json(structs.Setspec{}), config.Createset)
-	m.Post("/v1/config/set/configvar", binding.Json([]structs.Varspec{}), config.Addvars)
-	m.Patch("/v1/config/set/configvar", binding.Json(structs.Varspec{}), config.Updatevar)
-	m.Get("/v1/config/set/:setname/configvar/:varname", config.Getvar)
-	m.Delete("/v1/config/set/:setname/configvar/:varname", config.Deletevar)
+func InitOldServiceEndpoints(m *martini.ClassicMartini) {
+	// While moving over to the open service broker api spec
+	// these old end points formats should no longer be used.
+	m.Get("/v1/service/kafka/plans", service.GetKafkaPlansV1)
+	m.Post("/v1/service/kafka/instance", binding.Json(structs.Provisionspec{}), service.ProvisionKafkaV1)
+	m.Delete("/v1/service/kafka/instance/:servicename", service.DeleteKafkaV1)
+	m.Post("/v1/service/kafka/cluster/:cluster/topic", binding.Json(structs.KafkaTopic{}), service.ProvisionTopicV1)
+	m.Get("/v1/service/kafka/topics", service.GetTopicsV1)
+	m.Delete("/v1/service/kafka/cluster/:cluster/topics/:topic", service.DeleteTopicV1)
+	m.Get("/v1/service/kafka/topics/:topic", service.GetTopicV1)
+	m.Get("/v1/service/kafka/cluster/:cluster/configs", service.GetConfigsV1)
+	m.Get("/v1/service/kafka/cluster/:cluster/configs/:name", service.GetConfigV1)
+	m.Get("/v1/service/kafka/cluster/:cluster/schemas", service.GetSchemasV1)
+	m.Get("/v1/service/kafka/cluster/:cluster/schemas/:schema", service.GetSchemaV1)
+	m.Post("/v1/service/kafka/cluster/:cluster/topic-key-mapping", binding.Json(structs.TopicKeyMapping{}), service.CreateTopicKeyMappingV1)
+	m.Post("/v1/service/kafka/cluster/:cluster/topic-schema-mapping", binding.Json(structs.TopicSchemaMapping{}), service.CreateTopicSchemaMappingV1)
+	m.Get("/v1/service/kafka/cluster/:cluster/acls", service.GetAclsV1)
+	m.Post("/v1/service/kafka/cluster/:cluster/acls", binding.Json(structs.AclRequest{}), service.CreateAclV1)
+	m.Delete("/v1/service/kafka/acls/:id", service.DeleteAclV1)
+	m.Get("/v1/service/kafka/cluster/:cluster/consumer-groups", service.GetConsumerGroupsV1)
+	m.Get("/v1/service/kafka/cluster/:cluster/consumer-groups/:consumerGroupName/offsets", service.GetConsumerGroupOffsetsV1)
+	m.Get("/v1/service/kafka/cluster/:cluster/consumer-groups/:consumerGroupName/members", service.GetConsumerGroupMembersV1)
+	m.Post("/v1/service/kafka/cluster/:cluster/consumer-groups/:consumerGroupName/seek", binding.Json(structs.KafkaConsumerGroupSeekRequest{}), service.SeekConsumerGroupV1)
 
 	m.Get("/v1/service/redis/plans", service.Getredisplans)
 	m.Get("/v1/service/redis/url/:servicename", service.Getredisurl)
@@ -117,17 +152,15 @@ func Server() *martini.ClassicMartini {
 	m.Get("/v1/service/memcached/operations/stats/:name", service.GetMemcachedStats)
 	m.Delete("/v1/service/memcached/operations/cache/:name", service.FlushMemcached)
 
-        m.Get("/v1/service/influxdb/plans", service.GetInfluxdbPlans)
-        m.Get("/v1/service/influxdb/url/:servicename", service.GetInfluxdbURL)
-        m.Post("/v1/service/influxdb/instance", binding.Json(structs.Provisionspec{}), service.ProvisionInfluxdb)
-        m.Delete("/v1/service/influxdb/instance/:servicename", service.DeleteInfluxdb)
+	m.Get("/v1/service/influxdb/plans", service.GetInfluxdbPlans)
+	m.Get("/v1/service/influxdb/url/:servicename", service.GetInfluxdbURL)
+	m.Post("/v1/service/influxdb/instance", binding.Json(structs.Provisionspec{}), service.ProvisionInfluxdb)
+	m.Delete("/v1/service/influxdb/instance/:servicename", service.DeleteInfluxdb)
 
-
-        m.Get("/v1/service/cassandra/plans", service.GetCassandraPlans)
-        m.Get("/v1/service/cassandra/url/:servicename", service.GetCassandraURL)
-        m.Post("/v1/service/cassandra/instance", binding.Json(structs.Provisionspec{}), service.ProvisionCassandra)
-        m.Delete("/v1/service/cassandra/instance/:servicename", service.DeleteCassandra)
-
+	m.Get("/v1/service/cassandra/plans", service.GetCassandraPlans)
+	m.Get("/v1/service/cassandra/url/:servicename", service.GetCassandraURL)
+	m.Post("/v1/service/cassandra/instance", binding.Json(structs.Provisionspec{}), service.ProvisionCassandra)
+	m.Delete("/v1/service/cassandra/instance/:servicename", service.DeleteCassandra)
 
 	m.Get("/v1/service/neptune/plans", service.GetNeptunePlans)
 	m.Get("/v1/service/neptune/url/:servicename", service.GetNeptuneURL)
@@ -147,50 +180,6 @@ func Server() *martini.ClassicMartini {
 	m.Delete("/v1/service/s3/instance/:servicename", service.Deletes3)
 	m.Post("/v1/service/s3/instance/tag", binding.Json(structs.Tagspec{}), service.Tags3)
 
-	m.Get("/v1/service/postgres/plans", service.GetpostgresplansV1)                                             // deprecated
-	m.Get("/v1/service/postgres/url/:servicename", service.GetpostgresurlV1)                                    // deprecated
-	m.Post("/v1/service/postgres/instance", binding.Json(structs.Provisionspec{}), service.ProvisionpostgresV1) // deprecated
-	m.Delete("/v1/service/postgres/instance/:servicename", service.DeletepostgresV1)                            // deprecated
-	m.Post("/v1/service/postgres/instance/tag", binding.Json(structs.Tagspec{}), service.TagpostgresV1)         // deprecated
-
-	m.Get("/v1/service/postgresonprem/plans", service.GetpostgresonpremplansV1)
-	m.Get("/v1/service/postgresonprem/url/:servicename", service.GetpostgresonpremurlV1)
-	m.Post("/v1/service/postgresonprem/instance", binding.Json(structs.Provisionspec{}), service.ProvisionpostgresonpremV1)
-	m.Delete("/v1/service/postgresonprem/instance/:servicename", service.DeletepostgresonpremV1)
-	m.Post("/v1/service/postgresonprem/:servicename/roles", service.CreatePostgresonpremRoleV1)
-	m.Delete("/v1/service/postgresonprem/:servicename/roles/:role", service.DeletePostgresonpremRoleV1)
-	m.Get("/v1/service/postgresonprem/:servicename/roles", service.ListPostgresonpremRolesV1)
-	m.Put("/v1/service/postgresonprem/:servicename/roles/:role", service.RotatePostgresonpremRoleV1)
-	m.Get("/v1/service/postgresonprem/:servicename/roles/:role", service.GetPostgresonpremRoleV1)
-	m.Get("/v1/service/postgresonprem/:servicename", service.GetPostgresonpremV1)
-
-	m.Get("/v1/service/postgresonprem/:servicename/backups", service.ListPostgresonpremBackupsV1)
-	m.Get("/v1/service/postgresonprem/:servicename/backups/:backup", service.GetPostgresonpremBackupV1)
-	m.Put("/v1/service/postgresonprem/:servicename/backups", service.CreatePostgresonpremBackupV1)
-	m.Put("/v1/service/postgresonprem/:servicename/backups/:backup", service.RestorePostgresonpremBackupV1)
-	m.Get("/v1/service/postgresonprem/:servicename/logs", service.ListPostgresonpremLogsV1)
-	m.Get("/v1/service/postgresonprem/:servicename/logs/:dir/:file", service.GetPostgresonpremLogsV1)
-	m.Put("/v1/service/postgresonprem/:servicename", service.RestartPostgresonpremV1)
-
-	m.Get("/v2/services/postgres/plans", service.GetPostgresPlansV2)
-	m.Get("/v2/services/postgres/:servicename/url", service.GetPostgresUrlV2)
-	m.Post("/v2/services/postgres", binding.Json(structs.Provisionspec{}), service.ProvisionPostgresV2)
-	m.Delete("/v2/services/postgres/:servicename", service.DeletePostgresV2)
-	m.Post("/v2/services/postgres/:servicename/tags", binding.Json(structs.Tagspec{}), service.TagPostgresV2)
-	m.Get("/v2/services/postgres/:servicename/backups", service.ListPostgresBackupsV2)
-	m.Get("/v2/services/postgres/:servicename/backups/:backup", service.GetPostgresBackupV2)
-	m.Put("/v2/services/postgres/:servicename/backups", service.CreatePostgresBackupV2)
-	m.Put("/v2/services/postgres/:servicename/backups/:backup", service.RestorePostgresBackupV2)
-	m.Get("/v2/services/postgres/:servicename/logs", service.ListPostgresLogsV2)
-	m.Get("/v2/services/postgres/:servicename/logs/:dir/:file", service.GetPostgresLogsV2)
-	m.Put("/v2/services/postgres/:servicename", service.RestartPostgresV2)
-	m.Post("/v2/services/postgres/:servicename/roles", service.CreatePostgresRoleV2)
-	m.Delete("/v2/services/postgres/:servicename/roles/:role", service.DeletePostgresRoleV2)
-	m.Get("/v2/services/postgres/:servicename/roles", service.ListPostgresRolesV2)
-	m.Put("/v2/services/postgres/:servicename/roles/:role", service.RotatePostgresRoleV2)
-	m.Get("/v2/services/postgres/:servicename/roles/:role", service.GetPostgresRoleV2)
-	m.Get("/v2/services/postgres/:servicename", service.GetPostgresV2)
-
 	m.Get("/v1/service/mongodb/plans", service.GetmongodbplansV1)
 	m.Post("/v1/service/mongodb/instance", binding.Json(structs.Provisionspec{}), service.ProvisionmongodbV1)
 	m.Get("/v1/service/mongodb/url/:servicename", service.GetmongodburlV1)
@@ -205,6 +194,56 @@ func Server() *martini.ClassicMartini {
 	m.Post("/v1/service/aurora-mysql/instance/tag", binding.Json(structs.Tagspec{}), service.Tagauroramysql)
 
 	m.Get("/v1/service/:service/bindings", service.GetBindingList)
+}
+
+var catalogOSBProvider *service.OSBClientServices
+func InitOpenServiceBrokerEndpoints(db *sql.DB, m *martini.ClassicMartini) {
+	var err error
+	catalogOSBProvider, err = service.NewOSBClientServices(strings.Split(os.Getenv("SERVICES"),","), db)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	service.SetGlobalClientService(catalogOSBProvider)
+	m.Get("/v2/catalog", catalogOSBProvider.HttpGetCatalog)
+	m.Get("/v2/service_instances/:instance_id/last_operation", catalogOSBProvider.HttpGetLastOperation)
+	m.Put("/v2/service_instances/:instance_id", binding.Json(service.ProvisionRequestBody{}), catalogOSBProvider.HttpGetCreateOrUpdateInstance)
+	m.Delete("/v2/service_instances/:instance_id", catalogOSBProvider.HttpDeleteInstance)
+	m.Patch("/v2/service_instances/:instance_id", binding.Json(service.UpdateRequestBody{}), catalogOSBProvider.HttpPartialUpdateInstance)
+	m.Put("/v2/service_instances/:instance_id/service_bindings/:binding_id",  binding.Json(service.BindRequestBody{}), catalogOSBProvider.HttpCreateOrUpdateBinding)
+	m.Get("/v2/service_instances/:instance_id/service_bindings/:binding_id", catalogOSBProvider.HttpGetBinding)
+	m.Get("/v2/service_instances/:instance_id/service_bindings/:binding_id/last_operation", catalogOSBProvider.HttpGetBindingLastOperation)
+	m.Delete("/v2/service_instances/:instance_id/service_bindings/:binding_id", catalogOSBProvider.HttpRemoveBinding)
+	// Custom Actions
+	m.Delete("/v2/service_instances/:instance_id/actions/:action_id", catalogOSBProvider.HttpForwardAction)
+	m.Get("/v2/service_instances/:instance_id/actions/:action_id", catalogOSBProvider.HttpForwardAction)
+	m.Patch("/v2/service_instances/:instance_id/actions/:action_id", catalogOSBProvider.HttpForwardAction)
+	m.Put("/v2/service_instances/:instance_id/actions/:action_id", catalogOSBProvider.HttpForwardAction)
+	m.Post("/v2/service_instances/:instance_id/actions/:action_id", catalogOSBProvider.HttpForwardAction)
+	m.Delete("/v2/service_instances/:instance_id/actions/:action_id/:action_subject", catalogOSBProvider.HttpForwardAction)
+	m.Get("/v2/service_instances/:instance_id/actions/:action_id/:action_subject", catalogOSBProvider.HttpForwardAction)
+	m.Patch("/v2/service_instances/:instance_id/actions/:action_id/:action_subject", catalogOSBProvider.HttpForwardAction)
+	m.Put("/v2/service_instances/:instance_id/actions/:action_id/:action_subject", catalogOSBProvider.HttpForwardAction)
+	m.Post("/v2/service_instances/:instance_id/actions/:action_id/:action_subject", catalogOSBProvider.HttpForwardAction)
+}
+
+func Server(db *sql.DB) *martini.ClassicMartini {
+	m := martini.Classic()
+	m.Use(render.Renderer())
+
+	m.Post("/v1/app/deploy", binding.Json(structs.Deployspec{}), app.Deployment)
+	m.Post("/v1/app/deploy/oneoff", binding.Json(structs.OneOffSpec{}), app.OneOffDeployment)
+
+	m.Get("/v1/config/sets", config.Listsets)
+	m.Get("/v1/config/set/:setname", config.Dumpset)
+	m.Delete("/v1/config/set/:setname", config.Deleteset)
+	m.Post("/v1/config/set/:parent/include/:child", config.Includeset)
+	m.Delete("/v1/config/set/:parent/include/:child", config.Deleteinclude)
+	m.Post("/v1/config/set", binding.Json(structs.Setspec{}), config.Createset)
+	m.Post("/v1/config/set/configvar", binding.Json([]structs.Varspec{}), config.Addvars)
+	m.Patch("/v1/config/set/configvar", binding.Json(structs.Varspec{}), config.Updatevar)
+	m.Get("/v1/config/set/:setname/configvar/:varname", config.Getvar)
+	m.Delete("/v1/config/set/:setname/configvar/:varname", config.Deletevar)
+
 	m.Post("/v1/app", binding.Json(structs.Appspec{}), app.Createapp)
 	m.Patch("/v1/app", binding.Json(structs.Appspec{}), app.Updateapp)
 	m.Delete("/v1/app/:appname", app.Deleteapp)
@@ -281,7 +320,6 @@ func Server() *martini.ClassicMartini {
 
 	m.Get("/v1/octhc/router", router.Octhc)
 	m.Get("/v1/octhc/kube", utils.Octhc)
-	m.Get("/v1/octhc/service/postgres", service.GetPostgresPlansV2)
 	m.Get("/v1/octhc/service/aurora-mysql", service.Getauroramysqlplans)
 	m.Get("/v1/octhc/service/redis", service.Getredisplans)
 	m.Get("/v1/octhc/service/memcached", service.Getmemcachedplans)
@@ -327,6 +365,9 @@ func Server() *martini.ClassicMartini {
 	m.Get("/v1/utils/service/space/:space/app/:app", utils.GetService)
 	m.Get("/v1/utils/nodes", utils.GetNodes)
 	m.Get("/v1/utils/urltemplates", templates.GetURLTemplates)
+
+	InitOpenServiceBrokerEndpoints(db, m)
+	InitOldServiceEndpoints(m)
 
 	// proxy to log shuttle
 	if os.Getenv("LOGSHUTTLE_SERVICE_HOST") != "" && os.Getenv("LOGSHUTTLE_SERVICE_PORT") != "" {
@@ -435,7 +476,7 @@ func CreateDB(db *sql.DB) {
 }
 
 func Init(pool *sql.DB) {
-	m := Server()
+	m := Server(pool)
 	CreateDB(pool)
 	m.Map(pool)
 	m.Run()
@@ -446,7 +487,7 @@ func TestInit() *martini.ClassicMartini {
 	pool := utils.GetDB(pitdb)
 	CreateDB(pool)
 	utils.InitAuth()
-	m := Server()
+	m := Server(pool)
 	m.Map(pool)
 	return m
 }
