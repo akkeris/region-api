@@ -21,7 +21,8 @@ Ensure you've set the environment variables in the running section below.
 
 Set the following environment variables, if this is first time running it see the Setup section.
 
-* DOMAIN_NAME - the root domain name where new DNS entries will be added (must have add zone AWS DNS capabilities)
+* REGION - The region this region-api is running in, this should match the cloud providers definition of "region", e.g., us-west-2 for AWS Oregon Region.
+* DOMAIN_BLACKLIST - a comma delimited list of domains or regular expressions that should NOT be in the control of akkeris (region-api), this can be the provider id or domain name (provider id in aws is the hosted zone)
 * VAULT_ADDR - The https url for vault
 * VAULT_TOKEN - The vault token
 * VAULT_CERT_STORAGE - Temporary vault path where uncommited certificates may be stored. 
@@ -57,17 +58,16 @@ Set the following environment variables, if this is first time running it see th
 * ALAMO_INTERNAL_URL_TEMPLATE - The template for internal/private urls https://{name}-{space}.internalapps.example.com/
 * ALAMO_URL_TEMPLATE - The template for external/public urls https://{name}-{space}.apps.example.com/
 * REDIS_BROKER_URL - todo, get brokers to register with alamo-api, otherwise this is the host of the broker
-* POSTGRES_BROKER_URL - todo, get brokers to register with alamo-api, otherwise this is the host of the broker
 * MEMCACHED_BROKER_URL - todo, get brokers to register with alamo-api, otherwise this is the host of the broker
 * RABBITMQ_BROKER_URL - todo, get brokers to register with alamo-api, otherwise this is the host of the broker
-* AURORAMYSQL_BROKER_URL - todo, get brokers to register with alamo-api, otherwise this is the host of the broker
 * MONGODB_BROKER_URL - todo, get brokers to register with alamo-api, otherwise this is the host of the broker
 * S3_BROKER_URL - todo, get brokers to register with alamo-api, otherwise this is the host of the broker
 * ES_BROKER_URL - todo, get brokers to register with alamo-api, otherwise this is the host of the broker
-* POSTGRESONPREM_BROKER_URL - todo, get brokers to register with alamo-api, otherwise this is the host of the broker
 * INFLUXDB_URL - The influx DB url to retrieve http metrics and other custom app data
 * PROMETHEUS_URL - The prometheus DB url to retrieve metrics pod data for apps
 * NEPTUNE_BROKER_URL - todo, get brokers to register with alamo-api, otherwise this is the host of the broker
+* INFLUXDB_BROKER_URL - influx database broker
+* CASSANDRA_BROKER_URL - cassandra database broker
 
 **Optional Environment Variables:**
 
@@ -89,3 +89,66 @@ Note that dependencies are managed via `dep` command line tool, run `dep ensure`
 $ docker build -t region-api .
 $ docker run -p 3000:3000 -e <see below> region-api
 ```
+
+## Testing
+
+```sh
+go test -v ./app
+go test -v ./certs
+go test -v ./config
+go test -v ./router
+go test -v ./server
+go test -v ./service
+go test -v ./space
+go test -v ./templates
+go test -v ./vault
+```
+
+### Database Issues
+
+You must first have `gotest`, `default` and `deck1` space created for the tests to complete properly.  Run
+
+```
+INSERT INTO public.spaces (name, internal, compliancetags, stack) VALUES ('gotest', false, null, 'ds1');
+INSERT INTO public.spaces (name, internal, compliancetags, stack) VALUES ('deck1', DEFAULT, 'NULL', 'ds1');
+INSERT INTO public.spaces (name, internal, compliancetags, stack) VALUES ('default', DEFAULT, 'NULL', 'ds1');
+```
+
+And then add some test data for config vars needed here:
+
+```
+INSERT INTO public.sets (setid, name, type) VALUES ('48594a81-fa86-4a2e-5284-6aa9f87d319f', 'oct-apitest-cs', 'config');
+INSERT INTO public.configvars (setname, varname, varvalue) VALUES ('oct-apitest-cs', 'testvar', 'testvalue');
+INSERT INTO public.configvars (setname, varname, varvalue) VALUES ('oct-apitest-cs', 'testvar2', 'testval2');
+INSERT INTO public.configvars (setname, varname, varvalue) VALUES ('oct-apitest-cs', 'METADATA_URL', 'http://169.254.169.254/latest/meta-data/placement/availability-zone');
+```
+
+You may need to replace ds1 with your stack listed in the `stacks` table.
+
+If your tests are consistently failing run the following on your database:
+
+```
+delete from apps where name = 'gotest';
+delete from spacesapps where appname = 'gotest';
+```
+
+
+### Certificate Issues
+
+Golang does not implicitly trust intermediate certificates, even if they are signed by a root certificate authority it does turst. Sometimes machines may not have the right intermediate certificates installed and you'll see warnings similar to this:
+
+```
+Get https://www.digicert.com/services/v2/order/certificate: x509: certificate signed by unknown authority
+Get https://www.digicert.com/services/v2/order/certificate: x509: certificate signed by unknown authority
+certExists Get https://www.digicert.com/services/v2/order/certificate: x509: certificate signed by unknown authority
+2019/01/16 13:27:35 Get https://www.digicert.com/services/v2/order/certificate: x509: certificate signed by unknown authority
+```
+
+When this occurs the website being requested (for an API request most likely) is using an intermediate that isn't explicitly trusted by golang.  To fix this download the certificates that issued the certificate that is erroring and add it to the keychain as "Always Trusted" in osx, or on linux into the trusted ca chain. Most of the time these are some sort of intermediate cert from digicert that must be explicitly trusted: https://www.digicert.com/digicert-root-certificates.htm.
+
+You can also try upgrading golang to get the latest/greatest.
+
+
+
+
+

@@ -187,12 +187,6 @@ func InitOldServiceEndpoints(m *martini.ClassicMartini) {
 	m.Get("/v1/service/mongodb/:servicename", service.GetmongodbV1)
 	m.Get("/v1/service/mongodb/instance/:servicename", service.GetmongodbV1)
 
-	m.Get("/v1/service/aurora-mysql/plans", service.Getauroramysqlplans)
-	m.Get("/v1/service/aurora-mysql/url/:servicename", service.Getauroramysqlurl)
-	m.Post("/v1/service/aurora-mysql/instance", binding.Json(structs.Provisionspec{}), service.Provisionauroramysql)
-	m.Delete("/v1/service/aurora-mysql/instance/:servicename", service.Deleteauroramysql)
-	m.Post("/v1/service/aurora-mysql/instance/tag", binding.Json(structs.Tagspec{}), service.Tagauroramysql)
-
 	m.Get("/v1/service/:service/bindings", service.GetBindingList)
 }
 
@@ -230,8 +224,17 @@ func Server(db *sql.DB) *martini.ClassicMartini {
 	m := martini.Classic()
 	m.Use(render.Renderer())
 
+	// cause the dns provider to begin caching itself.
+	go router.GetDnsProvider()
+
 	m.Post("/v1/app/deploy", binding.Json(structs.Deployspec{}), app.Deployment)
 	m.Post("/v1/app/deploy/oneoff", binding.Json(structs.OneOffSpec{}), app.OneOffDeployment)
+
+	m.Get("/v1/domains", router.HttpGetDomains)
+	m.Get("/v1/domains/:domain", router.HttpGetDomain)
+	m.Get("/v1/domains/:domain/records", router.HttpGetDomainRecords)
+	m.Post("/v1/domains/:domain/records", binding.Json(router.DomainRecord{}), router.HttpCreateDomainRecords)
+	m.Delete("/v1/domains/:domain/records/:name", router.HttpRemoveDomainRecords)
 
 	m.Get("/v1/config/sets", config.Listsets)
 	m.Get("/v1/config/set/:setname", config.Dumpset)
@@ -320,7 +323,6 @@ func Server(db *sql.DB) *martini.ClassicMartini {
 
 	m.Get("/v1/octhc/router", router.Octhc)
 	m.Get("/v1/octhc/kube", utils.Octhc)
-	m.Get("/v1/octhc/service/aurora-mysql", service.Getauroramysqlplans)
 	m.Get("/v1/octhc/service/redis", service.Getredisplans)
 	m.Get("/v1/octhc/service/memcached", service.Getmemcachedplans)
 	m.Get("/v1/octhc/service/s3", service.Gets3plans)

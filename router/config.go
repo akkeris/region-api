@@ -3,16 +3,17 @@ package router
 import (
 	"database/sql"
 	"fmt"
-	spacepackage "region-api/space"
-	structs "region-api/structs"
-	utils "region-api/utils"
-	"strings"
-
 	"github.com/go-martini/martini"
 	_ "github.com/lib/pq" //driver
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
 	"github.com/nu7hatch/gouuid"
+	"net/http"
+	"os"
+	spacepackage "region-api/space"
+	structs "region-api/structs"
+	utils "region-api/utils"
+	"strings"
 )
 
 func DescribeRouters(db *sql.DB, params martini.Params, r render.Render) {
@@ -231,23 +232,37 @@ func CreateRouter(db *sql.DB, spec structs.Routerspec, berr binding.Errors, r re
 	r.JSON(msg.Status, msg)
 }
 
-func createRouter(spec structs.Routerspec, db *sql.DB) (m structs.Messagespec, err error) {
-	var msg structs.Messagespec
+func createRouter(spec structs.Routerspec, db *sql.DB) (structs.Messagespec, error) {
+	dns := GetDnsProvider()
+	domains, err := dns.Domain(spec.Domain)
+	if err != nil {
+		fmt.Printf("Error while fetching domain: %s: %s\n", spec.Domain, err.Error())
+	} else {
+		for _, domain := range domains {
+			if domain.Public && !spec.Internal {
+				if err := dns.CreateDomainRecord(domain, "A", spec.Domain, []string{os.Getenv("PUBLIC_SNI_VIP")}); err != nil {
+					fmt.Printf("Error: Failed to create public (external) dns: %s\n", err.Error())
+				}
+			}
+			if !domain.Public && !spec.Internal {
+				if err := dns.CreateDomainRecord(domain, "A", spec.Domain, []string{os.Getenv("PRIVATE_SNI_VIP")}); err != nil {
+					fmt.Printf("Error: Failed to create private (external) dns: %s\n", err.Error())
+				}
+			}
+			if !domain.Public && spec.Internal {
+				if err := dns.CreateDomainRecord(domain, "A", spec.Domain, []string{os.Getenv("PRIVATE_SNI_VIP_INTERNAL")}); err != nil {
+					fmt.Printf("Error: Failed to create private (internal) dns: %s\n", err.Error())
+				}
+			}
+		}
+	}
+	var routerid string
 	newrouteriduuid, _ := uuid.NewV4()
 	newrouterid := newrouteriduuid.String()
-
-	var routerid string
-	inserterr := db.QueryRow("INSERT INTO routers(routerid,domain,internal) VALUES($1,$2,$3) returning routerid;", newrouterid, spec.Domain, spec.Internal).Scan(&routerid)
-	if inserterr != nil {
-		fmt.Println(inserterr)
-		msg.Status = 500
-		msg.Message = "Error while inserting"
-		return msg, inserterr
+	if err := db.QueryRow("INSERT INTO routers(routerid,domain,internal) VALUES($1,$2,$3) returning routerid;", newrouterid, spec.Domain, spec.Internal).Scan(&routerid); err != nil {
+		return structs.Messagespec{Status: http.StatusInternalServerError, Message: "Error while adding router: " + err.Error()}, err
 	}
-	addDNSRecord(db, spec.Domain)
-	msg.Status = 201
-	msg.Message = "Router created with ID" + routerid
-	return msg, nil
+	return structs.Messagespec{Status: http.StatusCreated, Message: "Router created with ID " + routerid}, nil
 }
 
 func PushRouter(db *sql.DB, params martini.Params, r render.Render) {
@@ -315,9 +330,29 @@ func DeleteRouter(db *sql.DB, params martini.Params, r render.Render) {
 		utils.ReportError(err, r)
 		return
 	}
-
-        removeDNSRecord(db, domain)
-
+	dns := GetDnsProvider()
+	domains, err := dns.Domain(spec.Domain)
+	if err != nil {
+		fmt.Println("Error trying to fetch domain(s) for " + spec.Domain + ": " + err.Error())
+	} else {
+		for _, domain := range domains {
+			if domain.Public && !spec.Internal {
+				if err := dns.RemoveDomainRecord(domain, "A", spec.Domain, []string{os.Getenv("PUBLIC_SNI_VIP")}); err != nil {
+					fmt.Printf("Failed to remove public (external) dns: %s\n", err.Error())
+				}
+			}
+			if !domain.Public && !spec.Internal {
+				if err := dns.RemoveDomainRecord(domain, "A", spec.Domain, []string{os.Getenv("PRIVATE_SNI_VIP")}); err != nil {
+					fmt.Printf("Failed to remove private (external) dns: %s\n", err.Error())
+				}
+			}
+			if !domain.Public && spec.Internal {
+				if err := dns.RemoveDomainRecord(domain, "A", spec.Domain, []string{os.Getenv("PRIVATE_SNI_VIP_INTERNAL")}); err != nil {
+					fmt.Printf("Failed to remove private (internal) dns: %s\n", err.Error())
+				}
+			}
+		}
+	}
 	msg, err = deleteRouterBase(db, domain)
 	if err != nil {
 		utils.ReportError(err, r)
