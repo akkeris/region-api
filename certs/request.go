@@ -297,7 +297,7 @@ func CertificateRequest(db *sql.DB, requestin structs.CertificateRequestSpec, be
 func certificateRequest(request structs.CertificateRequestSpec, db *sql.DB) (error, *structs.CertificateRequest) {
 	exists, err := certExists(request)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("certExists", err)
 		return err, nil
 	}
 	if exists == true {
@@ -306,26 +306,26 @@ func certificateRequest(request structs.CertificateRequestSpec, db *sql.DB) (err
 
 	csr, certtype, err := generateRequest(request)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("generateRequest", err)
 		return err, nil
 
 	}
 	response, err := sendRequestToDigicert(csr, certtype)
 
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("sendRequestToDigicert",err)
 		return err, nil
 	}
 	request.Request = strconv.Itoa(response.Requests[0].ID)
 	requestobject, err := getRequestObject(request.Request)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("getRequestObject", err)
 		return err, nil
 	}
 	request.Order = strconv.Itoa(requestobject.Order.ID)
 	err, uuid := addRequestToDB(request, db)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("addRequestToDB", err)
 		return err, nil
 	}
 	cert_req := structs.CertificateRequest{
