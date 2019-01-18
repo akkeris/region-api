@@ -553,6 +553,8 @@ type Switch struct {
 	ReplacePath string
 	NewHost     string
 	Pool        string
+        Nodeport    string
+        Unipool     string
 }
 
 type RuleInfo struct {

@@ -19,6 +19,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+        runtime "region-api/runtime"
 	spacepack "region-api/space"
 	structs "region-api/structs"
 	templates "region-api/templates"
@@ -581,8 +582,15 @@ func buildRule(router structs.Routerspec, partition string, virtual string, db *
 		} else {
 			sw.Pool = element.App + "-pool"
 		}
+                nodeport, err := getNodePort(db, element.Space, element.App)
+                if err != nil {
+                        log.Printf("Unable to get app url while building rule (getting nodeport): %s\n", err.Error())
+                        return rule, err
+                }
+                sw.Nodeport = nodeport
 		sw.Path = element.Path
 		sw.ReplacePath = element.ReplacePath
+                sw.Unipool = "/"+partition+"/unipool"
 		appurl, err := getAppUrl(element.App, element.Space, db)
 		if err != nil {
 			log.Printf("Unable to get app url while building rule: %s\n", err.Error())
@@ -592,8 +600,14 @@ func buildRule(router structs.Routerspec, partition string, virtual string, db *
 		switches = append(switches, sw)
 	}
 	ruleinfo.Switches = switches
-
-	t := template.Must(template.New("snirule").Parse(templates.Snirule))
+        
+        var t *template.Template
+        if os.Getenv("UNIPOOL") != "" {
+	     t = template.Must(template.New("snirule").Parse(templates.SniruleUnipool))
+        }
+        if os.Getenv("UNIPOOL") == "" {
+             t = template.Must(template.New("snirule").Parse(templates.Snirule))
+         }
 	var b bytes.Buffer
 	wr := bufio.NewWriter(&b)
 	err := t.Execute(wr, ruleinfo)
@@ -763,4 +777,23 @@ func getAppUrl(app string, space string, db *sql.DB) (u string, e error) {
 	} else {
 		return app + "-" + space + "." + externaldomain, nil
 	}
+}
+
+func getNodePort(db *sql.DB, space string, app string) (n string, e error){
+        var toreturn string
+        rt, err := runtime.GetRuntimeFor(db, space)
+        if err != nil {
+                return toreturn, err
+        }
+        service, err := rt.GetService(space, app)
+        if err != nil {
+                return toreturn, err
+        }
+        if len(service.Spec.Ports) == 1 {
+                toreturn = strconv.Itoa(service.Spec.Ports[0].NodePort)
+        } else {
+                toreturn = "0"
+        }
+ 
+        return toreturn, nil
 }
