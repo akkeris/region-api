@@ -601,8 +601,14 @@ func buildRule(router structs.Routerspec, partition string, virtual string, db *
 		switches = append(switches, sw)
 	}
 	ruleinfo.Switches = switches
-
-	t := template.Must(template.New("snirule").Parse(templates.Snirule))
+        
+        var t *template.Template
+        if os.Getenv("UNIPOOL") != "" {
+	     t = template.Must(template.New("snirule").Parse(templates.SniruleUnipool))
+        }
+        if os.Getenv("UNIPOOL") == "" {
+             t = template.Must(template.New("snirule").Parse(templates.Snirule))
+         }
 	var b bytes.Buffer
 	wr := bufio.NewWriter(&b)
 	err := t.Execute(wr, ruleinfo)
