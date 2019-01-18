@@ -187,7 +187,7 @@ func HttpRemoveDomainRecords(params martini.Params, r render.Render) {
 		}
 		for _, record := range records {
 			// we only allow removal of A or CNAME records
-			if record.Name == params["name"] && (strings.ToUpper(record.Type) == "A" || strings.ToUpper(record.Type) == "CNAME") {
+			if record.Name == params["name"] && (strings.ToUpper(record.Type) == "A" || strings.ToUpper(record.Type) == "AAAA" || strings.ToUpper(record.Type) == "CNAME") {
 				record.Domain = &Domain{
 					ProviderId:  domain.ProviderId,
 					Name:        domain.Name,
