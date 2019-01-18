@@ -102,24 +102,20 @@ func HttpGetDomainRecords(params martini.Params, r render.Render) {
 }
 
 func HttpCreateDomainRecords(params martini.Params, spec DomainRecord, berr binding.Errors, r render.Render) {
-	if strings.ToUpper(spec.Type) == "NS" {
-		utils.ReportInvalidRequest("Name server records cannot be changed through this.", r)
-		return
-	}
-	if strings.ToUpper(spec.Type) == "MX" {
-		utils.ReportInvalidRequest("Mail exchange records cannot be changed through this.", r)
-		return
-	}
-	if strings.ToUpper(spec.Type) == "SOA" {
-		utils.ReportInvalidRequest("SOA records cannot be changed through this.", r)
-		return
-	}
-	if strings.ToUpper(spec.Type) == "TXT" {
-		utils.ReportInvalidRequest("TXT records cannot be changed through this.", r)
-		return
-	}
 	if berr != nil {
 		utils.ReportInvalidRequest(berr[0].Message, r)
+		return
+	}
+	if strings.ToUpper(spec.Type) != "A" && strings.ToUpper(spec.Type) != "AAAA" && strings.ToUpper(spec.Type) != "CNAME" {
+		utils.ReportInvalidRequest("Only A, AAAA and CNAME records may be added to a domain record.", r)
+		return
+	}
+	if strings.ToUpper(strings.Trim(params["domain"], ".")) == strings.ToUpper(strings.Trim(spec.Name, ".")) {
+		utils.ReportInvalidRequest("Entries cannot be created for the root domain.", r)
+		return
+	}
+	if spec.Name == "" {
+		utils.ReportInvalidRequest("Entries cannot be created for the root domain.", r)
 		return
 	}
 
@@ -163,6 +159,15 @@ func HttpRemoveDomainRecords(params martini.Params, r render.Render) {
 		r.JSON(http.StatusConflict, map[string]interface{}{"error": "CONFLICT", "error_description": "The name entry to delete was the domain itself."})
 		return
 	}
+	if strings.ToUpper(strings.Trim(params["domain"], ".")) == strings.ToUpper(strings.Trim(params["name"], ".")) {
+		utils.ReportInvalidRequest("Entries cannot be removed for the root of the domain.", r)
+		return
+	}
+	if params["name"] == "" {
+		utils.ReportInvalidRequest("Entries cannot be removed for the root of the domain.", r)
+		return
+	}
+
 	domains, err := dns.Domain(params["domain"])
 	if err != nil {
 		utils.ReportError(err, r)
@@ -194,6 +199,11 @@ func HttpRemoveDomainRecords(params martini.Params, r render.Render) {
 				toRemoveRecords = append(toRemoveRecords, record)
 			}
 		}
+	}
+
+	if len(toRemoveRecords) == 0 {
+		r.JSON(http.StatusNotFound, map[string]interface{}{"error": "NOT_FOUND", "error_description": "The domain " + params["name"] + " was not found."})
+		return
 	}
 
 	for _, rrec := range toRemoveRecords {
