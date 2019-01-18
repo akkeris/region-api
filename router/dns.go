@@ -86,8 +86,6 @@ func HttpGetDomainRecords(params martini.Params, r render.Render) {
 			utils.ReportError(err, r)
 			return
 		}
-		fmt.Printf("Looking at domain %s (%s) with %d\n", domain.Name, domain.ProviderId, len(record))
-
 		for _, r := range record {
 			r.Domain = &Domain{
 				ProviderId:  domain.ProviderId,
@@ -97,7 +95,6 @@ func HttpGetDomainRecords(params martini.Params, r render.Render) {
 				Status:      domain.Status,
 				RecordCount: domain.RecordCount,
 			}
-			fmt.Printf("Adding to domain %s (%s) record %s\n", domain.Name, domain.ProviderId, r.Name)
 			records = append(records, r)
 		}
 	}
@@ -105,24 +102,20 @@ func HttpGetDomainRecords(params martini.Params, r render.Render) {
 }
 
 func HttpCreateDomainRecords(params martini.Params, spec DomainRecord, berr binding.Errors, r render.Render) {
-	if strings.ToUpper(spec.Type) == "NS" {
-		utils.ReportInvalidRequest("Name server records cannot be changed through this.", r)
-		return
-	}
-	if strings.ToUpper(spec.Type) == "MX" {
-		utils.ReportInvalidRequest("Mail exchange records cannot be changed through this.", r)
-		return
-	}
-	if strings.ToUpper(spec.Type) == "SOA" {
-		utils.ReportInvalidRequest("SOA records cannot be changed through this.", r)
-		return
-	}
-	if strings.ToUpper(spec.Type) == "TXT" {
-		utils.ReportInvalidRequest("TXT records cannot be changed through this.", r)
-		return
-	}
 	if berr != nil {
 		utils.ReportInvalidRequest(berr[0].Message, r)
+		return
+	}
+	if strings.ToUpper(spec.Type) != "A" && strings.ToUpper(spec.Type) != "AAAA" && strings.ToUpper(spec.Type) != "CNAME" {
+		utils.ReportInvalidRequest("Only A, AAAA and CNAME records may be added to a domain record.", r)
+		return
+	}
+	if strings.ToUpper(strings.Trim(params["domain"], ".")) == strings.ToUpper(strings.Trim(spec.Name, ".")) {
+		utils.ReportInvalidRequest("Entries cannot be created for the root domain.", r)
+		return
+	}
+	if spec.Name == "" {
+		utils.ReportInvalidRequest("Entries cannot be created for the root domain.", r)
 		return
 	}
 
@@ -166,6 +159,15 @@ func HttpRemoveDomainRecords(params martini.Params, r render.Render) {
 		r.JSON(http.StatusConflict, map[string]interface{}{"error": "CONFLICT", "error_description": "The name entry to delete was the domain itself."})
 		return
 	}
+	if strings.ToUpper(strings.Trim(params["domain"], ".")) == strings.ToUpper(strings.Trim(params["name"], ".")) {
+		utils.ReportInvalidRequest("Entries cannot be removed for the root of the domain.", r)
+		return
+	}
+	if params["name"] == "" {
+		utils.ReportInvalidRequest("Entries cannot be removed for the root of the domain.", r)
+		return
+	}
+
 	domains, err := dns.Domain(params["domain"])
 	if err != nil {
 		utils.ReportError(err, r)
@@ -185,7 +187,7 @@ func HttpRemoveDomainRecords(params martini.Params, r render.Render) {
 		}
 		for _, record := range records {
 			// we only allow removal of A or CNAME records
-			if record.Name == params["name"] && (strings.ToUpper(record.Type) == "A" || strings.ToUpper(record.Type) == "CNAME") {
+			if record.Name == params["name"] && (strings.ToUpper(record.Type) == "A" || strings.ToUpper(record.Type) == "AAAA" || strings.ToUpper(record.Type) == "CNAME") {
 				record.Domain = &Domain{
 					ProviderId:  domain.ProviderId,
 					Name:        domain.Name,
@@ -197,6 +199,11 @@ func HttpRemoveDomainRecords(params martini.Params, r render.Render) {
 				toRemoveRecords = append(toRemoveRecords, record)
 			}
 		}
+	}
+
+	if len(toRemoveRecords) == 0 {
+		r.JSON(http.StatusNotFound, map[string]interface{}{"error": "NOT_FOUND", "error_description": "The domain " + params["name"] + " was not found."})
+		return
 	}
 
 	for _, rrec := range toRemoveRecords {
@@ -380,8 +387,7 @@ func (dnsProvider *AwsDNSProvider) Domains() ([]Domain, error) {
 	}
 	var domains []Domain = make([]Domain, 0)
 	var Marker *string = nil
-	t := time.NewTicker(time.Millisecond * 250)
-	// This only supports a maximum of 200 requests
+	t := time.NewTicker(time.Millisecond * 500)
 	for more := true; more == true; {
 		<-t.C // in order to not exceed our throttle rate
 		result, err := dnsProvider.client.ListHostedZones(&route53.ListHostedZonesInput{
@@ -437,7 +443,7 @@ func (dnsProvider *AwsDNSProvider) DomainRecords(domain Domain) ([]DomainRecord,
 	var nextRecordName *string = nil
 	var nextRecordType *string = nil
 	var nextRecordIdentifier *string = nil
-	t := time.NewTicker(time.Millisecond * 250)
+	t := time.NewTicker(time.Millisecond * 500)
 	for more := true; more == true; {
 		<-t.C // in order to not exceed our throttle rate
 		result, err := dnsProvider.client.ListResourceRecordSets(&route53.ListResourceRecordSetsInput{
@@ -481,7 +487,29 @@ func (dnsProvider *AwsDNSProvider) CreateDomainRecord(domain Domain, recordType 
 		},
 	})
 	if err == nil {
-		go AwsRefreshCache()
+		dnsProvider.mutex.Lock()
+		if provider.domainRecordsCache == nil {
+			dnsProvider.mutex.Unlock()
+			return nil
+		}
+		// ensure we remove the old record, if it exists
+		domains := make([]DomainRecord, 0)
+		prev := (*provider.domainRecordsCache)[domain.ProviderId]
+		for _, d := range prev {
+			if(d.Name != name && d.Type != recordType) {
+				domains = append(domains, d)
+			}
+		}
+		(*provider.domainRecordsCache)[domain.ProviderId] = domains
+
+		// now add the new record
+		(*provider.domainRecordsCache)[domain.ProviderId] = append((*provider.domainRecordsCache)[domain.ProviderId], DomainRecord{
+			Type: recordType,
+			Name: name,
+			Values: values,
+			Domain: &domain,
+		})
+		dnsProvider.mutex.Unlock()
 	}
 	return err
 }
@@ -505,7 +533,20 @@ func (dnsProvider *AwsDNSProvider) RemoveDomainRecord(domain Domain, recordType 
 		},
 	})
 	if err == nil {
-		go AwsRefreshCache()
+		dnsProvider.mutex.Lock()
+		if provider.domainRecordsCache == nil {
+			dnsProvider.mutex.Unlock()
+			return nil
+		}
+		domains := make([]DomainRecord, 0)
+		prev := (*provider.domainRecordsCache)[domain.ProviderId]
+		for _, d := range prev {
+			if(d.Name != name && d.Type != recordType) {
+				domains = append(domains, d)
+			}
+		}
+		(*provider.domainRecordsCache)[domain.ProviderId] = domains
+		dnsProvider.mutex.Unlock()
 	}
 	return err
 }
