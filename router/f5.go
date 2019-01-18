@@ -455,7 +455,6 @@ func UpdateF5(router structs.Routerspec, db *sql.DB) (m structs.Messagespec, e e
 		log.Printf("Unable to update F5 router (buildRule failed): %s\n", err.Error())
 		return msg, err	
 	}
-fmt.Printf("%+v\n", rule)
 	ruleexists, err := ruleExists(router)
 	if err != nil {
 		log.Printf("Unable to update F5 router (ruleExists failed): %s\n", err.Error())
