@@ -86,8 +86,6 @@ func HttpGetDomainRecords(params martini.Params, r render.Render) {
 			utils.ReportError(err, r)
 			return
 		}
-		fmt.Printf("Looking at domain %s (%s) with %d\n", domain.Name, domain.ProviderId, len(record))
-
 		for _, r := range record {
 			r.Domain = &Domain{
 				ProviderId:  domain.ProviderId,
@@ -97,7 +95,6 @@ func HttpGetDomainRecords(params martini.Params, r render.Render) {
 				Status:      domain.Status,
 				RecordCount: domain.RecordCount,
 			}
-			fmt.Printf("Adding to domain %s (%s) record %s\n", domain.Name, domain.ProviderId, r.Name)
 			records = append(records, r)
 		}
 	}
@@ -380,8 +377,7 @@ func (dnsProvider *AwsDNSProvider) Domains() ([]Domain, error) {
 	}
 	var domains []Domain = make([]Domain, 0)
 	var Marker *string = nil
-	t := time.NewTicker(time.Millisecond * 250)
-	// This only supports a maximum of 200 requests
+	t := time.NewTicker(time.Millisecond * 500)
 	for more := true; more == true; {
 		<-t.C // in order to not exceed our throttle rate
 		result, err := dnsProvider.client.ListHostedZones(&route53.ListHostedZonesInput{
@@ -437,7 +433,7 @@ func (dnsProvider *AwsDNSProvider) DomainRecords(domain Domain) ([]DomainRecord,
 	var nextRecordName *string = nil
 	var nextRecordType *string = nil
 	var nextRecordIdentifier *string = nil
-	t := time.NewTicker(time.Millisecond * 250)
+	t := time.NewTicker(time.Millisecond * 500)
 	for more := true; more == true; {
 		<-t.C // in order to not exceed our throttle rate
 		result, err := dnsProvider.client.ListResourceRecordSets(&route53.ListResourceRecordSetsInput{
@@ -481,7 +477,29 @@ func (dnsProvider *AwsDNSProvider) CreateDomainRecord(domain Domain, recordType 
 		},
 	})
 	if err == nil {
-		go AwsRefreshCache()
+		dnsProvider.mutex.Lock()
+		if provider.domainRecordsCache == nil {
+			dnsProvider.mutex.Unlock()
+			return nil
+		}
+		// ensure we remove the old record, if it exists
+		domains := make([]DomainRecord, 0)
+		prev := (*provider.domainRecordsCache)[domain.ProviderId]
+		for _, d := range prev {
+			if(d.Name != name && d.Type != recordType) {
+				domains = append(domains, d)
+			}
+		}
+		(*provider.domainRecordsCache)[domain.ProviderId] = domains
+
+		// now add the new record
+		(*provider.domainRecordsCache)[domain.ProviderId] = append((*provider.domainRecordsCache)[domain.ProviderId], DomainRecord{
+			Type: recordType,
+			Name: name,
+			Values: values,
+			Domain: &domain,
+		})
+		dnsProvider.mutex.Unlock()
 	}
 	return err
 }
@@ -505,7 +523,20 @@ func (dnsProvider *AwsDNSProvider) RemoveDomainRecord(domain Domain, recordType 
 		},
 	})
 	if err == nil {
-		go AwsRefreshCache()
+		dnsProvider.mutex.Lock()
+		if provider.domainRecordsCache == nil {
+			dnsProvider.mutex.Unlock()
+			return nil
+		}
+		domains := make([]DomainRecord, 0)
+		prev := (*provider.domainRecordsCache)[domain.ProviderId]
+		for _, d := range prev {
+			if(d.Name != name && d.Type != recordType) {
+				domains = append(domains, d)
+			}
+		}
+		(*provider.domainRecordsCache)[domain.ProviderId] = domains
+		dnsProvider.mutex.Unlock()
 	}
 	return err
 }
