@@ -14,7 +14,95 @@ import (
 	structs "region-api/structs"
 	utils "region-api/utils"
 	"strings"
+	"time"
+	f5client "github.com/octanner/f5er/f5"
 )
+
+func SiteInfo(db *sql.DB, params martini.Params, r render.Render) {
+	site := strings.ToLower(params["site"])
+	// Check to see if we have a TLS certificate
+	certs, err := ListTLSCerts()
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	certificates := make([]f5client.SSLCertificate, 0)
+	expiredCertificates := make([]f5client.SSLCertificate, 0)
+	for _, cert := range certs {
+		for _, subject := range strings.Split(cert.SubjectAlternativeName, ",") {
+			subject = strings.ToLower(strings.Trim(strings.Replace(subject, "DNS:", "", 1), " "))
+			if strings.HasPrefix(subject, "*.") {
+				if strings.HasSuffix(site, strings.Replace(subject, "*.", "", 1)) {
+					if time.Unix(int64(cert.Expiration), int64(0)).After(time.Now()) {
+						certificates = append(certificates, cert)
+					} else {
+						expiredCertificates = append(expiredCertificates, cert)
+					}
+				}
+			} else if subject == site {
+				if time.Unix(int64(cert.Expiration), int64(0)).After(time.Now()) {
+					certificates = append(certificates, cert)
+				} else {
+					expiredCertificates = append(expiredCertificates, cert)
+				}
+			}
+		}
+	}
+
+	profs, err := ListTLSProfiles()
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	profiles := make([]f5client.LBClientSsl, 0)
+	expiredProfiles := make([]f5client.LBClientSsl, 0)
+	for _, prof := range profs {
+		for _, cert := range expiredCertificates {
+			if ("/" + cert.Partition + "/" + cert.Name) == prof.Cert && cert.Partition == prof.Partition {
+				if strings.HasSuffix(site, strings.Replace(prof.ServerName, "*.", "", 1)) || prof.ServerName == site {
+					expiredProfiles = append(expiredProfiles, prof)
+				}
+			}
+		}
+		for _, cert := range certificates {
+			if ("/" + cert.Partition + "/" + cert.Name) == prof.Cert && cert.Partition == prof.Partition {
+				if strings.HasSuffix(site, strings.Replace(prof.ServerName, "*.", "", 1)) || prof.ServerName == site {
+					profiles = append(profiles, prof)
+				}
+			}
+		}
+	}
+
+	interfaces := make([]f5client.LBVirtual, 0)
+	vips, err := ListVIPs()
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	for _, vip := range vips {
+		if vip.Profiles.Items != nil {
+			for _, prof := range vip.Profiles.Items {
+				for _, aprof := range profiles {
+					if prof.Name == aprof.Name && prof.Partition == aprof.Partition {
+						interfaces = append(interfaces, vip)
+					}
+				}
+			}
+		}
+	}
+
+	r.JSON(http.StatusOK, map[string]interface{}{
+		"profiles":map[string]interface{}{
+			"expired":expiredProfiles, 
+			"active":profiles,
+		},
+		"certificates":map[string]interface{}{
+			"expired":expiredCertificates, 
+			"active":certificates,
+		},
+		"interfaces":interfaces,
+	})
+}
 
 func DescribeRouters(db *sql.DB, params martini.Params, r render.Render) {
 

@@ -408,6 +408,90 @@ func InstallNewCert(partition string, vip string, pem_cert []byte, pem_key []byt
 	return nil
 }
 
+
+func ListVIPs() ([]f5client.LBVirtual, error) {
+	f5, err := GetClient()
+	if err != nil {
+		return nil, err
+	}
+	device := f5client.New(strings.Replace(f5.Url, "https://", "", 1), f5.Username, f5.Password, f5client.BASIC_AUTH)
+	err, vips := device.ShowExpandedVirtuals()
+	if err != nil {
+		return nil, err
+	}
+	return vips.Items, nil
+}
+
+func GetVIPProfile(partition string, vipName string) ([]f5client.LBVirtualProfile, error) {
+	f5, err := GetClient()
+	if err != nil {
+		return nil, err
+	}
+	device := f5client.New(strings.Replace(f5.Url, "https://", "", 1), f5.Username, f5.Password, f5client.BASIC_AUTH)
+	err, vip := device.ShowVirtual("/" + partition + "/" + vipName)
+	if err != nil {
+		return nil, err
+	}
+	return vip.Profiles.Items, nil
+}
+
+/*
+func GetTLSProfile(partition string, name string) (f5client.SSLCertificate, error) {
+	f5, err := GetClient()
+	if err != nil {
+		return nil, err
+	}
+	device := f5client.New(strings.Replace(f5.Url, "https://", "", 1), f5.Username, f5.Password, f5client.BASIC_AUTH)
+	err, cert := device.ShowClientSsl("/" + partition + "/" + name)
+	if err != nil {
+		return nil, err
+	}
+	return cert, nil
+}
+*/
+
+func ListTLSProfiles() ([]f5client.LBClientSsl, error) {
+	f5, err := GetClient()
+	if err != nil {
+		return nil, err
+	}
+	device := f5client.New(strings.Replace(f5.Url, "https://", "", 1), f5.Username, f5.Password, f5client.BASIC_AUTH)
+	err, ssls := device.ShowClientSsls()
+	if err != nil {
+		return nil, err
+	}
+	return ssls.Items, nil
+}
+
+/*
+func GetTLSCert(partition string, name string) (f5client.SSLCertificate, error) {
+	f5, err := GetClient()
+	if err != nil {
+		return nil, err
+	}
+	device := f5client.New(strings.Replace(f5.Url, "https://", "", 1), f5.Username, f5.Password, f5client.BASIC_AUTH)
+	err, cert := device.GetCertificate(partition, name)
+	if err != nil {
+		return nil, err
+	}
+	return cert, nil
+}
+*/
+
+func ListTLSCerts() ([]f5client.SSLCertificate, error) {
+	f5, err := GetClient()
+	if err != nil {
+		return nil, err
+	}
+	device := f5client.New(strings.Replace(f5.Url, "https://", "", 1), f5.Username, f5.Password, f5client.BASIC_AUTH)
+	err, certs := device.GetCertificates()
+	if err != nil {
+		return nil, err
+	}
+	return certs.Items, nil
+}
+
+
 func DeleteF5(router structs.Routerspec, db *sql.DB) (m structs.Messagespec, e error) {
 	var msg structs.Messagespec
 	partition, virtual, err := getF5pv(router)
