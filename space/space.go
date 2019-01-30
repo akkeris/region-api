@@ -86,6 +86,7 @@ func Createspace(db *sql.DB, space structs.Spacespec, berr binding.Errors, r ren
 		utils.ReportError(err, r)
 		return
 	}
+if os.Getenv("FF_QUAY")=="true" {
 	vs, err := getQuayPullSecret(space.Name)
 	if err != nil {
 		utils.ReportError(err, r)
@@ -105,6 +106,7 @@ func Createspace(db *sql.DB, space structs.Spacespec, berr binding.Errors, r ren
 		utils.ReportError(err, r)
 		return
 	}
+}
 	r.JSON(http.StatusCreated, structs.Messagespec{Status: http.StatusCreated, Message: "space created"})
 }
 
