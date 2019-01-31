@@ -557,3 +557,20 @@ func SeekConsumerGroupV1(spec structs.KafkaConsumerGroupSeekRequest, params mart
     bodyj, _ := simplejson.NewFromReader(resp.Body)
     r.JSON(resp.StatusCode, bodyj)
 }
+
+func GetTopicPreviewV1(params martini.Params, r render.Render) {
+  cluster := params["cluster"]
+  topic := params["topic"]
+
+  client := &http.Client{}
+  req, err := http.NewRequest("GET", os.Getenv("KAFKA_BROKER_URL")+"/v1/kafka/cluster/"+cluster+"/topics/"+topic+"/preview", nil)
+  resp, err := client.Do(req)
+  if err != nil {
+      utils.ReportError(err, r)
+      return
+  }
+
+  defer resp.Body.Close()
+  bodyj, _ := simplejson.NewFromReader(resp.Body)
+  r.JSON(resp.StatusCode, bodyj)
+}
