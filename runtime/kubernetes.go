@@ -357,6 +357,7 @@ func deploymentToDeploymentSpec(deployment *structs.Deployment) (dp Deploymentsp
 	krc.Spec.Template.Spec.ImagePullSecrets = deployment.Secrets
 	krc.Spec.Template.Spec.Containers = clist
 	krc.Spec.Template.Spec.ImagePullPolicy = "Always"
+	krc.Spec.Template.Spec.TerminationGracePeriodSeconds = 60
 	// krc.Spec.Template.Spec.DnsPolicy = "Default"
 
 	return krc
