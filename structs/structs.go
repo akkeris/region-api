@@ -177,7 +177,7 @@ type Postgresspec struct {
 
 //Mongodbspec Postgres spec
 type Mongodbspec struct {
-	DatabaseUrl string `json:"DATABASE_URL"`
+	MongodbUrl string `json:"MONGODB_URL"`
 	Spec        string `json:"spec"`
 }
 
