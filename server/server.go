@@ -126,6 +126,7 @@ func InitOldServiceEndpoints(m *martini.ClassicMartini) {
 	m.Get("/v1/service/kafka/cluster/:cluster/acls", service.GetAclsV1)
 	m.Post("/v1/service/kafka/cluster/:cluster/acls", binding.Json(structs.AclRequest{}), service.CreateAclV1)
 	m.Delete("/v1/service/kafka/acls/:id", service.DeleteAclV1)
+	m.Get("/v1/service/kafka/cluster/:cluster/topics/:topic/preview", service.GetTopicPreviewV1)
 	m.Get("/v1/service/kafka/cluster/:cluster/consumer-groups", service.GetConsumerGroupsV1)
 	m.Get("/v1/service/kafka/cluster/:cluster/consumer-groups/:consumerGroupName/offsets", service.GetConsumerGroupOffsetsV1)
 	m.Get("/v1/service/kafka/cluster/:cluster/consumer-groups/:consumerGroupName/members", service.GetConsumerGroupMembersV1)
