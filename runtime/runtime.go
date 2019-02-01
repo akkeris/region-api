@@ -206,12 +206,13 @@ type Deploymentspec struct {
 				} `json:"labels"`
 			} `json:"metadata"`
 			Spec struct {
-				Containers       []ContainerItem    `json:"containers"`
-				ImagePullPolicy  string             `json:"imagePullPolicy"`
-				ImagePullSecrets []structs.Namespec `json:"imagePullSecrets"`
-				DnsPolicy        string             `json:"dnsPolicy,omitempty"`
-				InitContainers   *[]ContainerItem   `json:"initContainers,omitempty"`
-				Volumes          *[]structs.Volumes `json:"volumes,omitempty"`
+				Containers						[]ContainerItem		`json:"containers"`
+				ImagePullPolicy					string				`json:"imagePullPolicy"`
+				ImagePullSecrets				[]structs.Namespec	`json:"imagePullSecrets"`
+				DnsPolicy						string				`json:"dnsPolicy,omitempty"`
+				InitContainers					*[]ContainerItem	`json:"initContainers,omitempty"`
+				Volumes							*[]structs.Volumes	`json:"volumes,omitempty"`
+				TerminationGracePeriodSeconds	int 				`json:"terminationGracePeriodSeconds,omitempty"`
 			} `json:"spec"`
 		} `json:"template"`
 	} `json:"spec"`
