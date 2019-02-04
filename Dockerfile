@@ -8,5 +8,6 @@ WORKDIR /go/src/region-api
 COPY . .
 RUN dep ensure
 RUN go build .
-CMD ["./region-api"]
+RUN chmod +x start.sh
+CMD ["./start.sh"]
 EXPOSE 3000
