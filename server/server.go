@@ -230,6 +230,7 @@ func Server(db *sql.DB) *martini.ClassicMartini {
 	m.Post("/v1/app/deploy", binding.Json(structs.Deployspec{}), app.Deployment)
 	m.Post("/v1/app/deploy/oneoff", binding.Json(structs.OneOffSpec{}), app.OneOffDeployment)
 
+	m.Get("/v1/sites/:site", router.HttpGetSite)
 	m.Get("/v1/domains", router.HttpGetDomains)
 	m.Get("/v1/domains/:domain", router.HttpGetDomain)
 	m.Get("/v1/domains/:domain/records", router.HttpGetDomainRecords)
