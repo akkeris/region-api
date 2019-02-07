@@ -308,9 +308,9 @@ func BoolNilToFalse(value *bool) bool {
 
 func FixAwsDomainName(domain string) string {
 	if strings.HasSuffix(domain, ".") {
-		return strings.ToLower(strings.TrimRight(domain, "."))
+		return strings.Replace(strings.ToLower(strings.TrimRight(domain, ".")), "\\052", "*", 1)
 	} else {
-		return strings.ToLower(domain)
+		return strings.Replace(strings.ToLower(domain), "\\052", "*", 1)
 	}
 }
 
@@ -363,13 +363,14 @@ func MapAwsHostedZonesToDomains(awsDomains []*route53.HostedZone) []Domain {
 	return domains
 }
 
-func MapAwsResourceRecordsToDomainRecords(results []*route53.ResourceRecordSet) []DomainRecord {
+func MapAwsResourceRecordsToDomainRecords(domain Domain, results []*route53.ResourceRecordSet) []DomainRecord {
 	var domainRecords []DomainRecord = make([]DomainRecord, 0)
 	for _, d := range results {
 		domainRecords = append(domainRecords, DomainRecord{
 			Type:   StringNilToEmpty(d.Type),
 			Name:   FixAwsDomainName(StringNilToEmpty(d.Name)),
 			Values: MapResourceRecordToStringArray(d.ResourceRecords),
+			Domain: &domain,
 		})
 	}
 	return domainRecords
@@ -463,7 +464,7 @@ func (dnsProvider *AwsDNSProvider) DomainRecords(domain Domain) ([]DomainRecord,
 		} else {
 			more = false
 		}
-		domainRecords = append(domainRecords, MapAwsResourceRecordsToDomainRecords(result.ResourceRecordSets)...)
+		domainRecords = append(domainRecords, MapAwsResourceRecordsToDomainRecords(domain, result.ResourceRecordSets)...)
 	}
 	return domainRecords, nil
 }

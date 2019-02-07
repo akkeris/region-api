@@ -409,7 +409,6 @@ func InstallNewCert(partition string, vip string, pem_cert []byte, pem_key []byt
 	return nil
 }
 
-
 func ListVIPs() ([]f5client.LBVirtual, error) {
 	f5, err := GetClient()
 	if err != nil {
@@ -436,21 +435,6 @@ func GetVIPProfile(partition string, vipName string) ([]f5client.LBVirtualProfil
 	return vip.Profiles.Items, nil
 }
 
-/*
-func GetTLSProfile(partition string, name string) (f5client.SSLCertificate, error) {
-	f5, err := GetClient()
-	if err != nil {
-		return nil, err
-	}
-	device := f5client.New(strings.Replace(f5.Url, "https://", "", 1), f5.Username, f5.Password, f5client.BASIC_AUTH)
-	err, cert := device.ShowClientSsl("/" + partition + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	return cert, nil
-}
-*/
-
 func ListTLSProfiles() ([]f5client.LBClientSsl, error) {
 	f5, err := GetClient()
 	if err != nil {
@@ -464,21 +448,6 @@ func ListTLSProfiles() ([]f5client.LBClientSsl, error) {
 	return ssls.Items, nil
 }
 
-/*
-func GetTLSCert(partition string, name string) (f5client.SSLCertificate, error) {
-	f5, err := GetClient()
-	if err != nil {
-		return nil, err
-	}
-	device := f5client.New(strings.Replace(f5.Url, "https://", "", 1), f5.Username, f5.Password, f5client.BASIC_AUTH)
-	err, cert := device.GetCertificate(partition, name)
-	if err != nil {
-		return nil, err
-	}
-	return cert, nil
-}
-*/
-
 func ListTLSCerts() ([]f5client.SSLCertificate, error) {
 	f5, err := GetClient()
 	if err != nil {
@@ -490,6 +459,154 @@ func ListTLSCerts() ([]f5client.SSLCertificate, error) {
 		return nil, err
 	}
 	return certs.Items, nil
+}
+
+type Profile struct {
+	Name string
+	ServerName string
+	CertName string
+	Internal bool
+	External bool
+}
+
+func GetF5SiteInfo(site string) ([]Certificate, []Addresses, error) {
+	vipsn, err := ListVIPs()
+	if err != nil {
+		return nil, nil, err
+	}
+	ssl_profiles, err := ListTLSProfiles()
+	if err != nil {
+		return nil, nil, err
+	}
+	ssl_certs, err := ListTLSCerts()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var certs []Certificate = make([]Certificate, 0)
+	for _, cert := range ssl_certs {
+		var found = false
+		sans := strings.Split(strings.Replace(cert.SubjectAlternativeName, "DNS:", "", -1), ",")
+		var certType string = "normal"
+		if len(sans) > 1 {
+			certType = "sans"
+		} 
+		destsans := make([]string, 0)
+		for _, san := range sans {
+			san = strings.Replace(san, " ", "", -1)
+			destsans = append(destsans, san)
+			if strings.Contains(san, "*") {
+				certType = "wildcard"
+			}
+			found = WildCardMatch(san, site)
+		}
+		var partitionMatch = cert.Partition == os.Getenv("F5_PARTITION_INTERNAL") || cert.Partition == os.Getenv("F5_PARTITION")
+		var notExpired = int64(cert.Expiration) > time.Now().Unix() 
+		if partitionMatch && notExpired && found == true {
+			var alsoFound = false
+			for _, ecert := range certs {
+				if ecert.Name == cert.Name {
+					if cert.Partition == os.Getenv("F5_PARTITION_INTERNAL") {
+						ecert.Internal = true
+					}
+					if cert.Partition == os.Getenv("F5_PARTITION") {
+						ecert.External = true
+					}
+					alsoFound = true
+				}
+			}
+			if !alsoFound {
+				certs = append(certs, Certificate{
+					Type: certType,
+					Name: cert.Name,
+					Expires: cert.Expiration,
+					Alternatives: destsans,
+					Internal: cert.Partition == os.Getenv("F5_PARTITION_INTERNAL"),
+					External: cert.Partition == os.Getenv("F5_PARTITION"),
+				})
+			}
+		}
+	}
+
+	profiles := make([]Profile, 0)
+	for _, profile := range ssl_profiles {
+		for _, cert := range certs {
+			var certFound = false
+			if cert.External && profile.Cert == ("/" + os.Getenv("F5_PARTITION")+ "/" + cert.Name) {
+				certFound = true
+			}
+			if cert.Internal && profile.Cert == ("/" + os.Getenv("F5_PARTITION_INTERNAL")+ "/" + cert.Name) {
+				certFound = true 
+			}
+			var serverFound = WildCardMatch(profile.ServerName, site)
+			if certFound && serverFound {
+				var alsoFound = false
+				for _, iprof := range profiles {
+					if iprof.Name == profile.Name {
+						alsoFound = true
+						if cert.Internal {
+							iprof.Internal = true
+						}
+						if !cert.Internal {
+							iprof.External = true
+						}
+					}
+				}
+				if !alsoFound {
+					profiles = append(profiles, Profile{
+						Name:profile.Name,
+						ServerName:profile.ServerName,
+						CertName:cert.Name,
+						Internal:cert.Internal,
+						External:!cert.External,
+					})
+				}
+			}
+		}
+	}
+
+	vips := make([]Addresses, 0)
+	for _, vip := range vipsn {
+		for _, profile := range profiles {
+			for _, profileOnVips := range vip.Profiles.Items {
+				if profileOnVips.Name == profile.Name {
+					if vip.Partition == os.Getenv("F5_PARTITION_INTERNAL") {
+						vips = append(vips, Addresses{
+							Network:vip.Name,
+							Internal:true,
+							IP:os.Getenv("PRIVATE_SNI_VIP_INTERNAL"),
+						})
+					} else if vip.Partition == os.Getenv("F5_PARTITION") {
+						vips = append(vips, Addresses{
+							Network:vip.Name,
+							Internal:false,
+							IP:os.Getenv("PRIVATE_SNI_VIP"),
+						})
+						vips = append(vips, Addresses{
+							Network:vip.Name,
+							Internal:false,
+							IP:os.Getenv("PUBLIC_SNI_VIP"),
+						})
+					}
+				}
+			}
+		}
+	}
+	unique_vips := make([]Addresses, 0)
+	
+	for _, vip := range vips {
+		var found = false
+		for _, uvip := range unique_vips {
+			if uvip.Network == vip.Network && uvip.Internal == vip.Internal && uvip.IP == vip.IP {
+				found = true
+			}
+		}
+		if !found {
+			unique_vips = append(unique_vips, vip)
+		}
+	}
+
+	return certs, unique_vips, nil
 }
 
 
