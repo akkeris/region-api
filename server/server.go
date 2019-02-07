@@ -364,7 +364,6 @@ func Server(db *sql.DB) *martini.ClassicMartini {
 	m.Get("/v1/certs", certs.GetCerts)
 	m.Get("/v1/certs/:id", certs.GetCertStatus)
 	m.Post("/v1/certs/:id/install", certs.InstallCert)
-	m.Get("/v1/sites/:site", router.SiteInfo)
 
 	m.Get("/v1/utils/service/space/:space/app/:app", utils.GetService)
 	m.Get("/v1/utils/nodes", utils.GetNodes)
