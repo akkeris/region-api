@@ -28,6 +28,7 @@ import (
 	"github.com/martini-contrib/auth"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
+        "github.com/robfig/cron"
 )
 
 func singleJoiningSlash(a, b string) string {
@@ -231,6 +232,7 @@ func Server(db *sql.DB) *martini.ClassicMartini {
 	m.Post("/v1/app/deploy", binding.Json(structs.Deployspec{}), app.Deployment)
 	m.Post("/v1/app/deploy/oneoff", binding.Json(structs.OneOffSpec{}), app.OneOffDeployment)
 
+	m.Get("/v1/sites/:site", router.HttpGetSite)
 	m.Get("/v1/domains", router.HttpGetDomains)
 	m.Get("/v1/domains/:domain", router.HttpGetDomain)
 	m.Get("/v1/domains/:domain/records", router.HttpGetDomainRecords)
@@ -364,7 +366,6 @@ func Server(db *sql.DB) *martini.ClassicMartini {
 	m.Get("/v1/certs", certs.GetCerts)
 	m.Get("/v1/certs/:id", certs.GetCertStatus)
 	m.Post("/v1/certs/:id/install", certs.InstallCert)
-	m.Get("/v1/sites/:site", router.SiteInfo)
 
 	m.Get("/v1/utils/service/space/:space/app/:app", utils.GetService)
 	m.Get("/v1/utils/nodes", utils.GetNodes)
@@ -372,6 +373,11 @@ func Server(db *sql.DB) *martini.ClassicMartini {
 
 	InitOpenServiceBrokerEndpoints(db, m)
 	InitOldServiceEndpoints(m)
+
+        vault.GetVaultListPeriodic()
+        c := cron.New()
+        c.AddFunc("@every 10m", func() { go vault.GetVaultListPeriodic() })
+        c.Start()
 
 	// proxy to log shuttle
 	if os.Getenv("LOGSHUTTLE_SERVICE_HOST") != "" && os.Getenv("LOGSHUTTLE_SERVICE_PORT") != "" {
