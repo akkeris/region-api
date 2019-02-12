@@ -76,10 +76,10 @@ func GetmongodburlV1(params martini.Params, r render.Render) {
 	defer resp.Body.Close()
 
 	bodyj, _ := simplejson.NewFromReader(resp.Body)
-	databaseurl, _ := bodyj.Get("DATABASE_URL").String()
+	mongodburl, _ := bodyj.Get("MONGODB_URL").String()
 
-	mongodb.DatabaseUrl = databaseurl
-	mongodb.Spec = setspecname(databaseurl)
+	mongodb.MongodbUrl = mongodburl
+	mongodb.Spec = setspecname(mongodburl)
 
 	r.JSON(200, mongodb)
 }
@@ -117,10 +117,10 @@ func ProvisionmongodbV1(spec structs.Provisionspec, berr binding.Errors, r rende
 	}
 
 	bodyj, _ := simplejson.NewFromReader(resp.Body)
-	databaseurl, _ := bodyj.Get("DATABASE_URL").String()
+	mongodburl, _ := bodyj.Get("MONGODB_URL").String()
 
-	mongodb.DatabaseUrl = databaseurl
-	mongodb.Spec = setspecname(databaseurl)
+	mongodb.MongodbUrl = mongodburl
+	mongodb.Spec = setspecname(mongodburl)
 	r.JSON(http.StatusCreated, mongodb)
 }
 
@@ -187,7 +187,7 @@ func Getmongodbvars(servicename string) (e error, m map[string]string) {
 		return err, m
 	}
 	bodyj, _ := simplejson.NewFromReader(resp.Body)
-	m["DATABASE_URL"], err = bodyj.Get("DATABASE_URL").String()
+	m["MONGODB_URL"], err = bodyj.Get("MONGODB_URL").String()
 	return err, m
 
 }

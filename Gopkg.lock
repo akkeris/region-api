@@ -10,7 +10,7 @@
   revision = "6788ec8d19257929fbc71552b5e015a6a9d515ec"
 
 [[projects]]
-  digest = "1:e08407fa92753265eb8eb9169851e2dddac2b280f8f6bef1ff58c08ecf36f9a1"
+  digest = "1:567d05fa1340f5364b4cb1ffbb006c66e04cebc95dfe87316ed509ddf96c7977"
   name = "github.com/aws/aws-sdk-go"
   packages = [
     "aws",
@@ -89,7 +89,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:7a8e0f3e6962bfd8dc3b2f0395960cd36f32eb94ec7220cf7f6a2cd18bf02e59"
+  digest = "1:45be312094ed57afedb4871fe8c2f3d64c5f9d2f6b25e1e6eec00b2be23f602b"
   name = "github.com/gocql/gocql"
   packages = [
     ".",
@@ -156,7 +156,7 @@
   version = "v4.2.1"
 
 [[projects]]
-  digest = "1:8ef506fc2bb9ced9b151dafa592d4046063d744c646c1bbe801982ce87e4bc24"
+  digest = "1:b8ce08d470e11c14084572e7a83e2d91b835c357999a157c1fe94d6538f6fcce"
   name = "github.com/lib/pq"
   packages = [
     ".",
@@ -199,12 +199,12 @@
   revision = "179d4d0c4d8d407a32af483c2354df1d2c91e6c3"
 
 [[projects]]
-  digest = "1:3a398f0609be4265d97d9ff4f8f29d575c6a46b03b54ac75e8d31360847ebf36"
+  digest = "1:ce57ea06d81f6305addc714924620c5986ab1e6bd40b63a239ff67a63a9eadb0"
   name = "github.com/octanner/f5er"
   packages = ["f5"]
   pruneopts = "UT"
-  revision = "843dfb3b2a68acbd37e0bce793e8af155e608a81"
-  version = "v0.2"
+  revision = "99e01a9fd236c6fab73b23f5f70e10839b781b0b"
+  version = "0.3"
 
 [[projects]]
   branch = "master"
@@ -231,7 +231,7 @@
   version = "v1.1"
 
 [[projects]]
-  digest = "1:cc1c574c9cb5e99b123888c12b828e2d19224ab6c2244bda34647f230bf33243"
+  digest = "1:12f4e78cd664ec46c74735379f07d35b4fbc9b55e74c2c565009143c87581cc4"
   name = "github.com/smartystreets/assertions"
   packages = [
     ".",
@@ -243,7 +243,7 @@
   version = "1.8.3"
 
 [[projects]]
-  digest = "1:a3e081e593ee8e3b0a9af6a5dcac964c67a40c4f2034b5345b2ad78d05920728"
+  digest = "1:52fe67b62ac538e99a684af3691946fffde2de8683f2a934cf239f53fb96e2c2"
   name = "github.com/smartystreets/goconvey"
   packages = [
     "convey",
@@ -255,7 +255,7 @@
   version = "1.6.3"
 
 [[projects]]
-  digest = "1:e7971bcafd2257eaf2eb0a7f40c89d73c5ed736ddd34b833590d4787ae148c20"
+  digest = "1:713837454a1bc1872aa67934760e796874b1dc4cd15ab536cf604fd4262544d0"
   name = "github.com/stackimpact/stackimpact-go"
   packages = [
     ".",
@@ -276,7 +276,7 @@
 
 [[projects]]
   branch = "v2"
-  digest = "1:988de7520a09024d5d94cd99bd545afbf194893994ec759b1cda0a0bbb6adb80"
+  digest = "1:29bf5c8251ed1689ddb48fa672d6154694cd4a43975e69f151507e67071e3741"
   name = "gopkg.in/mgo.v2"
   packages = [
     ".",
