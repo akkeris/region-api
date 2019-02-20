@@ -28,6 +28,7 @@ import (
 	"github.com/martini-contrib/auth"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
+        "github.com/robfig/cron"
 )
 
 func singleJoiningSlash(a, b string) string {
@@ -126,6 +127,7 @@ func InitOldServiceEndpoints(m *martini.ClassicMartini) {
 	m.Get("/v1/service/kafka/cluster/:cluster/acls", service.GetAclsV1)
 	m.Post("/v1/service/kafka/cluster/:cluster/acls", binding.Json(structs.AclRequest{}), service.CreateAclV1)
 	m.Delete("/v1/service/kafka/acls/:id", service.DeleteAclV1)
+	m.Get("/v1/service/kafka/cluster/:cluster/topics/:topic/preview", service.GetTopicPreviewV1)
 	m.Get("/v1/service/kafka/cluster/:cluster/consumer-groups", service.GetConsumerGroupsV1)
 	m.Get("/v1/service/kafka/cluster/:cluster/consumer-groups/:consumerGroupName/offsets", service.GetConsumerGroupOffsetsV1)
 	m.Get("/v1/service/kafka/cluster/:cluster/consumer-groups/:consumerGroupName/members", service.GetConsumerGroupMembersV1)
@@ -187,12 +189,6 @@ func InitOldServiceEndpoints(m *martini.ClassicMartini) {
 	m.Get("/v1/service/mongodb/:servicename", service.GetmongodbV1)
 	m.Get("/v1/service/mongodb/instance/:servicename", service.GetmongodbV1)
 
-	m.Get("/v1/service/aurora-mysql/plans", service.Getauroramysqlplans)
-	m.Get("/v1/service/aurora-mysql/url/:servicename", service.Getauroramysqlurl)
-	m.Post("/v1/service/aurora-mysql/instance", binding.Json(structs.Provisionspec{}), service.Provisionauroramysql)
-	m.Delete("/v1/service/aurora-mysql/instance/:servicename", service.Deleteauroramysql)
-	m.Post("/v1/service/aurora-mysql/instance/tag", binding.Json(structs.Tagspec{}), service.Tagauroramysql)
-
 	m.Get("/v1/service/:service/bindings", service.GetBindingList)
 }
 
@@ -230,8 +226,18 @@ func Server(db *sql.DB) *martini.ClassicMartini {
 	m := martini.Classic()
 	m.Use(render.Renderer())
 
+	// cause the dns provider to begin caching itself.
+	go router.GetDnsProvider()
+
 	m.Post("/v1/app/deploy", binding.Json(structs.Deployspec{}), app.Deployment)
 	m.Post("/v1/app/deploy/oneoff", binding.Json(structs.OneOffSpec{}), app.OneOffDeployment)
+
+	m.Get("/v1/sites/:site", router.HttpGetSite)
+	m.Get("/v1/domains", router.HttpGetDomains)
+	m.Get("/v1/domains/:domain", router.HttpGetDomain)
+	m.Get("/v1/domains/:domain/records", router.HttpGetDomainRecords)
+	m.Post("/v1/domains/:domain/records", binding.Json(router.DomainRecord{}), router.HttpCreateDomainRecords)
+	m.Delete("/v1/domains/:domain/records/:name", router.HttpRemoveDomainRecords)
 
 	m.Get("/v1/config/sets", config.Listsets)
 	m.Get("/v1/config/set/:setname", config.Dumpset)
@@ -320,7 +326,6 @@ func Server(db *sql.DB) *martini.ClassicMartini {
 
 	m.Get("/v1/octhc/router", router.Octhc)
 	m.Get("/v1/octhc/kube", utils.Octhc)
-	m.Get("/v1/octhc/service/aurora-mysql", service.Getauroramysqlplans)
 	m.Get("/v1/octhc/service/redis", service.Getredisplans)
 	m.Get("/v1/octhc/service/memcached", service.Getmemcachedplans)
 	m.Get("/v1/octhc/service/s3", service.Gets3plans)
@@ -368,6 +373,11 @@ func Server(db *sql.DB) *martini.ClassicMartini {
 
 	InitOpenServiceBrokerEndpoints(db, m)
 	InitOldServiceEndpoints(m)
+
+        vault.GetVaultListPeriodic()
+        c := cron.New()
+        c.AddFunc("@every 10m", func() { go vault.GetVaultListPeriodic() })
+        c.Start()
 
 	// proxy to log shuttle
 	if os.Getenv("LOGSHUTTLE_SERVICE_HOST") != "" && os.Getenv("LOGSHUTTLE_SERVICE_PORT") != "" {

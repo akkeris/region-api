@@ -11,16 +11,25 @@ import (
 	"os"
 	structs "region-api/structs"
 	"strings"
+        "sync"
+
 )
 
+var list []string
+var mutex = &sync.Mutex{}
+
 func GetVaultList(params martini.Params, r render.Render) {
-	paths := getVaultPaths()
-	var list []string
-	for _, element := range paths {
-		toadd := getVaultList(element)
-		list = append(list, toadd...)
+        r.JSON(200, list)
+}
+
+func GetVaultListPeriodic() {
+        var newlist []string
+	for _, element := range getVaultPaths() {
+		newlist = append(newlist,getVaultList(element)...)
 	}
-	r.JSON(200, list)
+        mutex.Lock()
+        list = newlist
+        mutex.Unlock()
 }
 
 func getVaultPaths() []string {
@@ -102,7 +111,7 @@ func getCreds(secret string) []structs.Creds {
 	defer resp.Body.Close()
 	bodyj, _ := simplejson.NewFromReader(resp.Body)
 	data, _ := bodyj.Get("data").Map()
-	step1 := strings.Replace(secret, "secret", "OCT_VAULT", -1)
+	step1 := strings.Replace(secret, "secret", os.Getenv("VAULT_PREFIX"), -1)
 	step2 := strings.Replace(step1, "/dev/", "/", -1)
 	step3 := strings.Replace(step2, "/qa/", "/", -1)
 	step4 := strings.Replace(step3, "/prod/", "/", -1)
