@@ -498,10 +498,12 @@ func GetF5SiteInfo(site string) ([]Certificate, []Addresses, error) {
 			if strings.Contains(san, "*") {
 				certType = "wildcard"
 			}
-			found = WildCardMatch(san, site)
+			if !found {
+				found = WildCardMatch(san, site)
+			}
 		}
 		var partitionMatch = cert.Partition == os.Getenv("F5_PARTITION_INTERNAL") || cert.Partition == os.Getenv("F5_PARTITION")
-		var notExpired = int64(cert.Expiration) > time.Now().Unix() 
+		var notExpired = int64(cert.Expiration) > time.Now().Unix()
 		if partitionMatch && notExpired && found == true {
 			var alsoFound = false
 			for _, ecert := range certs {

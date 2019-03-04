@@ -9,9 +9,9 @@ import (
 )
 
 type Addresses struct {
-	Network string
-	Internal bool `json:"internal"`
-	IP string `json:"ip"`
+	Network string	`json:"network"`
+	Internal bool 	`json:"internal"`
+	IP string 		`json:"ip"`
 }
 
 type Domains struct {
@@ -41,8 +41,8 @@ type Site struct {
 func WildCardMatch(wildcard string, domain string) bool {
 	if strings.Contains(wildcard, "*.") {
 		var d = strings.Split(domain, ".")
-		if len(d) > 1 {
-			d = d[1:]
+		if len(d) > 2 {
+			d = d[len(d)-2:]
 		}
 		if strings.Join(d, ".") == strings.Replace(wildcard, "*.", "", 1) {
 			return true
@@ -65,6 +65,7 @@ func HttpGetSite(params martini.Params, r render.Render) {
 		utils.ReportError(err, r)
 		return
 	}
+
 	certs, ips, err := GetF5SiteInfo(site)
 	if err != nil {
 		utils.ReportError(err, r)
@@ -73,6 +74,7 @@ func HttpGetSite(params martini.Params, r render.Render) {
 	domains := make([]DomainRecord, 0)
 	for _, dz := range dzones {
 		records, err := dns.DomainRecords(dz)
+
 		if err != nil {
 			utils.ReportError(err, r)
 			return
