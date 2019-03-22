@@ -31,6 +31,12 @@ import (
         "github.com/robfig/cron"
 )
 
+func GetInfo(db *sql.DB, params martini.Params, r render.Render) {
+	r.JSON(http.StatusOK, map[string]string{
+		"kafka_hosts":os.Getenv("KAFKA_BROKERS"),
+	})
+}
+
 func singleJoiningSlash(a, b string) string {
 	aslash := strings.HasSuffix(a, "/")
 	bslash := strings.HasPrefix(b, "/")
@@ -228,6 +234,8 @@ func Server(db *sql.DB) *martini.ClassicMartini {
 
 	// cause the dns provider to begin caching itself.
 	go router.GetDnsProvider()
+
+	m.Get("/v2/config", GetInfo)
 
 	m.Post("/v1/app/deploy", binding.Json(structs.Deployspec{}), app.Deployment)
 	m.Post("/v1/app/deploy/oneoff", binding.Json(structs.OneOffSpec{}), app.OneOffDeployment)

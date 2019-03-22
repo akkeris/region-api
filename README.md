@@ -68,6 +68,7 @@ Set the following environment variables, if this is first time running it see th
 * NEPTUNE_BROKER_URL - todo, get brokers to register with alamo-api, otherwise this is the host of the broker
 * INFLUXDB_BROKER_URL - influx database broker
 * CASSANDRA_BROKER_URL - cassandra database broker
+* KAFKA_BROKERS - The kafka brokers for this region
 
 **Optional Environment Variables:**
 
