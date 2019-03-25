@@ -207,26 +207,67 @@ begin
 
     if (select count(*) from plans) = 0 then
         INSERT INTO public.plans (name, memrequest, memlimit, price, "description") 
-            VALUES ('scout', '256Mi', '256Mi', 10, 'Scout - 256MB RAM, $10/mo');
+            VALUES ('scout', '256Mi', '256Mi', 10, '256MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking');
         INSERT INTO public.plans (name, memrequest, memlimit, price, "description") 
-            VALUES ('scout-prod', '256Mi', '256Mi', 15, 'Scout (Production) - 256MB RAM, $15/mo');
+            VALUES ('scout-prod', '256Mi', '256Mi', 15, '256MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking');
         INSERT INTO public.plans (name, memrequest, memlimit, price, "description") 
-            VALUES ('constellation', '256Mi', '512Mi', 20, 'Constellation - 256MB RAM, $20/mo');
+            VALUES ('constellation', '256Mi', '512Mi', 20, '256MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking');
         INSERT INTO public.plans (name, memrequest, memlimit, price, "description") 
-            VALUES ('constellation-prod', '512Mi', '512Mi', 25, 'Constellation (Production) - 256MB RAM, $25/mo');
+            VALUES ('constellation-prod', '512Mi', '512Mi', 25, '512MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking');
         INSERT INTO public.plans (name, memrequest, memlimit, price, "description") 
-            VALUES ('akira', '768Mi', '1024Mi', 30, 'Akira - 768MB RAM, $30/mo');
+            VALUES ('akira', '768Mi', '1024Mi', 30, '768MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking');
         INSERT INTO public.plans (name, memrequest, memlimit, price, "description") 
-            VALUES ('akria-prod', '1024Mi', '1024Mi', 35, 'Akira (Production) - 768MB RAM, $30/mo');
+            VALUES ('akria-prod', '1024Mi', '1024Mi', 35, '1024MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking');
         INSERT INTO public.plans (name, memrequest, memlimit, price, "description") 
-            VALUES ('galaxy', '1024Mi', '1536Mi', 40, 'Galaxy - 1024MB RAM, $40/mo');
+            VALUES ('galaxy', '1024Mi', '1536Mi', 40, '1024MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking');
         INSERT INTO public.plans (name, memrequest, memlimit, price, "description") 
-            VALUES ('galaxy-prod', '1536Mi', '1536Mi', 45, 'Galaxy (Production) - 1024MB RAM, $40/mo');
+            VALUES ('galaxy-prod', '1536Mi', '1536Mi', 45, '1536MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking');
         INSERT INTO public.plans (name, memrequest, memlimit, price, "description") 
-            VALUES ('sovereign', '1536Mi', '2048Mi', 50, 'Sovereign - 1536MB RAM, $50/mo');
+            VALUES ('sovereign', '1536Mi', '2048Mi', 50, '1536MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking');
         INSERT INTO public.plans (name, memrequest, memlimit, price, "description") 
-            VALUES ('sovereign-prod', '2048Mi', '2048Mi', 'Sovereign (Production) - 1536MB RAM, $50/mo');
+            VALUES ('sovereign-prod', '2048Mi', '2048Mi', '2048MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking');
     end if;
+
+    if (select count(*) from plans where name = 'scout' and description is null) > 0 then
+        update plans set description = '256MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking' where description is null and name = 'scout';
+    end if;
+
+    if (select count(*) from plans where name = 'scout-prod' and description is null) > 0 then
+        update plans set description = '256MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking' where description is null and name = 'scout-prod';
+    end if;
+
+    if (select count(*) from plans where name = 'constellation' and description is null) > 0 then
+        update plans set description = '256MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking' where description is null and name = 'constellation';
+    end if;
+
+    if (select count(*) from plans where name = 'constellation-prod' and description is null) > 0 then
+        update plans set description = '512MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking' where description is null and name = 'constellation-prod';
+    end if;
+
+    if (select count(*) from plans where name = 'akira' and description is null) > 0 then
+        update plans set description = '768MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking' where description is null and name = 'akira';
+    end if;
+
+    if (select count(*) from plans where name = 'akira-prod' and description is null) > 0 then
+        update plans set description = '1024MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking' where description is null and name = 'akira-prod';
+    end if;
+
+    if (select count(*) from plans where name = 'galaxy' and description is null) > 0 then
+        update plans set description = '1024MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking' where description is null and name = 'galaxy';
+    end if;
+
+    if (select count(*) from plans where name = 'galaxy-prod' and description is null) > 0 then
+        update plans set description = '1536MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking' where description is null and name = 'galaxy-prod';
+    end if;
+
+    if (select count(*) from plans where name = 'sovereign' and description is null) > 0 then
+        update plans set description = '1536MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking' where description is null and name = 'sovereign';
+    end if;
+
+    if (select count(*) from plans where name = 'sovereign-prod' and description is null) > 0 then
+        update plans set description = '2048MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking' where description is null and name = 'sovereign-prod';
+    end if;
+
 
     if (select count(*) from sets where name='oct-apitest-cs') = 0 then
         insert into sets (setid, name, type) values ('48594a81-fa86-4a2e-5284-6aa9f87d319f', 'oct-apitest-cs', 'config');
