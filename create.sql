@@ -119,8 +119,16 @@ begin
         name TEXT PRIMARY KEY NOT NULL,
         memrequest TEXT,
         memlimit TEXT,
-        price INTEGER
+        price INTEGER,
+        deprecated BOOLEAN DEFAULT FALSE,
+        "description" TEXT,
+        "type" TEXT
     );
+
+    ALTER TABLE plans 
+        ADD COLUMN IF NOT EXISTS deprecated BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS "description" TEXT,
+        ADD COLUMN IF NOT EXISTS "type" TEXT;
 
     create table if not exists routerpaths
     (
@@ -198,16 +206,26 @@ begin
     );
 
     if (select count(*) from plans) = 0 then
-        INSERT INTO public.plans (name, memrequest, memlimit, price) VALUES ('sovereign', '1536Mi', '2048Mi', 50);
-        INSERT INTO public.plans (name, memrequest, memlimit, price) VALUES ('akira', '768Mi', '1024Mi', 30);
-        INSERT INTO public.plans (name, memrequest, memlimit, price) VALUES ('scout', '256Mi', '256Mi', 10);
-        INSERT INTO public.plans (name, memrequest, memlimit, price) VALUES ('sovereign-prod', '2048Mi', '2048Mi', 55);
-        INSERT INTO public.plans (name, memrequest, memlimit, price) VALUES ('akria-prod', '1024Mi', '1024Mi', 35);
-        INSERT INTO public.plans (name, memrequest, memlimit, price) VALUES ('scout-prod', '256Mi', '256Mi', 15);
-        INSERT INTO public.plans (name, memrequest, memlimit, price) VALUES ('galaxy', '1024Mi', '1536Mi', 40);
-        INSERT INTO public.plans (name, memrequest, memlimit, price) VALUES ('constellation', '256Mi', '512Mi', 20);
-        INSERT INTO public.plans (name, memrequest, memlimit, price) VALUES ('galaxy-prod', '1536Mi', '1536Mi', 45);
-        INSERT INTO public.plans (name, memrequest, memlimit, price) VALUES ('constellation-prod', '512Mi', '512Mi', 25);
+        INSERT INTO public.plans (name, memrequest, memlimit, price, "description") 
+            VALUES ('scout', '256Mi', '256Mi', 10, 'Scout - 256MB RAM, $10/mo');
+        INSERT INTO public.plans (name, memrequest, memlimit, price, "description") 
+            VALUES ('scout-prod', '256Mi', '256Mi', 15, 'Scout (Production) - 256MB RAM, $15/mo');
+        INSERT INTO public.plans (name, memrequest, memlimit, price, "description") 
+            VALUES ('constellation', '256Mi', '512Mi', 20, 'Constellation - 256MB RAM, $20/mo');
+        INSERT INTO public.plans (name, memrequest, memlimit, price, "description") 
+            VALUES ('constellation-prod', '512Mi', '512Mi', 25, 'Constellation (Production) - 256MB RAM, $25/mo');
+        INSERT INTO public.plans (name, memrequest, memlimit, price, "description") 
+            VALUES ('akira', '768Mi', '1024Mi', 30, 'Akira - 768MB RAM, $30/mo');
+        INSERT INTO public.plans (name, memrequest, memlimit, price, "description") 
+            VALUES ('akria-prod', '1024Mi', '1024Mi', 35, 'Akira (Production) - 768MB RAM, $30/mo');
+        INSERT INTO public.plans (name, memrequest, memlimit, price, "description") 
+            VALUES ('galaxy', '1024Mi', '1536Mi', 40, 'Galaxy - 1024MB RAM, $40/mo');
+        INSERT INTO public.plans (name, memrequest, memlimit, price, "description") 
+            VALUES ('galaxy-prod', '1536Mi', '1536Mi', 45, 'Galaxy (Production) - 1024MB RAM, $40/mo');
+        INSERT INTO public.plans (name, memrequest, memlimit, price, "description") 
+            VALUES ('sovereign', '1536Mi', '2048Mi', 50, 'Sovereign - 1536MB RAM, $50/mo');
+        INSERT INTO public.plans (name, memrequest, memlimit, price, "description") 
+            VALUES ('sovereign-prod', '2048Mi', '2048Mi', 'Sovereign (Production) - 1536MB RAM, $50/mo');
     end if;
 
     if (select count(*) from sets where name='oct-apitest-cs') = 0 then
