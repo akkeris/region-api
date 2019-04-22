@@ -156,6 +156,7 @@ type Esspec struct {
 //Rabbitmqspec  spec
 type Rabbitmqspec struct {
 	RabbitmqUrl string `json:"RABBITMQ_URL"`
+        RabbitmqUiUrl string `json:"RABBITMQUI_URL"`
 	Spec        string `json:"spec"`
 }
 
