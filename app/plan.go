@@ -12,7 +12,7 @@ import (
 func GetPlans(db *sql.DB, params martini.Params, r render.Render) {
 	var plan structs.QoS
 
-	rows, err := db.Query("select name, memrequest, memlimit, price from plans")
+	rows, err := db.Query("select name, memrequest, memlimit, price, deprecated, description from plans")
 	if err != nil {
 		utils.ReportError(err, r)
 		return
@@ -20,7 +20,7 @@ func GetPlans(db *sql.DB, params martini.Params, r render.Render) {
 	defer rows.Close()
 	var planlist []interface{}
 	for rows.Next() {
-		err := rows.Scan(&plan.Name, &plan.Resources.Requests.Memory, &plan.Resources.Limits.Memory, &plan.Price)
+		err := rows.Scan(&plan.Name, &plan.Resources.Requests.Memory, &plan.Resources.Limits.Memory, &plan.Price, &plan.deprecated, &plan.description)
 		if err != nil {
 			utils.ReportError(err, r)
 			return

@@ -155,9 +155,9 @@ type Esspec struct {
 
 //Rabbitmqspec  spec
 type Rabbitmqspec struct {
-	RabbitmqUrl string `json:"RABBITMQ_URL"`
-        RabbitmqUiUrl string `json:"RABBITMQUI_URL"`
-	Spec        string `json:"spec"`
+	RabbitmqUrl   string `json:"RABBITMQ_URL"`
+	RabbitmqUiUrl string `json:"RABBITMQUI_URL"`
+	Spec          string `json:"spec"`
 }
 
 //S3spec  spec
@@ -179,7 +179,7 @@ type Postgresspec struct {
 //Mongodbspec Postgres spec
 type Mongodbspec struct {
 	MongodbUrl string `json:"MONGODB_URL"`
-	Spec        string `json:"spec"`
+	Spec       string `json:"spec"`
 }
 
 //Auroramysqlspec mysql spec
@@ -199,20 +199,19 @@ type Neptunespec struct {
 }
 
 type Influxdbspec struct {
-        Name  string `json:"INFLUX_DB"`
-        Url   string `json:"INFLUX_URL"`
-        Username    string `json:"INFLUX_USERNAME"`
-        Password string `json:"INFLUX_PASSWORD"`
-        Spec               string `json:"spec"`
-
+	Name     string `json:"INFLUX_DB"`
+	Url      string `json:"INFLUX_URL"`
+	Username string `json:"INFLUX_USERNAME"`
+	Password string `json:"INFLUX_PASSWORD"`
+	Spec     string `json:"spec"`
 }
 
 type Cassandraspec struct {
-        Keyspace string `json:"CASSANDRA_KEYSPACE"`
-        Location string `json:"CASSANDRA_LOCATION"`
-        Password string `json:"CASSANDRA_PASSWORD"`
-        Username string `json:"CASSANDRA_USERNAME"`
-        Spec     string `json:"spec"`
+	Keyspace string `json:"CASSANDRA_KEYSPACE"`
+	Location string `json:"CASSANDRA_LOCATION"`
+	Password string `json:"CASSANDRA_PASSWORD"`
+	Username string `json:"CASSANDRA_USERNAME"`
+	Spec     string `json:"spec"`
 }
 
 type Deployment struct {
@@ -450,9 +449,11 @@ type ResourceSpec struct {
 }
 
 type QoS struct {
-	Name      string       `json:"name"`
-	Resources ResourceSpec `json:"resources"`
-	Price     int          `json:"price"`
+	Name        string       `json:"name"`
+	Resources   ResourceSpec `json:"resources"`
+	Price       int          `json:"price"`
+	Description string       `json:"description"`
+	Deprecated  bool         `json:"deprecated"`
 }
 
 type OneOffSpec struct {
@@ -554,8 +555,8 @@ type Switch struct {
 	ReplacePath string
 	NewHost     string
 	Pool        string
-        Nodeport    string
-        Unipool     string
+	Nodeport    string
+	Unipool     string
 }
 
 type RuleInfo struct {
@@ -869,57 +870,56 @@ type URLTemplates struct {
 	External string `json:"external"`
 }
 
-
 type KafkaTopic struct {
 	Topic struct {
-		Name         string `json:"name"`
-		Config       struct {
-		    Name          string `json:"name"`
+		Name   string `json:"name"`
+		Config struct {
+			Name          string `json:"name"`
 			Cleanuppolicy string `json:"cleanup.policy,omitempty"`
-			Partitions    *int    `json:"partitions,omitempty"`
-			Retentionms   *int    `json:"retention.ms,omitempty"`
-			Replicas      *int    `json:"replicas,omitempty"`
+			Partitions    *int   `json:"partitions,omitempty"`
+			Retentionms   *int   `json:"retention.ms,omitempty"`
+			Replicas      *int   `json:"replicas,omitempty"`
 		} `json:"config"`
 	} `json:"topic"`
 }
 
 type KafkaAclCredentials struct {
-    AclCredentials struct {
-        Username   string `json:"username"`
-    } `json:"aclCredentials"`
+	AclCredentials struct {
+		Username string `json:"username"`
+	} `json:"aclCredentials"`
 }
 
 type Kafkaspec struct {
-    Spec string `json:"spec"`
+	Spec string `json:"spec"`
 }
 
 type TopicSchemaMapping struct {
-    Topic         string `json:"topic"`
-    Schema        struct {
-        Name      string `json:"name"`
-    } `json:"schema"`
+	Topic  string `json:"topic"`
+	Schema struct {
+		Name string `json:"name"`
+	} `json:"schema"`
 }
 
 type TopicKeyMapping struct {
-    Topic         string `json:"topic"`
-    KeyType       string `json:"keyType"`
-    Schema        *struct {
-        Name      string `json:"name"`
-    } `json:"schema,omitempty"`
+	Topic   string `json:"topic"`
+	KeyType string `json:"keyType"`
+	Schema  *struct {
+		Name string `json:"name"`
+	} `json:"schema,omitempty"`
 }
 
 type AclRequest struct {
-    Topic         string `json:"topic"`
-    User          string `json:"user,omitempty"`
-    Space         string `json:"space"`
-    Appname       string `json:"app"`
-    Role          string `json:"role"`
-    ConsumerGroupName string `json:"consumerGroupName,omitempty"`
+	Topic             string `json:"topic"`
+	User              string `json:"user,omitempty"`
+	Space             string `json:"space"`
+	Appname           string `json:"app"`
+	Role              string `json:"role"`
+	ConsumerGroupName string `json:"consumerGroupName,omitempty"`
 }
 
 type KafkaConsumerGroupSeekRequest struct {
-    Topic         string `json:"topic"`
-    Partitions    []int  `json:"partitions,omitempty"`
-    SeekTo        string `json:"seekTo"`
-    AllPartitions bool   `json:"allPartitions,omitempty"`
+	Topic         string `json:"topic"`
+	Partitions    []int  `json:"partitions,omitempty"`
+	SeekTo        string `json:"seekTo"`
+	AllPartitions bool   `json:"allPartitions,omitempty"`
 }
