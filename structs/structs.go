@@ -454,6 +454,7 @@ type QoS struct {
 	Price       int          `json:"price"`
 	Description string       `json:"description"`
 	Deprecated  bool         `json:"deprecated"`
+	Type        string       `json:"type"`
 }
 
 type OneOffSpec struct {
