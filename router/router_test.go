@@ -15,7 +15,11 @@ import (
 	"testing"
 )
 
-func Server() *martini.ClassicMartini {
+func Init() *martini.ClassicMartini {
+	pitdb := os.Getenv("PITDB")
+	pool := utils.GetDB(pitdb)
+	utils.InitAuth()
+	
 	m := martini.Classic()
 	m.Use(render.Renderer())
 
@@ -26,14 +30,6 @@ func Server() *martini.ClassicMartini {
 	m.Get("/v1/routers", DescribeRouters)
 	m.Get("/v1/router/:router", DescribeRouter)
 	m.Delete("/v1/router/:router/path", binding.Json(structs.Routerpathspec{}), DeletePath)
-	return m
-}
-
-func Init() *martini.ClassicMartini {
-	pitdb := os.Getenv("PITDB")
-	pool := utils.GetDB(pitdb)
-	utils.InitAuth()
-	m := Server()
 	m.Map(pool)
 	return m
 }

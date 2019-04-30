@@ -55,8 +55,7 @@ func Createspace(db *sql.DB, space structs.Spacespec, berr binding.Errors, r ren
 		return
 	}
 
-	_, err := getSpace(db, space.Name)
-	if err == nil {
+	if _, err := getSpace(db, space.Name); err == nil {
 		utils.ReportInvalidRequest("The specified space is already taken.", r)
 		return
 	}
@@ -69,8 +68,7 @@ func Createspace(db *sql.DB, space structs.Spacespec, berr binding.Errors, r ren
 	}
 
 	// this must happen before GetRuntimeFor.
-	_, err = addSpace(db, space)
-	if err != nil {
+	if _, err := addSpace(db, space); err != nil {
 		utils.ReportError(err, r)
 		return
 	}
@@ -80,33 +78,30 @@ func Createspace(db *sql.DB, space structs.Spacespec, berr binding.Errors, r ren
 		utils.ReportError(err, r)
 		return
 	}
+	
+	if err = rt.CreateSpace(space.Name, space.ComplianceTags); err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	if os.Getenv("FF_QUAY")=="true" || os.Getenv("IMAGE_PULL_SECRET") != "" {
+		vs, err := getPullSecret(space.Name)
+		if err != nil {
+			utils.ReportError(err, r)
+			return
+		}
 
-	err = rt.CreateSpace(space.Name, space.ComplianceTags)
-	if err != nil {
-		utils.ReportError(err, r)
-		return
-	}
-if os.Getenv("FF_QUAY")=="true" {
-	vs, err := getQuayPullSecret(space.Name)
-	if err != nil {
-		utils.ReportError(err, r)
-		return
-	}
+		// This secret created used to be passed in to AddImagePullSecretToSpace, but that method
+		// did nothing with it, so we don't in the refactor.
+		if _, err = rt.CreateSecret(space.Name, vs.Data.Name, vs.Data.Base64, "kubernetes.io/dockerconfigjson"); err != nil {
+			utils.ReportError(err, r)
+			return
+		}
 
-	// This secret created used to be passed in to AddImagePullSecretToSpace, but that method
-	// did nothing with it, so we don't in the refactor.
-	_, err = rt.CreateSecret(space.Name, vs.Data.Name, vs.Data.Base64, "kubernetes.io/dockerconfigjson")
-	if err != nil {
-		utils.ReportError(err, r)
-		return
+		if err = rt.AddImagePullSecretToSpace(space.Name); err != nil {
+			utils.ReportError(err, r)
+			return
+		}
 	}
-
-	err = rt.AddImagePullSecretToSpace(space.Name)
-	if err != nil {
-		utils.ReportError(err, r)
-		return
-	}
-}
 	r.JSON(http.StatusCreated, structs.Messagespec{Status: http.StatusCreated, Message: "space created"})
 }
 
@@ -124,8 +119,7 @@ func Deletespace(db *sql.DB, params martini.Params, r render.Render) {
 		return
 	}
 
-	_, err = getSpace(db, space)
-	if err != nil {
+	if _, err = getSpace(db, space); err != nil {
 		if err.Error() == "sql: no rows in result set" {
 			r.JSON(http.StatusNotFound, structs.Messagespec{Status: http.StatusNotFound, Message: "The specified space does not exist"})
 			return
@@ -158,15 +152,13 @@ func Deletespace(db *sql.DB, params martini.Params, r render.Render) {
 		return
 	}
 
-	err = rt.DeleteSpace(space)
-	if err != nil {
+	if err = rt.DeleteSpace(space); err != nil {
 		utils.ReportError(err, r)
 		return
 	}
 
 	// this must happen after GetRuntimeFor.
-	_, err = db.Exec("delete from spaces where name = $1", space)
-	if err != nil {
+	if _, err = db.Exec("delete from spaces where name = $1", space); err != nil {
 		utils.ReportError(err, r)
 		return
 	}
@@ -174,12 +166,15 @@ func Deletespace(db *sql.DB, params martini.Params, r render.Render) {
 	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: "space deleted"})
 }
 
-func getQuayPullSecret(datacenter string) (vs structs.Vaultsecretspec, err error) {
+func getPullSecret(datacenter string) (vs structs.Vaultsecretspec, err error) {
 	var vsecret structs.Vaultsecretspec
 	vaulttoken := os.Getenv("VAULT_TOKEN")
 	vaultaddr := os.Getenv("VAULT_ADDR")
-	quaysecret := os.Getenv("QUAY_PULL_SECRET")
-	vaultaddruri := vaultaddr + "/v1/" + quaysecret
+	secretPath := os.Getenv("QUAY_PULL_SECRET") // deprecated name
+	if secretPath == "" {
+		secretPath = os.Getenv("IMAGE_PULL_SECRET")
+	}
+	vaultaddruri := vaultaddr + "/v1/" + secretPath
 	vreq, err := http.NewRequest("GET", vaultaddruri, nil)
 	vreq.Header.Add("X-Vault-Token", vaulttoken)
 	vclient := &http.Client{}

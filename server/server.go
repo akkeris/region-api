@@ -370,10 +370,10 @@ func Server(db *sql.DB) *martini.ClassicMartini {
 	m.Delete("/v1/space/:space/app/:app/maintenance", maintenance.DisableMaintenancePage)
 	m.Get("/v1/space/:space/app/:app/maintenance", maintenance.MaintenancePageStatus)
 
-	m.Post("/v1/certs", binding.Json(structs.CertificateRequestSpec{}), certs.CertificateRequest)
-	m.Get("/v1/certs", certs.GetCerts)
-	m.Get("/v1/certs/:id", certs.GetCertStatus)
-	m.Post("/v1/certs/:id/install", certs.InstallCert)
+	m.Post("/v1/certs", binding.Json(structs.CertificateOrder{}), certs.CreateCertificateOrder)
+	m.Get("/v1/certs", certs.GetCertificateOrders)
+	m.Get("/v1/certs/:id", certs.GetCertificateOrderStatus)
+	m.Post("/v1/certs/:id/install", certs.InstallCertificate)
 
 	m.Get("/v1/utils/service/space/:space/app/:app", utils.GetService)
 	m.Get("/v1/utils/nodes", utils.GetNodes)
@@ -382,10 +382,10 @@ func Server(db *sql.DB) *martini.ClassicMartini {
 	InitOpenServiceBrokerEndpoints(db, m)
 	InitOldServiceEndpoints(m)
 
-        vault.GetVaultListPeriodic()
-        c := cron.New()
-        c.AddFunc("@every 10m", func() { go vault.GetVaultListPeriodic() })
-        c.Start()
+	vault.GetVaultListPeriodic()
+	c := cron.New()
+	c.AddFunc("@every 10m", func() { go vault.GetVaultListPeriodic() })
+	c.Start()
 
 	// proxy to log shuttle
 	if os.Getenv("LOGSHUTTLE_SERVICE_HOST") != "" && os.Getenv("LOGSHUTTLE_SERVICE_PORT") != "" {

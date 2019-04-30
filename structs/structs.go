@@ -2,6 +2,21 @@ package structs
 
 import "time"
 
+type CertificateOrder struct {
+	Id						string   `json:"id,omitempty"`
+	CommonName				string   `json:"common_name"`
+	SubjectAlternativeNames	[]string `json:"subject_alternative_names"`
+	Status 					string	 `json:"status,omitempty"` // can be pending, approved, issued, rejected
+	Comment					string	 `json:"comment,omitempty"`
+	Requestor				string	 `json:"requestor,omitempty"`
+}
+
+type Certificate struct {
+	Order					string	`json:"order"`
+	Key						string	`json:"key"`
+	Certificate				string	`json:"certificate"`
+}
+
 type Namespec struct {
 	Name string `json:"name"`
 }
@@ -11,27 +26,20 @@ type KV struct {
 	Value string `json:"value"`
 }
 
-type Virtualspec struct {
-	Rules []string `json:"rules"`
-}
-
-type Rulespec struct {
-	Name         string `json:"name"`
-	Partition    string `json:"partition"`
-	ApiAnonymous string `json:"apiAnonymous"`
-}
-
 type Routerpathspec struct {
 	Domain      string `json:"domain"`
 	Path        string `json:"path"`
 	Space       string `json:"space"`
 	App         string `json:"app"`
 	ReplacePath string `json:"replacepath"`
+	Port        string `json:"port"`
 }
 
 type Routerspec struct {
 	Domain   string           `json:"domain"`
 	Internal bool             `json:"internal"`
+	VSNamespace string        `json:"vsnamespace"`
+	ResourceVersion string   `json:"resourceVersion"`
 	Paths    []Routerpathspec `json:"paths"`
 }
 
@@ -47,6 +55,7 @@ type Deployspec struct {
 
 type Features struct {
 	ServiceMesh bool `json:"serviceMesh,omitempty"`
+	IstioInject bool `json:"istioInject,omitempty"`
 }
 
 //Setspec setspec
@@ -541,16 +550,6 @@ type Rules struct {
 	SelfLink string `json:"selfLink"`
 }
 
-type Rule struct {
-	Kind         string `json:"kind"`
-	Name         string `json:"name"`
-	Partition    string `json:"partition"`
-	FullPath     string `json:"fullPath"`
-	Generation   int    `json:"generation"`
-	SelfLink     string `json:"selfLink"`
-	APIAnonymous string `json:"apiAnonymous"`
-}
-
 type Switch struct {
 	Path        string
 	ReplacePath string
@@ -563,210 +562,6 @@ type Switch struct {
 type RuleInfo struct {
 	Domain   string
 	Switches []Switch
-}
-
-type CertificateRequest struct {
-	Response CertificateRequestResponseSpec `json:request`
-	ID       string                         `json:"id"`
-}
-
-type CertificateRequestResponseSpec struct {
-	ID       int `json:"id"`
-	Requests []struct {
-		ID     int    `json:"id"`
-		Status string `json:"status"`
-	} `json:"requests"`
-}
-
-type CertificateRequestObject struct {
-	ID            int       `json:"id"`
-	Date          time.Time `json:"date"`
-	Type          string    `json:"type"`
-	Status        string    `json:"status"`
-	DateProcessed time.Time `json:"date_processed"`
-	Requester     struct {
-		ID        int    `json:"id"`
-		FirstName string `json:"first_name"`
-		LastName  string `json:"last_name"`
-		Email     string `json:"email"`
-	} `json:"requester"`
-	Processor struct {
-		ID        int    `json:"id"`
-		FirstName string `json:"first_name"`
-		LastName  string `json:"last_name"`
-		Email     string `json:"email"`
-	} `json:"processor"`
-	Order struct {
-		ID          int `json:"id"`
-		Certificate struct {
-			ID           int       `json:"id"`
-			CommonName   string    `json:"common_name"`
-			DNSNames     []string  `json:"dns_names"`
-			DateCreated  time.Time `json:"date_created"`
-			Csr          string    `json:"csr"`
-			Organization struct {
-				ID      int    `json:"id"`
-				Name    string `json:"name"`
-				City    string `json:"city"`
-				State   string `json:"state"`
-				Country string `json:"country"`
-			} `json:"organization"`
-			ServerPlatform struct {
-				ID         int    `json:"id"`
-				Name       string `json:"name"`
-				InstallURL string `json:"install_url"`
-				CsrURL     string `json:"csr_url"`
-			} `json:"server_platform"`
-			SignatureHash string `json:"signature_hash"`
-			KeySize       int    `json:"key_size"`
-			CaCert        struct {
-				ID   string `json:"id"`
-				Name string `json:"name"`
-			} `json:"ca_cert"`
-		} `json:"certificate"`
-		Status       string    `json:"status"`
-		IsRenewal    bool      `json:"is_renewal"`
-		DateCreated  time.Time `json:"date_created"`
-		Organization struct {
-			ID      int    `json:"id"`
-			Name    string `json:"name"`
-			City    string `json:"city"`
-			State   string `json:"state"`
-			Country string `json:"country"`
-		} `json:"organization"`
-		ValidityYears               int  `json:"validity_years"`
-		DisableRenewalNotifications bool `json:"disable_renewal_notifications"`
-		AutoRenew                   int  `json:"auto_renew"`
-		Container                   struct {
-			ID   int    `json:"id"`
-			Name string `json:"name"`
-		} `json:"container"`
-		Product struct {
-			NameID                string `json:"name_id"`
-			Name                  string `json:"name"`
-			Type                  string `json:"type"`
-			ValidationType        string `json:"validation_type"`
-			ValidationName        string `json:"validation_name"`
-			ValidationDescription string `json:"validation_description"`
-		} `json:"product"`
-		OrganizationContact struct {
-			FirstName string `json:"first_name"`
-			LastName  string `json:"last_name"`
-			Email     string `json:"email"`
-			JobTitle  string `json:"job_title"`
-			Telephone string `json:"telephone"`
-		} `json:"organization_contact"`
-		TechnicalContact struct {
-			FirstName string `json:"first_name"`
-			LastName  string `json:"last_name"`
-			Email     string `json:"email"`
-			JobTitle  string `json:"job_title"`
-			Telephone string `json:"telephone"`
-		} `json:"technical_contact"`
-		User struct {
-			ID        int    `json:"id"`
-			FirstName string `json:"first_name"`
-			LastName  string `json:"last_name"`
-			Email     string `json:"email"`
-		} `json:"user"`
-		Requests []struct {
-			ID       int       `json:"id"`
-			Date     time.Time `json:"date"`
-			Type     string    `json:"type"`
-			Status   string    `json:"status"`
-			Comments string    `json:"comments"`
-		} `json:"requests"`
-		CsProvisioningMethod string `json:"cs_provisioning_method"`
-		ShipInfo             struct {
-			Name    string `json:"name"`
-			Addr1   string `json:"addr1"`
-			Addr2   string `json:"addr2"`
-			City    string `json:"city"`
-			State   string `json:"state"`
-			Zip     int    `json:"zip"`
-			Country string `json:"country"`
-			Method  string `json:"method"`
-		} `json:"ship_info"`
-	} `json:"order"`
-	Comments         string `json:"comments"`
-	ProcessorComment string `json:"processor_comment"`
-}
-
-type CertificateRequestSpec struct {
-	ID            string   `json:"id"`
-	Comment       string   `json:"comment,omitempty"`
-	CN            string   `json:"cn"`
-	SAN           []string `json:"san"`
-	Key           string   `json:"key,omitempty"`
-	CSR           string   `json:"csr,omitempty"`
-	Request       string   `json:"request,omitempty"`
-	Requestedby   string   `json:"requestedby,omitempty"`
-	Requesteddate string   `json:"requesteddate,omitempty"`
-	RequestStatus string   `json:"requeststatus,omitempty"`
-	Order         string   `json:"order,omitempty"`
-	OrderStatus   string   `json:"orderstatus,omitempty"`
-	Installed     bool     `json:"installed,omitempty"`
-	Installeddate string   `json:"installeddate,omitempty"`
-	ValidFrom     string   `json:"validfrom,omitempty"`
-	ValidTo       string   `json:"validto,omitempty"`
-	VIP           string   `json:"vip,omitempty"`
-	SignatureHash string   `json:"signature,omitempty"`
-}
-
-type DigicertRequest struct {
-	Certificate struct {
-		CommonName        string   `json:"common_name"`
-		DNSNames          []string `json:"dns_names,omitempty"`
-		Csr               string   `json:"csr"`
-		OrganizationUnits []string `json:"organization_units"`
-		ServerPlatform    struct {
-			ID int `json:"id"`
-		} `json:"server_platform"`
-		SignatureHash string `json:"signature_hash"`
-	} `json:"certificate"`
-	Organization struct {
-		ID int `json:"id"`
-	} `json:"organization"`
-	ValidityYears int    `json:"validity_years"`
-	Comments      string `json:"comments,omitempty"`
-}
-
-type OrderList struct {
-	Orders []struct {
-		ID          int `json:"id"`
-		Certificate struct {
-			ID            int      `json:"id"`
-			CommonName    string   `json:"common_name"`
-			DNSNames      []string `json:"dns_names"`
-			ValidTill     string   `json:"valid_till"`
-			SignatureHash string   `json:"signature_hash"`
-		} `json:"certificate"`
-		Status       string    `json:"status"`
-		IsRenewed    bool      `json:"is_renewed"`
-		DateCreated  time.Time `json:"date_created"`
-		Organization struct {
-			ID   int    `json:"id"`
-			Name string `json:"name"`
-		} `json:"organization"`
-		ValidityYears int `json:"validity_years"`
-		Container     struct {
-			ID   int    `json:"id"`
-			Name string `json:"name"`
-		} `json:"container"`
-		Product struct {
-			NameID string `json:"name_id"`
-			Name   string `json:"name"`
-			Type   string `json:"type"`
-		} `json:"product"`
-		HasDuplicates bool   `json:"has_duplicates"`
-		Price         int    `json:"price"`
-		ProductNameID string `json:"product_name_id"`
-	} `json:"orders"`
-	Page struct {
-		Total  int `json:"total"`
-		Limit  int `json:"limit"`
-		Offset int `json:"offset"`
-	} `json:"page"`
 }
 
 type EnvVar struct {
@@ -812,37 +607,6 @@ type Secret struct {
 	SecretName string `json:"secretName,omitempty"`
 }
 
-type OrderSpec struct {
-	ID          int `json:"id"`
-	Certificate struct {
-		ID           int       `json:"id"`
-		Thumbprint   string    `json:"thumbprint"`
-		SerialNumber string    `json:"serial_number"`
-		CommonName   string    `json:"common_name"`
-		DNSNames     []string  `json:"dns_names"`
-		DateCreated  time.Time `json:"date_created"`
-		ValidFrom    string    `json:"valid_from"`
-		ValidTill    string    `json:"valid_till"`
-		Csr          string    `json:"csr"`
-		Organization struct {
-			ID int `json:"id"`
-		} `json:"organization"`
-		OrganizationUnits []string `json:"organization_units"`
-		ServerPlatform    struct {
-			ID         int    `json:"id"`
-			Name       string `json:"name"`
-			InstallURL string `json:"install_url"`
-			CsrURL     string `json:"csr_url"`
-		} `json:"server_platform"`
-		SignatureHash string `json:"signature_hash"`
-		KeySize       int    `json:"key_size"`
-		CaCert        struct {
-			ID   string `json:"id"`
-			Name string `json:"name"`
-		} `json:"ca_cert"`
-	} `json:"certificate"`
-	Status string `json:"status"`
-}
 
 type KubeNodeItems struct {
 	Metadata struct {

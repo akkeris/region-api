@@ -48,7 +48,7 @@ type Itemsspec struct {
 
 type Serviceaccountspec struct {
 	Metadata         structs.Namespec   `json:"metadata"`
-	ImagePullSecrets []structs.Namespec `json:"imagePullSecrets"`
+	ImagePullSecrets []structs.Namespec `json:"imagePullSecrets,omitempty"`
 }
 
 type Namespacespec struct {
@@ -179,7 +179,7 @@ type Deploymentspec struct {
 		Metadata             struct {
 			Annotations struct {
 				SidecarIstioIOStatus string `json:"sidecar.istio.io/status"`
-			} `json:"annotations`
+			} `json:"annotations,omitempty"`
 		} `json:"metadata",omitempty`
 		Replicas int `json:"replicas"`
 		Strategy struct {
@@ -204,11 +204,14 @@ type Deploymentspec struct {
 					App     string `json:"app,omitempty"`
 					Version string `json:"version,omitempty"`
 				} `json:"labels"`
+				Annotations struct {
+					SidecarIstioIoInject string `json:"sidecar.istio.io/inject"`
+				} `json:"annotations,omitempty"`
 			} `json:"metadata"`
 			Spec struct {
 				Containers						[]ContainerItem		`json:"containers"`
-				ImagePullPolicy					string				`json:"imagePullPolicy"`
-				ImagePullSecrets				[]structs.Namespec	`json:"imagePullSecrets"`
+				ImagePullPolicy					string				`json:"imagePullPolicy,omitempty"`
+				ImagePullSecrets				[]structs.Namespec	`json:"imagePullSecrets,omitempty"`
 				DnsPolicy						string				`json:"dnsPolicy,omitempty"`
 				InitContainers					*[]ContainerItem	`json:"initContainers,omitempty"`
 				Volumes							*[]structs.Volumes	`json:"volumes,omitempty"`
@@ -241,7 +244,7 @@ type ReplicationController struct {
 			} `json:"metadata"`
 			Spec struct {
 				Containers      []ContainerItem `json:"containers"`
-				ImagePullPolicy string          `json:"imagePullPolicy"`
+				ImagePullPolicy string          `json:"imagePullPolicy,omitempty"`
 			} `json:"spec"`
 		} `json:"template"`
 	} `json:"spec"`
@@ -261,7 +264,7 @@ type OneOffPod struct {
 	Spec struct {
 		Containers                    []ContainerItem    `json:"containers"`
 		ImagePullPolicy               string             `json:"imagePullPolicy,omitempty"`
-		ImagePullSecrets              []structs.Namespec `json:"imagePullSecrets"`
+		ImagePullSecrets              []structs.Namespec `json:"imagePullSecrets,omitempty"`
 		RestartPolicy                 string             `json:"restartPolicy"`
 		TerminationGracePeriodSeconds int                `json:"terminationGracePeriodSeconds"`
 		DnsPolicy                     string             `json:"dnsPolicy,omitempty"`
@@ -312,7 +315,7 @@ type Job struct {
 			Spec struct {
 				Containers       []ContainerItem    `json:"containers"`
 				NodeSelector     string             `json:"nodeSelector,omitempty"`
-				ImagePullSecrets []structs.Namespec `json:"imagePullSecrets"`
+				ImagePullSecrets []structs.Namespec `json:"imagePullSecrets,omitempty"`
 				RestartPolicy    string             `json:"restartPolicy"`
 				DnsPolicy        string             `json:"dnsPolicy,omitempty"`
 			} `json:"spec"`
@@ -413,7 +416,7 @@ type ReplicaSetSpec struct {
 					Resources struct {
 					} `json:"resources"`
 					TerminationMessagePath string `json:"terminationMessagePath"`
-					ImagePullPolicy        string `json:"imagePullPolicy"`
+					ImagePullPolicy        string `json:"imagePullPolicy,omitempty"`
 				} `json:"containers"`
 				RestartPolicy                 string `json:"restartPolicy"`
 				TerminationGracePeriodSeconds int    `json:"terminationGracePeriodSeconds"`
@@ -422,7 +425,7 @@ type ReplicaSetSpec struct {
 				} `json:"securityContext"`
 				ImagePullSecrets []struct {
 					Name string `json:"name"`
-				} `json:"imagePullSecrets"`
+				} `json:"imagePullSecrets,omitempty"`
 			} `json:"spec"`
 		} `json:"template"`
 	} `json:"spec"`
@@ -489,7 +492,7 @@ type JobScaleGet struct {
 					} `json:"env"`
 					TerminationMessagePath   string `json:"terminationMessagePath"`
 					TerminationMessagePolicy string `json:"terminationMessagePolicy"`
-					ImagePullPolicy          string `json:"imagePullPolicy"`
+					ImagePullPolicy          string `json:"imagePullPolicy,omitempty"`
 				} `json:"containers"`
 				RestartPolicy                 string `json:"restartPolicy"`
 				TerminationGracePeriodSeconds int    `json:"terminationGracePeriodSeconds"`
@@ -498,7 +501,7 @@ type JobScaleGet struct {
 				} `json:"securityContext"`
 				ImagePullSecrets []struct {
 					Name string `json:"name"`
-				} `json:"imagePullSecrets"`
+				} `json:"imagePullSecrets,omitempty"`
 				SchedulerName string `json:"schedulerName"`
 			} `json:"spec"`
 		} `json:"template"`
@@ -506,6 +509,7 @@ type JobScaleGet struct {
 }
 
 type Runtime interface {
+	GenericRequest(method string, path string, payload interface{}) ([]byte, int, error)
 	Scale(space string, app string, amount int) (e error)
 	GetService(space string, app string) (service KubeService, e error)
 	CreateService(space string, app string, port int) (c *Createspec, e error)
@@ -572,7 +576,7 @@ func GetRuntimeStack(db *sql.DB, stack string) (rt Runtime, e error) {
 		auth_type         string
 		auth_vault_path   string
 	)
-	rows := db.QueryRow("select stacks.stack, stacks.description, stacks.api_server, stacks.api_version, stacks.image_pull_secret, stacks.auth_type, stacks.auth_vault_path from stacks where stacks.stack = ?", stack)
+	rows := db.QueryRow("select stacks.stack, stacks.description, stacks.api_server, stacks.api_version, stacks.image_pull_secret, stacks.auth_type, stacks.auth_vault_path from stacks where stacks.stack = $1", stack)
 	err := rows.Scan(&stackn, &description, &api_server, &api_version, &image_pull_secret, &auth_type, &auth_vault_path)
 	if err != nil {
 		return nil, err
