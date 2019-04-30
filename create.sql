@@ -217,7 +217,7 @@ begin
         INSERT INTO public.plans (name, memrequest, memlimit, price, "description") 
             VALUES ('akira', '768Mi', '1024Mi', 30, '768MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking');
         INSERT INTO public.plans (name, memrequest, memlimit, price, "description") 
-            VALUES ('akria-prod', '1024Mi', '1024Mi', 35, '1024MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking');
+            VALUES ('akira-prod', '1024Mi', '1024Mi', 35, '1024MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking');
         INSERT INTO public.plans (name, memrequest, memlimit, price, "description") 
             VALUES ('galaxy', '1024Mi', '1536Mi', 40, '1024MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking');
         INSERT INTO public.plans (name, memrequest, memlimit, price, "description") 
