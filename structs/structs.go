@@ -9,6 +9,8 @@ type CertificateOrder struct {
 	Status 					string	 `json:"status,omitempty"` // can be pending, approved, issued, rejected
 	Comment					string	 `json:"comment,omitempty"`
 	Requestor				string	 `json:"requestor,omitempty"`
+	Issued					string   `json:"issued,omitempty"`
+	Expires					string   `json:"issued,omitempty"`
 }
 
 type Certificate struct {

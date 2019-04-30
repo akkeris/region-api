@@ -28,7 +28,6 @@ func CreateCertificateOrder(db *sql.DB, request structs.CertificateOrder, berr b
 	}
 	request.Id = id
 	r.JSON(http.StatusCreated, request)
-	// TODO: Fix request/response structure in api-default
 }
 
 func GetCertificateOrderStatus(db *sql.DB, params martini.Params, r render.Render) {
@@ -43,7 +42,6 @@ func GetCertificateOrderStatus(db *sql.DB, params martini.Params, r render.Rende
 		return
 	}
 	r.JSON(http.StatusOK, order)
-	// TODO: Fix request/response structure in api-default
 }
 
 func GetCertificateOrders(db *sql.DB, params martini.Params, r render.Render) {
@@ -58,7 +56,6 @@ func GetCertificateOrders(db *sql.DB, params martini.Params, r render.Render) {
 		return
 	}
 	r.JSON(http.StatusOK, orders)
-	// TODO: Fix request/response structure in api-default
 }
 
 func InstallCertificate(db *sql.DB, params martini.Params, r render.Render) {
@@ -119,7 +116,6 @@ func InstallCertificate(db *sql.DB, params martini.Params, r render.Render) {
 		}
 	}
 	r.JSON(http.StatusOK, structs.Messagespec{Status:http.StatusOK, Message:"Certificate Installed"})
-	// TODO: Fix request/response structure in api-default
 }
 
 

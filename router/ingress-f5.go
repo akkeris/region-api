@@ -587,11 +587,16 @@ func (f5 *F5Client) InstallCertificate(partition string, vip string, server_name
 		}
 		profile_name := strings.Replace(server_name, "*.", "star.", -1) + "_" + LeadingZero(x509_decoded_cert.NotAfter.Year()) + LeadingZero(int(x509_decoded_cert.NotAfter.Month())) + LeadingZero(x509_decoded_cert.NotAfter.Day())
 
+		f5_cipher_list := "!SSLv2:!SSLv3:!MD5:!EXPORT:!RSA+3DES:!RSA+RC4:!ECDHE+RC4:!ECDHE+3DES:ECDHE+AES:RSA+AES"
+		if os.Getenv("F5_CIPHER_LIST") != "" {
+			f5_cipher_list = os.Getenv("F5_CIPHER_LIST")
+		}
+
 		// Install the SSL/TLS Profile
 		profile := LBClientSsl{
 			Name:       profile_name,
 			Partition:  partition,
-			Ciphers:    "!SSLv2:!SSLv3:!MD5:!EXPORT:!RSA+3DES:!RSA+RC4:!ECDHE+RC4:!ECDHE+3DES:ECDHE+AES:RSA+AES", // MUST BE THIS LIST!
+			Ciphers:    f5_cipher_list, // MUST BE THIS LIST!
 			SniDefault: "false",
 			ServerName: server_name,
 			Mode:       "enabled",

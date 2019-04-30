@@ -52,6 +52,7 @@ type certManagerACMECertificate struct {
 
 type certManagerCertificateStatus struct {
 	Metadata   struct {
+		CreationTimestamp string `json:"creationTimestamp,omitempty"`
 		Annotations struct {
 			Comments string `json:"comments,omitempty"`
 			Requestor string `json:"requestor,omitempty"`
@@ -70,6 +71,7 @@ type certManagerCertificateStatus struct {
         SecretName string `json:"secretName"`
     } `json:"spec"`
     Status struct {
+    	NotAfter string `json:"creationTimestamp,omitempty"`
         Conditions []struct {
             Message            string    `json:"message"`
             Reason             string    `json:"reason"`
@@ -152,6 +154,8 @@ func CertificateStatusToOrder(status certManagerCertificateStatus) (structs.Cert
 		Status: s,
 		Comment: status.Metadata.Annotations.Comments,
 		Requestor: status.Metadata.Annotations.Requestor,
+		Issued: status.Metadata.CreationTimestamp,
+		Expires: status.Status.NotAfter,
 	}, nil
 }
 

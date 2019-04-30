@@ -666,6 +666,8 @@ func (issuer *DigiCertIssuer) GetOrderStatus(id string) (*structs.CertificateOrd
 		CommonName: certspec.CN,
 		SubjectAlternativeNames:certspec.SAN,
 		Status: order.Status,
+		Issued: order.Certificate.ValidFrom,
+		Expires: order.Certificate.ValidTill,
 	}, nil
 }
 
