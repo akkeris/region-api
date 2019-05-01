@@ -1,14 +1,14 @@
 package certs
 
 import (
+	"database/sql"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
-	"region-api/utils"
-	"region-api/structs"
-	"region-api/router"
-	"database/sql"
 	"net/http"
+	"region-api/router"
+	"region-api/structs"
+	"region-api/utils"
 )
 
 func CreateCertificateOrder(db *sql.DB, request structs.CertificateOrder, berr binding.Errors, r render.Render) {
@@ -70,7 +70,7 @@ func InstallCertificate(db *sql.DB, params martini.Params, r render.Render) {
 		return
 	}
 	if !ready {
-		r.JSON(http.StatusUnprocessableEntity, structs.Messagespec{Status:http.StatusUnprocessableEntity, Message:"The certificate is not yet ready to be installed, it may still need to be approved or issued."})
+		r.JSON(http.StatusUnprocessableEntity, structs.Messagespec{Status: http.StatusUnprocessableEntity, Message: "The certificate is not yet ready to be installed, it may still need to be approved or issued."})
 		return
 	}
 	order, err := issuer.GetOrderStatus(params["id"])
@@ -115,7 +115,5 @@ func InstallCertificate(db *sql.DB, params martini.Params, r render.Render) {
 			return
 		}
 	}
-	r.JSON(http.StatusOK, structs.Messagespec{Status:http.StatusOK, Message:"Certificate Installed"})
+	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: "Certificate Installed"})
 }
-
-

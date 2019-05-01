@@ -2,22 +2,22 @@ package certs
 
 import (
 	"database/sql"
-	"region-api/structs"
-	"region-api/runtime"
-	"region-api/router"
 	"encoding/base64"
 	"encoding/json"
-	"net/http"
 	"errors"
-	"os"
-	"strings"
 	"github.com/nu7hatch/gouuid"
+	"net/http"
+	"os"
+	"region-api/router"
+	"region-api/runtime"
+	"region-api/structs"
 	"strconv"
+	"strings"
 )
 
 type certManagerACMEConfig struct {
 	DNS01 struct {
-	        Provider string `json:"provider"`
+		Provider string `json:"provider"`
 	} `json:"dns01"`
 	Domains []string `json:"domains"`
 }
@@ -26,10 +26,10 @@ type certManagerACMECertificate struct {
 	APIVersion string `json:"apiVersion"`
 	Kind       string `json:"kind"`
 	Metadata   struct {
-        Name      string `json:"name"`
-        Namespace string `json:"namespace"`
+		Name        string `json:"name"`
+		Namespace   string `json:"namespace"`
 		Annotations struct {
-			Comments string `json:"comments,omitempty"`
+			Comments  string `json:"comments,omitempty"`
 			Requestor string `json:"requestor,omitempty"`
 		} `json:"annotations,omitempty"`
 		Labels struct {
@@ -37,24 +37,24 @@ type certManagerACMECertificate struct {
 		} `json:"labels,omitempty"`
 	} `json:"metadata"`
 	Spec struct {
-        Acme struct {
-            Config []certManagerACMEConfig `json:"config"`
-        } `json:"acme"`
-        CommonName string   `json:"commonName"`
-        DNSNames   []string `json:"dnsNames"`
-        IssuerRef  struct {
-            Kind string `json:"kind"`
-            Name string `json:"name"`
-        } `json:"issuerRef"`
-        SecretName string `json:"secretName"`
+		Acme struct {
+			Config []certManagerACMEConfig `json:"config"`
+		} `json:"acme"`
+		CommonName string   `json:"commonName"`
+		DNSNames   []string `json:"dnsNames"`
+		IssuerRef  struct {
+			Kind string `json:"kind"`
+			Name string `json:"name"`
+		} `json:"issuerRef"`
+		SecretName string `json:"secretName"`
 	} `json:"spec"`
 }
 
 type certManagerCertificateStatus struct {
-	Metadata   struct {
+	Metadata struct {
 		CreationTimestamp string `json:"creationTimestamp,omitempty"`
-		Annotations struct {
-			Comments string `json:"comments,omitempty"`
+		Annotations       struct {
+			Comments  string `json:"comments,omitempty"`
 			Requestor string `json:"requestor,omitempty"`
 		} `json:"annotations,omitempty"`
 		Labels struct {
@@ -62,24 +62,23 @@ type certManagerCertificateStatus struct {
 		} `json:"labels,omitempty"`
 	} `json:"metadata"`
 	Spec struct {
-    	CommonName	string 		`json:"commonName"`
-    	DNSNames	[]string	`json:"dnsNames"`
-        IssuerRef  struct {
-            Kind string `json:"kind"`
-            Name string `json:"name"`
-        } `json:"issuerRef"`
-        SecretName string `json:"secretName"`
-    } `json:"spec"`
-    Status struct {
-    	NotAfter string `json:"creationTimestamp,omitempty"`
-        Conditions []struct {
-            Message            string    `json:"message"`
-            Reason             string    `json:"reason"`
-            Status             string    `json:"status"`
-            Type               string    `json:"type"`
-        } `json:"conditions"`
-    } `json:"status"`
-    
+		CommonName string   `json:"commonName"`
+		DNSNames   []string `json:"dnsNames"`
+		IssuerRef  struct {
+			Kind string `json:"kind"`
+			Name string `json:"name"`
+		} `json:"issuerRef"`
+		SecretName string `json:"secretName"`
+	} `json:"spec"`
+	Status struct {
+		NotAfter   string `json:"creationTimestamp,omitempty"`
+		Conditions []struct {
+			Message string `json:"message"`
+			Reason  string `json:"reason"`
+			Status  string `json:"status"`
+			Type    string `json:"type"`
+		} `json:"conditions"`
+	} `json:"status"`
 }
 
 type certManagerCertificateStatusList struct {
@@ -87,26 +86,25 @@ type certManagerCertificateStatusList struct {
 }
 
 type kubeTlsSecret struct {
-	Kind string `json:"kind"`
-	Type string `json:"type"` //"type":"kubernetes.io/tls"
+	Kind     string `json:"kind"`
+	Type     string `json:"type"` //"type":"kubernetes.io/tls"
 	Metadata struct {
-		Name string	`json:"name"`
+		Name      string `json:"name"`
 		Namespace string `json:"namespace"`
 	} `json:"metadata"`
 	Data struct {
 		CaCrt *string `json:"ca.crt,omitempty"`
-		Crt *string `json:"tls.crt,omitempty"`
-		Key *string `json:"tls.key,omitempty"` 
+		Crt   *string `json:"tls.crt,omitempty"`
+		Key   *string `json:"tls.key,omitempty"`
 	} `json:"data"`
 }
 
 type CertManagerIssuer struct {
-	runtime runtime.Runtime
-	issuerName string
+	runtime              runtime.Runtime
+	issuerName           string
 	certificateNamespace string
-	providerName string
+	providerName         string
 }
-
 
 func GetCertManagerIssuer(db *sql.DB) (*CertManagerIssuer, error) {
 	issuerName := os.Getenv("CERTMANAGER_ISSUER_NAME")
@@ -129,10 +127,10 @@ func GetCertManagerIssuer(db *sql.DB) (*CertManagerIssuer, error) {
 		return nil, err
 	}
 	return &CertManagerIssuer{
-		issuerName:issuerName,
-		runtime:runtime,
-		certificateNamespace:certificateNamespace,
-		providerName:providerName,
+		issuerName:           issuerName,
+		runtime:              runtime,
+		certificateNamespace: certificateNamespace,
+		providerName:         providerName,
 	}, nil
 }
 
@@ -148,14 +146,14 @@ func CertificateStatusToOrder(status certManagerCertificateStatus) (structs.Cert
 		}
 	}
 	return structs.CertificateOrder{
-		Id: status.Metadata.Labels.Id,
-		CommonName: status.Spec.CommonName,
+		Id:                      status.Metadata.Labels.Id,
+		CommonName:              status.Spec.CommonName,
 		SubjectAlternativeNames: names,
-		Status: s,
-		Comment: status.Metadata.Annotations.Comments,
-		Requestor: status.Metadata.Annotations.Requestor,
-		Issued: status.Metadata.CreationTimestamp,
-		Expires: status.Status.NotAfter,
+		Status:                  s,
+		Comment:                 status.Metadata.Annotations.Comments,
+		Requestor:               status.Metadata.Annotations.Requestor,
+		Issued:                  status.Metadata.CreationTimestamp,
+		Expires:                 status.Status.NotAfter,
 	}, nil
 }
 
@@ -192,7 +190,7 @@ func (issuer *CertManagerIssuer) CreateOrder(domain string, sans []string, comme
 	cert.Spec.IssuerRef.Kind = "ClusterIssuer"
 	cert.Spec.IssuerRef.Name = issuer.issuerName
 	cert.Spec.SecretName = strings.Replace(domain, ".", "-", -1) + "-tls"
-	body, code, err := issuer.runtime.GenericRequest("post", "/apis/certmanager.k8s.io/v1alpha1/namespaces/" + issuer.certificateNamespace + "/certificates", cert)
+	body, code, err := issuer.runtime.GenericRequest("post", "/apis/certmanager.k8s.io/v1alpha1/namespaces/"+issuer.certificateNamespace+"/certificates", cert)
 	if err != nil {
 		return cert.Metadata.Labels.Id, err
 	}
@@ -202,9 +200,8 @@ func (issuer *CertManagerIssuer) CreateOrder(domain string, sans []string, comme
 	return cert.Metadata.Labels.Id, nil
 }
 
-
 func (issuer *CertManagerIssuer) GetOrderStatus(id string) (*structs.CertificateOrder, error) {
-	body, code, err := issuer.runtime.GenericRequest("get", "/apis/certmanager.k8s.io/v1alpha1/namespaces/" + issuer.certificateNamespace + "/certificates?labelSelector=akkeris-cert-id%3D" + id, nil)
+	body, code, err := issuer.runtime.GenericRequest("get", "/apis/certmanager.k8s.io/v1alpha1/namespaces/"+issuer.certificateNamespace+"/certificates?labelSelector=akkeris-cert-id%3D"+id, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -226,7 +223,7 @@ func (issuer *CertManagerIssuer) GetOrderStatus(id string) (*structs.Certificate
 }
 
 func (issuer *CertManagerIssuer) GetOrders() (orders []structs.CertificateOrder, err error) {
-	body, code, err := issuer.runtime.GenericRequest("get", "/apis/certmanager.k8s.io/v1alpha1/namespaces/" + issuer.certificateNamespace + "/certificates?labelSelector=akkeris-cert-id", nil)
+	body, code, err := issuer.runtime.GenericRequest("get", "/apis/certmanager.k8s.io/v1alpha1/namespaces/"+issuer.certificateNamespace+"/certificates?labelSelector=akkeris-cert-id", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -250,7 +247,7 @@ func (issuer *CertManagerIssuer) IsOrderAutoInstalled(ingress router.Ingress) (b
 }
 
 func (issuer *CertManagerIssuer) IsOrderReady(id string) (bool, error) {
-	body, code, err := issuer.runtime.GenericRequest("get", "/apis/certmanager.k8s.io/v1alpha1/namespaces/" + issuer.certificateNamespace + "/certificates?labelSelector=akkeris-cert-id%3D" + id, nil)
+	body, code, err := issuer.runtime.GenericRequest("get", "/apis/certmanager.k8s.io/v1alpha1/namespaces/"+issuer.certificateNamespace+"/certificates?labelSelector=akkeris-cert-id%3D"+id, nil)
 	if err != nil {
 		return false, err
 	}
@@ -275,11 +272,10 @@ func (issuer *CertManagerIssuer) IsOrderReady(id string) (bool, error) {
 	}
 }
 
-
 func (issuer *CertManagerIssuer) GetCertificate(id string, domain string) (pem_cert []byte, pem_key []byte, err error) {
 	name := strings.Replace(domain, "*.", "star.", -1)
 	name = strings.Replace(name, ".", "-", -1) + "-tls"
-	body, code, err := issuer.runtime.GenericRequest("get", "/api/v1/namespaces/" + issuer.certificateNamespace + "/secrets/" + name, nil)
+	body, code, err := issuer.runtime.GenericRequest("get", "/api/v1/namespaces/"+issuer.certificateNamespace+"/secrets/"+name, nil)
 	if err != nil {
 		return nil, nil, err
 	}

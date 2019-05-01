@@ -34,5 +34,3 @@ func getURLTemplates() (u structs.URLTemplates, e error) {
 	}
 	return urltemplates, nil
 }
-
-

@@ -17,8 +17,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	structs "region-api/structs"
 	"region-api/router"
+	structs "region-api/structs"
 	"strconv"
 	"strings"
 	"time"
@@ -65,7 +65,7 @@ type digiCertRequest struct {
 
 type digiCertCertificateRequest struct {
 	Response digiCertCertificateResponse `json:request`
-	ID       string                         `json:"id"`
+	ID       string                      `json:"id"`
 }
 
 type digiCertCertificateResponse struct {
@@ -296,7 +296,7 @@ func getCert(db *sql.DB, id string) (c digiCertCertificateRequestSpec, e error) 
 	)
 	if err := db.QueryRow("select id, cn, san, request, ordernumber from certs where id = $1", id).Scan(&id, &cn, &san, &request, &order); err != nil {
 		return certspec, err
-	}	
+	}
 	certspec.ID = id
 	certspec.CN = cn
 	certspec.SAN = strings.Split(san, ",")
@@ -308,10 +308,10 @@ func getCert(db *sql.DB, id string) (c digiCertCertificateRequestSpec, e error) 
 func getCerts(db *sql.DB) (c []digiCertCertificateRequestSpec, e error) {
 	var certspecs []digiCertCertificateRequestSpec
 	var (
-		id  string
-		cn  string
-		san string
-		request string
+		id          string
+		cn          string
+		san         string
+		request     string
 		ordernumber string
 	)
 	stmt, err := db.Prepare("select id, cn, san, request, ordernumber from certs")
@@ -635,16 +635,16 @@ type DigiCertIssuer struct {
 
 func GetDigiCertIssuer(db *sql.DB) (*DigiCertIssuer, error) {
 	return &DigiCertIssuer{
-		db:db,
+		db: db,
 	}, nil
 }
 
 func (issuer *DigiCertIssuer) CreateOrder(domain string, sans []string, comment string, requestor string) (id string, err error) {
-	err, response := certificateRequest(digiCertCertificateRequestSpec {
-		CN:domain,
-		SAN:sans,
-		Comment:comment,
-		Requestedby:comment,
+	err, response := certificateRequest(digiCertCertificateRequestSpec{
+		CN:          domain,
+		SAN:         sans,
+		Comment:     comment,
+		Requestedby: comment,
 	}, issuer.db)
 	if err != nil {
 		return "", err
@@ -662,12 +662,12 @@ func (issuer *DigiCertIssuer) GetOrderStatus(id string) (*structs.CertificateOrd
 		return nil, err
 	}
 	return &structs.CertificateOrder{
-		Id: certspec.ID,
-		CommonName: certspec.CN,
-		SubjectAlternativeNames:certspec.SAN,
-		Status: order.Status,
-		Issued: order.Certificate.ValidFrom,
-		Expires: order.Certificate.ValidTill,
+		Id:                      certspec.ID,
+		CommonName:              certspec.CN,
+		SubjectAlternativeNames: certspec.SAN,
+		Status:                  order.Status,
+		Issued:                  order.Certificate.ValidFrom,
+		Expires:                 order.Certificate.ValidTill,
 	}, nil
 }
 
@@ -680,24 +680,24 @@ func (issuer *DigiCertIssuer) GetOrders() (orders []structs.CertificateOrder, er
 	for _, certspec := range certspecs {
 		status := "unknown"
 		/*
-		TODO: See if its necessary to re-request order status on a list...
+			TODO: See if its necessary to re-request order status on a list...
 
-		order, err := getOrder(certspec.Order)
-		if err != nil {
-			return nil, err
-		}
-		if order.Status == "approved" {
-			status := "ready"
-		} else if order.Status == "rejected" {
-			status := "rejected"
-		}
+			order, err := getOrder(certspec.Order)
+			if err != nil {
+				return nil, err
+			}
+			if order.Status == "approved" {
+				status := "ready"
+			} else if order.Status == "rejected" {
+				status := "rejected"
+			}
 		*/
 		orders = append(orders, structs.CertificateOrder{
-			Id: certspec.ID,
-			CommonName: certspec.CN,
-			SubjectAlternativeNames:certspec.SAN,
-			Status: status,
-		});
+			Id:                      certspec.ID,
+			CommonName:              certspec.CN,
+			SubjectAlternativeNames: certspec.SAN,
+			Status:                  status,
+		})
 	}
 	return orders, nil
 }

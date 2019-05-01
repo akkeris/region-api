@@ -7,11 +7,11 @@ import (
 )
 
 type Ingress interface {
-	SetMaintenancePage(app string, space string, value bool) (error)
+	SetMaintenancePage(app string, space string, value bool) error
 	GetMaintenancePageStatus(app string, space string) (bool, error)
-	DeleteRouter(router structs.Routerspec) (error)
-	CreateOrUpdateRouter(router structs.Routerspec) (error)
-	InstallCertificate(server_name string, pem_cert []byte, pem_key []byte) (error)
+	DeleteRouter(router structs.Routerspec) error
+	CreateOrUpdateRouter(router structs.Routerspec) error
+	InstallCertificate(server_name string, pem_cert []byte, pem_key []byte) error
 	GetInstalledCertificates(site string) ([]Certificate, error)
 	Config() *IngressConfig
 	Name() string
@@ -43,7 +43,7 @@ func GetAppIngress(db *sql.DB, internal bool) (Ingress, error) {
 		var in Ingress = Ingress(ing)
 		return in, nil
 	} else {
-		return nil, errors.New("Unable to find ingress for " + config.Device) 
+		return nil, errors.New("Unable to find ingress for " + config.Device)
 	}
 }
 
@@ -73,6 +73,6 @@ func GetSiteIngress(db *sql.DB, internal bool) (Ingress, error) {
 		var in Ingress = Ingress(ing)
 		return in, nil
 	} else {
-		return nil, errors.New("Unable to find ingress for " + config.Device) 
+		return nil, errors.New("Unable to find ingress for " + config.Device)
 	}
 }

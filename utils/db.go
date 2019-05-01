@@ -13,9 +13,9 @@ func GetDB(uri string) *sql.DB {
 		fmt.Println(dberr)
 		return nil
 	}
-  // not available in 1.5 golang, youll want to turn it on for v1.6 or higher once upgraded.
-  //pool.SetConnMaxLifetime(time.ParseDuration("1h"));
-  db.SetMaxIdleConns(4);
-  db.SetMaxOpenConns(20);
+	// not available in 1.5 golang, youll want to turn it on for v1.6 or higher once upgraded.
+	//pool.SetConnMaxLifetime(time.ParseDuration("1h"));
+	db.SetMaxIdleConns(4)
+	db.SetMaxOpenConns(20)
 	return db
 }

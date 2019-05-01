@@ -209,13 +209,13 @@ type Deploymentspec struct {
 				} `json:"annotations,omitempty"`
 			} `json:"metadata"`
 			Spec struct {
-				Containers						[]ContainerItem		`json:"containers"`
-				ImagePullPolicy					string				`json:"imagePullPolicy,omitempty"`
-				ImagePullSecrets				[]structs.Namespec	`json:"imagePullSecrets,omitempty"`
-				DnsPolicy						string				`json:"dnsPolicy,omitempty"`
-				InitContainers					*[]ContainerItem	`json:"initContainers,omitempty"`
-				Volumes							*[]structs.Volumes	`json:"volumes,omitempty"`
-				TerminationGracePeriodSeconds	int 				`json:"terminationGracePeriodSeconds,omitempty"`
+				Containers                    []ContainerItem    `json:"containers"`
+				ImagePullPolicy               string             `json:"imagePullPolicy,omitempty"`
+				ImagePullSecrets              []structs.Namespec `json:"imagePullSecrets,omitempty"`
+				DnsPolicy                     string             `json:"dnsPolicy,omitempty"`
+				InitContainers                *[]ContainerItem   `json:"initContainers,omitempty"`
+				Volumes                       *[]structs.Volumes `json:"volumes,omitempty"`
+				TerminationGracePeriodSeconds int                `json:"terminationGracePeriodSeconds,omitempty"`
 			} `json:"spec"`
 		} `json:"template"`
 	} `json:"spec"`

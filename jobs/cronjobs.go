@@ -309,7 +309,6 @@ func DeployCronJob(db *sql.DB, params martini.Params, req structs.JobDeploy, ber
 		elist = append(elist, e)
 	}
 
-
 	// Create deployment
 	var deployment structs.Deployment
 	deployment.Space = space

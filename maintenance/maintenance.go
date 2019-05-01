@@ -26,7 +26,7 @@ func EnableMaintenancePage(db *sql.DB, params martini.Params, r render.Render) {
 		utils.ReportError(err, r)
 		return
 	}
-	r.JSON(http.StatusCreated, structs.Messagespec{Status:http.StatusCreated, Message:"Maintenance Page Enabled"})
+	r.JSON(http.StatusCreated, structs.Messagespec{Status: http.StatusCreated, Message: "Maintenance Page Enabled"})
 }
 
 func DisableMaintenancePage(db *sql.DB, params martini.Params, r render.Render) {
@@ -44,7 +44,7 @@ func DisableMaintenancePage(db *sql.DB, params martini.Params, r render.Render) 
 		utils.ReportError(err, r)
 		return
 	}
-	r.JSON(http.StatusOK, structs.Messagespec{Status:http.StatusOK, Message:"Maintenance Page Disabled"})
+	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: "Maintenance Page Disabled"})
 }
 
 func MaintenancePageStatus(db *sql.DB, params martini.Params, r render.Render) {
@@ -67,5 +67,5 @@ func MaintenancePageStatus(db *sql.DB, params martini.Params, r render.Render) {
 	if enabled {
 		status = "on"
 	}
-	r.JSON(http.StatusOK, structs.Maintenancespec{App:params["app"], Space:params["space"], Status:status})
+	r.JSON(http.StatusOK, structs.Maintenancespec{App: params["app"], Space: params["space"], Status: status})
 }

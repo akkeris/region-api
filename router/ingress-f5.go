@@ -15,17 +15,16 @@ import (
 	"github.com/bitly/go-simplejson"
 	f5client "github.com/octanner/f5er/f5"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	structs "region-api/structs"
 	"strconv"
 	"strings"
 	"sync"
-	"log"
-	"time"
 	"text/template"
+	"time"
 )
-
 
 type F5Request struct {
 	Status     string
@@ -60,14 +59,14 @@ type f5Rule struct {
 }
 
 type F5Client struct {
-	Url 		string
-	Token 		string
-	Username    string
-	Password    string
-	Debug		bool
-	mutex       *sync.Mutex
-	client      *http.Client
-	device		*f5client.Device
+	Url      string
+	Token    string
+	Username string
+	Password string
+	Debug    bool
+	mutex    *sync.Mutex
+	client   *http.Client
+	device   *f5client.Device
 }
 
 type LBClientSsl struct {
@@ -89,9 +88,9 @@ type LBCertKeyChain struct {
 }
 
 type Profile struct {
-	Name string
+	Name       string
 	ServerName string
-	CertName string
+	CertName   string
 }
 
 func LeadingZero(num int) string {
@@ -193,17 +192,17 @@ func (f5 *F5Client) Request(method string, path string, payload interface{}) (r 
 		body, err := json.Marshal(payload)
 		if err != nil {
 			if f5.Debug {
-				log.Printf("** f5: invalid payload/body supplied: %s %s - %s\n", method, f5.Url + path, err)
+				log.Printf("** f5: invalid payload/body supplied: %s %s - %s\n", method, f5.Url+path, err)
 			}
 			return nil, err
 		}
 		body = bytes.Replace(body, []byte("\\u003e"), []byte(">"), -1)
-		req, err = http.NewRequest(strings.ToUpper(method), f5.Url + path, bytes.NewReader(body))
+		req, err = http.NewRequest(strings.ToUpper(method), f5.Url+path, bytes.NewReader(body))
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		req, err = http.NewRequest(strings.ToUpper(method), f5.Url + path, nil)
+		req, err = http.NewRequest(strings.ToUpper(method), f5.Url+path, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -214,14 +213,14 @@ func (f5 *F5Client) Request(method string, path string, payload interface{}) (r 
 	req.Header.Add("X-F5-Auth-Token", f5.Token)
 	req.Header.Add("Content-Type", "application/json")
 	if f5.Debug {
-		log.Printf("-> f5: %s %s with headers [%s] with payload [%s]\n", method, f5.Url + path, req.Header, body)
+		log.Printf("-> f5: %s %s with headers [%s] with payload [%s]\n", method, f5.Url+path, req.Header, body)
 	}
 	f5.mutex.Lock()
 	resp, err := f5.client.Do(req)
 	f5.mutex.Unlock()
 	if err != nil {
 		if f5.Debug {
-			log.Printf("<- f5 ERROR: %s %s - %s\n", method, f5.Url + path, err)
+			log.Printf("<- f5 ERROR: %s %s - %s\n", method, f5.Url+path, err)
 		}
 		return nil, err
 	}
@@ -229,7 +228,7 @@ func (f5 *F5Client) Request(method string, path string, payload interface{}) (r 
 	respBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		if f5.Debug {
-			log.Printf("<- f5 ERROR: %s %s - %s\n", method, f5.Url + path, err)
+			log.Printf("<- f5 ERROR: %s %s - %s\n", method, f5.Url+path, err)
 		}
 		return nil, err
 	}
@@ -248,24 +247,24 @@ func (f5 *F5Client) Request(method string, path string, payload interface{}) (r 
 	if resp.StatusCode > 299 || resp.StatusCode < 200 {
 		err = fmt.Errorf("%s (%d)", resp.Status, resp.StatusCode)
 		if f5.Debug {
-			log.Printf("<- f5 ERROR: %s %s - %s\n", method, f5.Url + path, err)
+			log.Printf("<- f5 ERROR: %s %s - %s\n", method, f5.Url+path, err)
 		}
 		return nil, err
 	}
 	if f5.Debug {
-		log.Printf("<- f5: %s %s - %s\n", method, f5.Url + path, resp.Status)
+		log.Printf("<- f5: %s %s - %s\n", method, f5.Url+path, resp.Status)
 	}
 	return &F5Request{Body: respBody, Status: resp.Status, StatusCode: resp.StatusCode}, nil
 }
 
 func (f5 *F5Client) getToken() error {
-	str, err := json.Marshal(f5creds{Username:f5.Username, Password:f5.Password, LoginProviderName:"tmos"})
+	str, err := json.Marshal(f5creds{Username: f5.Username, Password: f5.Password, LoginProviderName: "tmos"})
 	if err != nil {
 		log.Printf("Error creating new F5 client, unable to marshal data: %s\n", err.Error())
 		return err
 	}
-	req, err := http.NewRequest("POST", f5.Url + "/mgmt/shared/authn/login", bytes.NewBuffer([]byte(string(str))))
-	req.Header.Add("Authorization", "Basic " + base64.StdEncoding.EncodeToString([]byte(f5.Username + ":" + f5.Password)))
+	req, err := http.NewRequest("POST", f5.Url+"/mgmt/shared/authn/login", bytes.NewBuffer([]byte(string(str))))
+	req.Header.Add("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(f5.Username+":"+f5.Password)))
 	req.Header.Add("Content-Type", "application/json")
 	f5.mutex.Lock()
 	resp, err := f5.client.Do(req)
@@ -295,7 +294,7 @@ func (f5 *F5Client) getToken() error {
 }
 
 func (f5 *F5Client) GetRule(partition string, rulename string) (*f5Rulespec, error) {
-	resp, err := f5.Request("get", "/mgmt/tm/ltm/rule/~" + partition + "~" + rulename, nil)
+	resp, err := f5.Request("get", "/mgmt/tm/ltm/rule/~"+partition+"~"+rulename, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -307,7 +306,7 @@ func (f5 *F5Client) GetRule(partition string, rulename string) (*f5Rulespec, err
 }
 
 func (f5 *F5Client) GetRules(partition string) ([]string, error) {
-	res, err := f5.Request("get", "/mgmt/tm/ltm/rule?$filter=partition+eq+" + partition, nil)
+	res, err := f5.Request("get", "/mgmt/tm/ltm/rule?$filter=partition+eq+"+partition, nil)
 	if err != nil {
 		log.Printf("Unable to getRules from F5 (http call failed): %s\n", err.Error())
 		return []string{}, err
@@ -328,7 +327,7 @@ func (f5 *F5Client) GetRules(partition string) ([]string, error) {
 	return elements, nil
 }
 
-func (f5 *F5Client) AddRule(rule f5Rulespec) (error) {
+func (f5 *F5Client) AddRule(rule f5Rulespec) error {
 	if f5.Debug {
 		log.Printf("f5 -> Adding rule: %#+v\n", rule)
 	}
@@ -340,7 +339,7 @@ func (f5 *F5Client) AddRule(rule f5Rulespec) (error) {
 }
 
 func (f5 *F5Client) GetRulesAttached(partition string, virtual string) ([]string, error) {
-	res, err := f5.Request("get", "/mgmt/tm/ltm/virtual/~" + partition + "~" + virtual, nil)
+	res, err := f5.Request("get", "/mgmt/tm/ltm/virtual/~"+partition+"~"+virtual, nil)
 	if err != nil {
 		log.Printf("Unable to getRulesAttached from the F5 (http call to F5 failed): %s\n", err.Error())
 		return nil, err
@@ -363,7 +362,7 @@ func (f5 *F5Client) GetRulesAttached(partition string, virtual string) ([]string
 	return rulesa, nil
 }
 
-func (f5 *F5Client) UpdateRule(partition string, rulename string, rule f5Rulespec) (error) {
+func (f5 *F5Client) UpdateRule(partition string, rulename string, rule f5Rulespec) error {
 	if f5.Debug {
 		log.Printf("f5 -> Updating rule: %#+v\n", rule)
 		log.Printf("=== iRule [" + "/mgmt/tm/ltm/rule/~" + partition + "~" + rulename + "] ===\n")
@@ -375,7 +374,7 @@ func (f5 *F5Client) UpdateRule(partition string, rulename string, rule f5Rulespe
 		}
 		log.Printf("=== iRule ===\n")
 	}
-	_, err := f5.Request("patch", "/mgmt/tm/ltm/rule/~" + partition + "~" + rulename, rule)
+	_, err := f5.Request("patch", "/mgmt/tm/ltm/rule/~"+partition+"~"+rulename, rule)
 	if err != nil {
 		return err
 	}
@@ -394,7 +393,7 @@ func (f5 *F5Client) DetachRule(rule string, partition string, virtual string) (e
 			newrules = append(newrules, element)
 		}
 	}
-	_, err = f5.Request("patch", "/mgmt/tm/ltm/virtual/~" + partition + "~" + virtual, f5Virtualspec{Rules:newrules})
+	_, err = f5.Request("patch", "/mgmt/tm/ltm/virtual/~"+partition+"~"+virtual, f5Virtualspec{Rules: newrules})
 	if err != nil {
 		log.Printf("Untable to detachRule, http call to F5 failed: %s\n", err.Error())
 		return err
@@ -405,7 +404,7 @@ func (f5 *F5Client) DetachRule(rule string, partition string, virtual string) (e
 func (f5 *F5Client) DeleteRule(rulename string, partition string, virtual string) (e error) {
 	newrulename := strings.Replace(rulename, "/", "~", -1)
 	newpartition := "~" + strings.Replace(partition, "/", "~", -1)
-	if _, err := f5.Request("delete", "/mgmt/tm/ltm/rule/" + newpartition + "~" + newrulename, nil); err != nil {
+	if _, err := f5.Request("delete", "/mgmt/tm/ltm/rule/"+newpartition+"~"+newrulename, nil); err != nil {
 		log.Printf("Unable to deleteRule to the F5 router (http request failed): %s\n", err.Error())
 		return err
 	}
@@ -413,8 +412,8 @@ func (f5 *F5Client) DeleteRule(rulename string, partition string, virtual string
 }
 
 func (f5 *F5Client) BuildRule(db *sql.DB, router structs.Routerspec, partition string, virtual string) (f5Rulespec, error) {
-	rule := f5Rulespec{Name:router.Domain + "-rule", Partition:partition}
-	ruleinfo := structs.RuleInfo{Domain:router.Domain}
+	rule := f5Rulespec{Name: router.Domain + "-rule", Partition: partition}
+	ruleinfo := structs.RuleInfo{Domain: router.Domain}
 	var switches []structs.Switch
 	for _, element := range router.Paths {
 		var sw structs.Switch
@@ -431,7 +430,7 @@ func (f5 *F5Client) BuildRule(db *sql.DB, router structs.Routerspec, partition s
 		sw.Nodeport = nodeport
 		sw.Path = element.Path
 		sw.ReplacePath = element.ReplacePath
-		sw.Unipool = "/"+partition+"/unipool"
+		sw.Unipool = "/" + partition + "/unipool"
 		appurl, err := GetAppUrl(db, element.App, element.Space)
 		if err != nil {
 			log.Printf("Unable to get app url while building rule: %s\n", err.Error())
@@ -483,21 +482,21 @@ func (f5 *F5Client) IsRuleAttached(router structs.Routerspec, partition string, 
 		return false, err
 	}
 	for _, element := range rules {
-		if element == "/" + partition + "/" + router.Domain + "-rule" {
+		if element == "/"+partition+"/"+router.Domain+"-rule" {
 			return true, nil
 		}
 	}
 	return false, nil
 }
 
-func (f5 *F5Client) AttachRule(rule f5Rulespec, partition string, virtual string) (error) {
+func (f5 *F5Client) AttachRule(rule f5Rulespec, partition string, virtual string) error {
 	rules, err := f5.GetRulesAttached(partition, virtual)
 	if err != nil {
 		log.Printf("Unable to attachRule to the F5 (getRulesAttached failed): %s\n", err.Error())
 		return err
 	}
-	rules = append(rules, "/" + partition + "/" + rule.Name)
-	_, err = f5.Request("patch", "/mgmt/tm/ltm/virtual/~" + partition + "~" + virtual, f5Virtualspec{Rules:rules})
+	rules = append(rules, "/"+partition+"/"+rule.Name)
+	_, err = f5.Request("patch", "/mgmt/tm/ltm/virtual/~"+partition+"~"+virtual, f5Virtualspec{Rules: rules})
 	if err != nil {
 		log.Printf("Unable to addRule to the F5 (http call failed): %s\n", err.Error())
 		return err
@@ -511,7 +510,7 @@ func (f5 *F5Client) InstallCertificate(partition string, vip string, server_name
 	if f5.Debug {
 		log.Printf("-> f5: Installing certificate on partition %s for vip %s with server name %s\n", partition, vip, server_name)
 	}
-	x509_decoded_cert, pem_cert, pem_chain, err := DecodeCertificateBundle(server_name, pem_certs);
+	x509_decoded_cert, pem_cert, pem_chain, err := DecodeCertificateBundle(server_name, pem_certs)
 	if err != nil {
 		fmt.Println(err)
 		return err
@@ -539,23 +538,23 @@ func (f5 *F5Client) InstallCertificate(partition string, vip string, server_name
 
 	// Upload certificate and key to F5
 	if len(pem_chain) != 0 {
-		if err = f5.device.UploadFile(main_certs_name + "_chain.crt", pem_chain); err != nil {
+		if err = f5.device.UploadFile(main_certs_name+"_chain.crt", pem_chain); err != nil {
 			fmt.Println(err)
 			return err
 		}
 	}
-	if err = f5.device.UploadFile(main_certs_name + ".crt", pem_cert); err != nil {
+	if err = f5.device.UploadFile(main_certs_name+".crt", pem_cert); err != nil {
 		fmt.Println(err)
 		return err
 	}
-	if err = f5.device.UploadFile(main_certs_name + ".key", pem_key); err != nil {
+	if err = f5.device.UploadFile(main_certs_name+".key", pem_key); err != nil {
 		fmt.Println(err)
 		return err
 	}
 
 	// Create the certificate and key objects in the F5
 	if len(pem_chain) != 0 {
-		err, _ = f5.device.CreateCertificateFromLocalFile(main_certs_name + "_chain", partition, main_certs_name + "_chain.crt")
+		err, _ = f5.device.CreateCertificateFromLocalFile(main_certs_name+"_chain", partition, main_certs_name+"_chain.crt")
 		if err != nil {
 			fmt.Println("Failed to create cert chain from local file")
 			fmt.Println(main_certs_name + "_chain partition: " + partition)
@@ -563,14 +562,14 @@ func (f5 *F5Client) InstallCertificate(partition string, vip string, server_name
 			return err
 		}
 	}
-	err, _ = f5.device.CreateCertificateFromLocalFile(main_certs_name, partition, main_certs_name + ".crt")
+	err, _ = f5.device.CreateCertificateFromLocalFile(main_certs_name, partition, main_certs_name+".crt")
 	if err != nil {
 		fmt.Println("Failed to create cert from local file")
 		fmt.Println(main_certs_name + " partition: " + partition + " key: " + main_certs_name + ".key")
 		fmt.Println(err)
 		return err
 	}
-	err, _ = f5.device.CreateKeyFromLocalFile(main_certs_name, partition, main_certs_name + ".key")
+	err, _ = f5.device.CreateKeyFromLocalFile(main_certs_name, partition, main_certs_name+".key")
 	if err != nil {
 		fmt.Println("Failed to create key from local file")
 		fmt.Println(main_certs_name + " partition: " + partition + " key: " + main_certs_name + ".key")
@@ -724,7 +723,7 @@ func NewF5Client(url string, username string, password string) (*F5Client, error
 	return f5, nil
 }
 
-var f5Client *F5Client = nil;
+var f5Client *F5Client = nil
 
 func GetClient() (*F5Client, error) {
 	if f5Client != nil {
@@ -791,7 +790,7 @@ func GetClient() (*F5Client, error) {
 type F5Ingress struct {
 	client *F5Client
 	config *IngressConfig
-	db *sql.DB
+	db     *sql.DB
 }
 
 func GetF5Ingress(db *sql.DB, config *IngressConfig) (*F5Ingress, error) {
@@ -800,13 +799,13 @@ func GetF5Ingress(db *sql.DB, config *IngressConfig) (*F5Ingress, error) {
 		return nil, err
 	}
 	return &F5Ingress{
-		client:client,
-		config:config,
-		db:db,
+		client: client,
+		config: config,
+		db:     db,
 	}, nil
 }
 
-func (ingress *F5Ingress) CreateOrUpdateRouter(router structs.Routerspec) (error) {
+func (ingress *F5Ingress) CreateOrUpdateRouter(router structs.Routerspec) error {
 	config, err := GetSitesIngressPublicExternal()
 	if err != nil {
 		return err
@@ -820,22 +819,22 @@ func (ingress *F5Ingress) CreateOrUpdateRouter(router structs.Routerspec) (error
 	rule, err := ingress.client.BuildRule(ingress.db, router, config.Environment, config.Name)
 	if err != nil {
 		log.Printf("Unable to update F5 router (buildRule failed): %s\n", err.Error())
-		return err	
+		return err
 	}
-	exists, err := ingress.client.RuleExists(config.Environment, config.Name, router.Domain + "-rule")
+	exists, err := ingress.client.RuleExists(config.Environment, config.Name, router.Domain+"-rule")
 	if err != nil {
 		log.Printf("Unable to update F5 router (ruleExists failed): %s\n", err.Error())
-		return err	
+		return err
 	}
 	if exists {
-		if err = ingress.client.UpdateRule(config.Environment, router.Domain + "-rule", rule); err != nil {
+		if err = ingress.client.UpdateRule(config.Environment, router.Domain+"-rule", rule); err != nil {
 			log.Printf("Unable to update F5 router (updateRule failed): %s\n", err.Error())
-			return err	
+			return err
 		}
 	} else {
 		if err = ingress.client.AddRule(rule); err != nil {
 			log.Printf("Unable to update F5 router (addRule failed): %s\n", err.Error())
-			return err	
+			return err
 		}
 	}
 	attached, err := ingress.client.IsRuleAttached(router, config.Environment, config.Name)
@@ -852,7 +851,7 @@ func (ingress *F5Ingress) CreateOrUpdateRouter(router structs.Routerspec) (error
 	return nil
 }
 
-func (ingress *F5Ingress) DeleteRouter(router structs.Routerspec) (error) {
+func (ingress *F5Ingress) DeleteRouter(router structs.Routerspec) error {
 	config, err := GetSitesIngressPublicExternal()
 	if err != nil {
 		return err
@@ -889,7 +888,7 @@ func (ingress *F5Ingress) DeleteRouter(router structs.Routerspec) (error) {
 	return nil
 }
 
-func (ingress *F5Ingress) SetMaintenancePage(app string, space string, value bool) (error) {
+func (ingress *F5Ingress) SetMaintenancePage(app string, space string, value bool) error {
 	status, err := ingress.GetMaintenancePageStatus(app, space)
 	if err != nil {
 		return err
@@ -966,7 +965,7 @@ func (ingress *F5Ingress) GetCertificateInfo(server_name string) (string, error)
 	return string(body), nil
 }
 
-func (ingress *F5Ingress) InstallCertificate(server_name string, pem_cert []byte, pem_key []byte) (error) {
+func (ingress *F5Ingress) InstallCertificate(server_name string, pem_cert []byte, pem_key []byte) error {
 	return ingress.client.InstallCertificate(ingress.config.Environment, ingress.config.Name, server_name, pem_cert, pem_key)
 }
 
@@ -989,7 +988,7 @@ func (ingress *F5Ingress) GetInstalledCertificates(site string) ([]Certificate, 
 		var certType string = "normal"
 		if len(sans) > 1 {
 			certType = "sans"
-		} 
+		}
 		destsans := make([]string, 0)
 		for _, san := range sans {
 			san = strings.Replace(san, " ", "", -1)
@@ -1013,12 +1012,12 @@ func (ingress *F5Ingress) GetInstalledCertificates(site string) ([]Certificate, 
 		}
 		if matchedSiteDomain && onCorrectPartition && isAttachedToVip {
 			certs = append(certs, Certificate{
-				Type: certType,
-				Name: cert.Name,
-				Expires: int64(cert.Expiration),
+				Type:         certType,
+				Name:         cert.Name,
+				Expires:      int64(cert.Expiration),
 				Alternatives: destsans,
-				Expired: !notExpired,
-				Address: ingress.config.Address,
+				Expired:      !notExpired,
+				Address:      ingress.config.Address,
 			})
 		}
 	}
@@ -1032,4 +1031,3 @@ func (ingress *F5Ingress) Config() *IngressConfig {
 func (ingress *F5Ingress) Name() string {
 	return "f5"
 }
-

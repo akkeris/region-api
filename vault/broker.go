@@ -11,25 +11,24 @@ import (
 	"os"
 	structs "region-api/structs"
 	"strings"
-        "sync"
-
+	"sync"
 )
 
 var list []string
 var mutex = &sync.Mutex{}
 
 func GetVaultList(params martini.Params, r render.Render) {
-        r.JSON(200, list)
+	r.JSON(200, list)
 }
 
 func GetVaultListPeriodic() {
-        var newlist []string
+	var newlist []string
 	for _, element := range getVaultPaths() {
-		newlist = append(newlist,getVaultList(element)...)
+		newlist = append(newlist, getVaultList(element)...)
 	}
-        mutex.Lock()
-        list = newlist
-        mutex.Unlock()
+	mutex.Lock()
+	list = newlist
+	mutex.Unlock()
 }
 
 func getVaultPaths() []string {

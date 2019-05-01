@@ -1,56 +1,56 @@
 package router
 
 import (
+	"crypto/x509"
 	"database/sql"
+	"encoding/pem"
+	"errors"
+	"fmt"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/render"
 	"net/http"
 	utils "region-api/utils"
 	"strings"
-	"crypto/x509"
-	"fmt"
-	"errors"
-	"encoding/pem"
 )
 
 type Addresses struct {
-	Network string	`json:"network"`
-	Internal bool 	`json:"internal"`
-	Address string 		`json:"address"`
+	Network  string `json:"network"`
+	Internal bool   `json:"internal"`
+	Address  string `json:"address"`
 }
 
 type Domains struct {
-	Internal bool `json:"internal"`
-	Value string `json:"value"`
+	Internal  bool      `json:"internal"`
+	Value     string    `json:"value"`
 	Addresses Addresses `json:"ips"`
-	Type string `json:"type"`
+	Type      string    `json:"type"`
 }
 
 type Certificate struct {
 	Alternatives []string `json:"alternatives"`
-	Name string `json:"name"`
-	Expires int64 `json:"expires"`
-	Type string `json:"type"`
-	Expired bool `json:"expired"`
-	Address string `json:"address"`
+	Name         string   `json:"name"`
+	Expires      int64    `json:"expires"`
+	Type         string   `json:"type"`
+	Expired      bool     `json:"expired"`
+	Address      string   `json:"address"`
 }
 
 type SiteStatus struct {
-	Public bool `json:"public"`
+	Public                     bool `json:"public"`
 	DomainRecordPointingToSite bool `json:"domain_record_pointing_to_site"`
-	CertificateExists bool `json:"certificate_exists"`
-	CertificateIsInstalled bool `json:"certificate_is_installed"`
-	CertificateIsNotExpired bool `json:"certificate_is_not_expired"`
-	Valid bool `json:"valid"`
+	CertificateExists          bool `json:"certificate_exists"`
+	CertificateIsInstalled     bool `json:"certificate_is_installed"`
+	CertificateIsNotExpired    bool `json:"certificate_is_not_expired"`
+	Valid                      bool `json:"valid"`
 }
 
 type Site struct {
-	Name string `json:"name"`
-	Addresses []Addresses `json:"ips"`
-	Domains []Domain `json:"domains"`
+	Name          string         `json:"name"`
+	Addresses     []Addresses    `json:"ips"`
+	Domains       []Domain       `json:"domains"`
 	DomainRecords []DomainRecord `json:"records"`
-	Certificates []Certificate `json:"certificates"`
-	Status []SiteStatus `json:"status"`
+	Certificates  []Certificate  `json:"certificates"`
+	Status        []SiteStatus   `json:"status"`
 }
 
 func DecodeCertificateBundle(server_name string, pem_certs []byte) (x509_decoded_cert *x509.Certificate, pem_cert []byte, pem_chain []byte, err error) {
@@ -140,8 +140,8 @@ func HttpGetSite(db *sql.DB, params martini.Params, r render.Render) {
 		return
 	}
 
-	siteStatusPublic := SiteStatus{Public:true, DomainRecordPointingToSite:false, CertificateExists:false, CertificateIsInstalled:false, CertificateIsNotExpired: false, Valid:false}
-	siteStatusPrivate := SiteStatus{Public:false, DomainRecordPointingToSite:false, CertificateExists:false, CertificateIsInstalled:false, CertificateIsNotExpired: false, Valid:false}
+	siteStatusPublic := SiteStatus{Public: true, DomainRecordPointingToSite: false, CertificateExists: false, CertificateIsInstalled: false, CertificateIsNotExpired: false, Valid: false}
+	siteStatusPrivate := SiteStatus{Public: false, DomainRecordPointingToSite: false, CertificateExists: false, CertificateIsInstalled: false, CertificateIsNotExpired: false, Valid: false}
 	for _, cert := range internalCertificates {
 		siteStatusPrivate.CertificateExists = true
 		siteStatusPrivate.CertificateIsInstalled = true
@@ -182,7 +182,7 @@ func HttpGetSite(db *sql.DB, params martini.Params, r render.Render) {
 						siteStatusPrivate.DomainRecordPointingToSite = true
 					}
 					domainRecords = append(domainRecords, record)
-				}	
+				}
 			}
 		}
 	}
@@ -194,15 +194,15 @@ func HttpGetSite(db *sql.DB, params martini.Params, r render.Render) {
 		siteStatusPrivate.Valid = true
 	}
 
-	internalAddress := Addresses{Network:"", Internal:true, Address:internalIngress.Config().Address}
-	externalAddress := Addresses{Network:"", Internal:false, Address:externalIngress.Config().Address}
+	internalAddress := Addresses{Network: "", Internal: true, Address: internalIngress.Config().Address}
+	externalAddress := Addresses{Network: "", Internal: false, Address: externalIngress.Config().Address}
 
 	r.JSON(http.StatusOK, Site{
-		Name:site,
-		Domains:dzones,
-		DomainRecords:domainRecords,
-		Addresses:[]Addresses{internalAddress, externalAddress},
-		Certificates:append(internalCertificates, externalCertificates...),
-		Status:[]SiteStatus{siteStatusPublic, siteStatusPrivate},
+		Name:          site,
+		Domains:       dzones,
+		DomainRecords: domainRecords,
+		Addresses:     []Addresses{internalAddress, externalAddress},
+		Certificates:  append(internalCertificates, externalCertificates...),
+		Status:        []SiteStatus{siteStatusPublic, siteStatusPrivate},
 	})
 }

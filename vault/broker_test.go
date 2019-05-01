@@ -59,7 +59,7 @@ func TestVaultPlans(t *testing.T) {
 }
 
 func TestGetVaultVariables(t *testing.T) {
-        GetVaultListPeriodic()
+	GetVaultListPeriodic()
 	testSecretQa := "secret/qa/db/perf"
 	testSecretStage := "secret/stage/db/perf"
 

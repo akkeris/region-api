@@ -138,7 +138,7 @@ func (rt Kubernetes) k8sRequest(method string, path string, payload interface{})
 // This is external to provide functionality for specific types of systems (istio for example)
 // can make requests, rather than using k8s we use this as its more generic
 func (rt Kubernetes) GenericRequest(method string, path string, payload interface{}) ([]byte, int, error) {
-	req, err := rt.k8sRequest(method, path, payload);
+	req, err := rt.k8sRequest(method, path, payload)
 	if err != nil {
 		return []byte{}, 0, err
 	}
@@ -239,7 +239,7 @@ func (rt Kubernetes) UpdateDeployment(deployment *structs.Deployment) (err error
 
 	// Assemble secrets
 	if os.Getenv("FF_QUAY") == "true" || os.Getenv("IMAGE_PULL_SECRET") != "" {
-		deployment.Secrets = append(deployment.Secrets, structs.Namespec{Name:rt.imagePullSecret})
+		deployment.Secrets = append(deployment.Secrets, structs.Namespec{Name: rt.imagePullSecret})
 	}
 
 	resp, err := rt.k8sRequest("PUT", "/apis/extensions/v1beta1/namespaces/"+deployment.Space+"/deployments/"+deployment.App,
@@ -257,7 +257,7 @@ func (rt Kubernetes) CreateDeployment(deployment *structs.Deployment) (err error
 
 	// Assemble secrets
 	if os.Getenv("FF_QUAY") == "true" || os.Getenv("IMAGE_PULL_SECRET") != "" {
-		deployment.Secrets = append(deployment.Secrets, structs.Namespec{Name:rt.imagePullSecret})
+		deployment.Secrets = append(deployment.Secrets, structs.Namespec{Name: rt.imagePullSecret})
 	}
 	resp, err := rt.k8sRequest("POST", "/apis/extensions/v1beta1/namespaces/"+deployment.Space+"/deployments", deploymentToDeploymentSpec(deployment))
 	if err != nil {
@@ -465,7 +465,7 @@ func (rt Kubernetes) CreateOneOffPod(deployment *structs.Deployment) (e error) {
 	}
 	// Assemble secrets
 	if os.Getenv("FF_QUAY") == "true" || os.Getenv("IMAGE_PULL_SECRET") != "" {
-		deployment.Secrets = append(deployment.Secrets, structs.Namespec{Name:rt.imagePullSecret})
+		deployment.Secrets = append(deployment.Secrets, structs.Namespec{Name: rt.imagePullSecret})
 	}
 
 	var koneoff OneOffPod
@@ -937,7 +937,7 @@ func (rt Kubernetes) CreateCronJob(deployment *structs.Deployment) (*structs.Cro
 	}
 
 	if os.Getenv("FF_QUAY") == "true" || os.Getenv("IMAGE_PULL_SECRET") != "" {
-		deployment.Secrets = append(deployment.Secrets, structs.Namespec{Name:rt.imagePullSecret})
+		deployment.Secrets = append(deployment.Secrets, structs.Namespec{Name: rt.imagePullSecret})
 	}
 
 	// Update or Create Job
@@ -963,9 +963,9 @@ func (rt Kubernetes) UpdateCronJob(deployment *structs.Deployment) (*structs.Cro
 	if deployment.App == "" {
 		return nil, errors.New("FATAL ERROR: Unable to update cron job, the app is blank.")
 	}
-	
+
 	if os.Getenv("FF_QUAY") == "true" || os.Getenv("IMAGE_PULL_SECRET") != "" {
-		deployment.Secrets = append(deployment.Secrets, structs.Namespec{Name:rt.imagePullSecret})
+		deployment.Secrets = append(deployment.Secrets, structs.Namespec{Name: rt.imagePullSecret})
 	}
 
 	resp, err := rt.k8sRequest("put", "/apis/batch/v2alpha1/namespaces/"+deployment.Space+"/cronjobs/"+deployment.App, deploymentToCronJob(deployment))
@@ -990,10 +990,10 @@ func (rt Kubernetes) CreateJob(deployment *structs.Deployment) (*structs.JobStat
 	if deployment.App == "" {
 		return nil, errors.New("FATAL ERROR: Unable to create job, the job name is blank.")
 	}
-	
+
 	// Image Secret
 	if os.Getenv("FF_QUAY") == "true" || os.Getenv("IMAGE_PULL_SECRET") != "" {
-		deployment.Secrets = append(deployment.Secrets, structs.Namespec{Name:rt.imagePullSecret})
+		deployment.Secrets = append(deployment.Secrets, structs.Namespec{Name: rt.imagePullSecret})
 	}
 
 	var resources structs.ResourceSpec

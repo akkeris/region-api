@@ -2,9 +2,9 @@ package certs
 
 import (
 	"database/sql"
-	"region-api/structs"
-	"region-api/router"
 	"os"
+	"region-api/router"
+	"region-api/structs"
 )
 
 type Issuer interface {

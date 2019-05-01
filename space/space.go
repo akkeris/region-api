@@ -78,12 +78,12 @@ func Createspace(db *sql.DB, space structs.Spacespec, berr binding.Errors, r ren
 		utils.ReportError(err, r)
 		return
 	}
-	
+
 	if err = rt.CreateSpace(space.Name, space.ComplianceTags); err != nil {
 		utils.ReportError(err, r)
 		return
 	}
-	if os.Getenv("FF_QUAY")=="true" || os.Getenv("IMAGE_PULL_SECRET") != "" {
+	if os.Getenv("FF_QUAY") == "true" || os.Getenv("IMAGE_PULL_SECRET") != "" {
 		vs, err := getPullSecret(space.Name)
 		if err != nil {
 			utils.ReportError(err, r)

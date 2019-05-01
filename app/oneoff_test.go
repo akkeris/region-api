@@ -167,14 +167,14 @@ func TestOneoffs(t *testing.T) {
 								panic(err)
 							}
 							So(len(response), ShouldBeGreaterThan, 0)
-                                                        var found bool
-                                                        found = false
-                                                        for _, element := range response {
-                                                            if element.Appname == testAppName {
-                                                                 found=true
-                                                            }
-                                                        }
-                                                        So(found, ShouldBeTrue)
+							var found bool
+							found = false
+							for _, element := range response {
+								if element.Appname == testAppName {
+									found = true
+								}
+							}
+							So(found, ShouldBeTrue)
 							Convey("it should have info in a space", func() {
 								r, _ := http.NewRequest("GET", "/v1/space/"+testAppSpace+"/app/"+testAppName, nil)
 								w := httptest.NewRecorder()

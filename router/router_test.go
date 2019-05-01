@@ -19,7 +19,7 @@ func Init() *martini.ClassicMartini {
 	pitdb := os.Getenv("PITDB")
 	pool := utils.GetDB(pitdb)
 	utils.InitAuth()
-	
+
 	m := martini.Classic()
 	m.Use(render.Renderer())
 

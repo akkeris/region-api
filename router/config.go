@@ -2,39 +2,39 @@ package router
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"github.com/go-martini/martini"
 	_ "github.com/lib/pq" //driver
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
 	"github.com/nu7hatch/gouuid"
-	"net/http"
-	"os"
-	"net/url"
 	"net"
-	spacepackage "region-api/space"
+	"net/http"
+	"net/url"
+	"os"
 	runtime "region-api/runtime"
+	spacepackage "region-api/space"
 	structs "region-api/structs"
 	utils "region-api/utils"
-	"strings"
-	"errors"
 	"strconv"
+	"strings"
 )
 
 type IngressesConfig struct {
-	AppsPublicInternal *IngressConfig `json:"apps_public_internal"`
-	AppsPublicExternal *IngressConfig `json:"apps_public_external"`
-	AppsPrivateInternal *IngressConfig `json:"apps_private_interal"`
-	SitesPublicInternal *IngressConfig `json:"sites_public_internal"`
-	SitesPublicExternal *IngressConfig `json:"sites_public_external"`
+	AppsPublicInternal   *IngressConfig `json:"apps_public_internal"`
+	AppsPublicExternal   *IngressConfig `json:"apps_public_external"`
+	AppsPrivateInternal  *IngressConfig `json:"apps_private_interal"`
+	SitesPublicInternal  *IngressConfig `json:"sites_public_internal"`
+	SitesPublicExternal  *IngressConfig `json:"sites_public_external"`
 	SitesPrivateInternal *IngressConfig `json:"sites_private_interal"`
 }
 
 type IngressConfig struct {
-	Device string `json:"device"`
-	Address string `json:"address"`
+	Device      string `json:"device"`
+	Address     string `json:"address"`
 	Environment string `json:"environment"`
-	Name string `json:name`
+	Name        string `json:name`
 }
 
 func urlToIngressConfig(uri string) (*IngressConfig, error) {
@@ -56,10 +56,10 @@ func urlToIngressConfig(uri string) (*IngressConfig, error) {
 		return nil, errors.New("The ingress " + uri + " contains an invalid address for the ingress.")
 	}
 	return &IngressConfig{
-		Device:strings.ToLower(u.Scheme),
-		Address:strings.ToLower(u.Host),
-		Environment:components[1],
-		Name:components[2],
+		Device:      strings.ToLower(u.Scheme),
+		Address:     strings.ToLower(u.Host),
+		Environment: components[1],
+		Name:        components[2],
 	}, nil
 }
 
@@ -108,12 +108,12 @@ func GetIngressConfig() (*IngressesConfig, error) {
 		return nil, err
 	}
 	return &IngressesConfig{
-		AppsPublicInternal:api,
-		AppsPublicExternal:ape,
-		AppsPrivateInternal:apri,
-		SitesPublicInternal:spi,
-		SitesPublicExternal:spe,
-		SitesPrivateInternal:spri,
+		AppsPublicInternal:   api,
+		AppsPublicExternal:   ape,
+		AppsPrivateInternal:  apri,
+		SitesPublicInternal:  spi,
+		SitesPublicExternal:  spe,
+		SitesPrivateInternal: spri,
 	}, nil
 }
 
@@ -172,7 +172,7 @@ func getRouterList(db *sql.DB) (list []string, e error) {
 }
 
 func DescribeRouter(db *sql.DB, params martini.Params, r render.Render) {
-	spec := structs.Routerspec{Domain:params["router"]}
+	spec := structs.Routerspec{Domain: params["router"]}
 	internal, err := IsInternalRouter(db, params["router"])
 	if err != nil {
 		utils.ReportError(err, r)
@@ -236,7 +236,7 @@ func AddPath(db *sql.DB, spec structs.Routerpathspec, berr binding.Errors, r ren
 		return
 	}
 
-	r.JSON(http.StatusCreated, structs.Messagespec{Status:http.StatusCreated, Message:"Path Added"})
+	r.JSON(http.StatusCreated, structs.Messagespec{Status: http.StatusCreated, Message: "Path Added"})
 }
 
 func DeletePath(db *sql.DB, params martini.Params, spec structs.Routerpathspec, berr binding.Errors, r render.Render) {
@@ -256,7 +256,7 @@ func DeletePath(db *sql.DB, params martini.Params, spec structs.Routerpathspec, 
 		utils.ReportError(err, r)
 		return
 	}
-	r.JSON(http.StatusOK, structs.Messagespec{Status:http.StatusOK, Message:"Path Deleted"})
+	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: "Path Deleted"})
 }
 
 func CreateRouter(db *sql.DB, spec structs.Routerspec, berr binding.Errors, r render.Render) {
@@ -281,7 +281,7 @@ func CreateRouter(db *sql.DB, spec structs.Routerspec, berr binding.Errors, r re
 	r.JSON(msg.Status, msg)
 }
 
-func GetDNSRecordType(address string) (string) {
+func GetDNSRecordType(address string) string {
 	recType := "A"
 	if net.ParseIP(address) == nil {
 		recType = "CNAME"
@@ -328,18 +328,18 @@ func createRouter(spec structs.Routerspec, db *sql.DB) (structs.Messagespec, err
 
 func GetNodePort(db *sql.DB, space string, app string) (string, error) {
 	rt, err := runtime.GetRuntimeFor(db, space)
-    if err != nil {
-    	return "", err
-    }
-    service, err := rt.GetService(space, app)
-    if err != nil {
-    	return "", err
-    }
-    if len(service.Spec.Ports) == 1 {
-    	return strconv.Itoa(service.Spec.Ports[0].NodePort), nil
-    } else {
-    	return "0", nil
-    }
+	if err != nil {
+		return "", err
+	}
+	service, err := rt.GetService(space, app)
+	if err != nil {
+		return "", err
+	}
+	if len(service.Spec.Ports) == 1 {
+		return strconv.Itoa(service.Spec.Ports[0].NodePort), nil
+	} else {
+		return "0", nil
+	}
 }
 
 func GetAppUrl(db *sql.DB, app string, space string) (string, error) {
@@ -370,7 +370,7 @@ func PushRouter(db *sql.DB, params martini.Params, r render.Render) {
 		utils.ReportError(err, r)
 		return
 	}
-	router := structs.Routerspec{Domain:params["router"], Paths:pathspecs}
+	router := structs.Routerspec{Domain: params["router"], Paths: pathspecs}
 	IsInternal, err := IsInternalRouter(db, params["router"])
 	if err != nil {
 		utils.ReportError(err, r)
@@ -387,14 +387,14 @@ func PushRouter(db *sql.DB, params martini.Params, r render.Render) {
 			utils.ReportError(err, r)
 			return
 		}
-		r.JSON(http.StatusOK, structs.Messagespec{Status:http.StatusOK, Message:"Router Updated"})
+		r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: "Router Updated"})
 		return
 	} else {
 		if err = ingress.CreateOrUpdateRouter(router); err != nil {
 			utils.ReportError(err, r)
 			return
 		}
-		r.JSON(http.StatusOK, structs.Messagespec{Status:http.StatusOK, Message:"Router Updated"})
+		r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: "Router Updated"})
 		return
 	}
 }
@@ -405,7 +405,7 @@ func DeleteRouter(db *sql.DB, params martini.Params, r render.Render) {
 		utils.ReportError(err, r)
 		return
 	}
-	router := structs.Routerspec{Domain:params["router"], Paths:pathspecs}
+	router := structs.Routerspec{Domain: params["router"], Paths: pathspecs}
 	if err != nil {
 		utils.ReportError(err, r)
 		return
@@ -462,7 +462,7 @@ func DeleteRouter(db *sql.DB, params martini.Params, r render.Render) {
 		utils.ReportError(err, r)
 		return
 	}
-	r.JSON(http.StatusOK, structs.Messagespec{Status:http.StatusOK, Message:"Router Deleted"})
+	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: "Router Deleted"})
 }
 
 func UpdatePath(db *sql.DB, spec structs.Routerpathspec, berr binding.Errors, r render.Render) {
@@ -491,7 +491,7 @@ func UpdatePath(db *sql.DB, spec structs.Routerpathspec, berr binding.Errors, r 
 		utils.ReportError(err, r)
 		return
 	}
-	r.JSON(http.StatusOK, structs.Messagespec{Status:http.StatusOK, Message:"Path Updated"})
+	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: "Path Updated"})
 }
 
 func GetPaths(db *sql.DB, domain string) ([]structs.Routerpathspec, error) {
@@ -504,7 +504,7 @@ func GetPaths(db *sql.DB, domain string) ([]structs.Routerpathspec, error) {
 	defer rows.Close()
 	var pathspecs []structs.Routerpathspec
 	for rows.Next() {
-		pathspec := structs.Routerpathspec{Domain:domain}
+		pathspec := structs.Routerpathspec{Domain: domain}
 		if err := rows.Scan(&pathspec.Path, &pathspec.Space, &pathspec.App, &pathspec.ReplacePath); err != nil {
 			return nil, err
 		}

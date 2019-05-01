@@ -1,29 +1,29 @@
 package router
 
 import (
-	"bytes"
 	"bufio"
+	"bytes"
+	"crypto/x509"
 	"database/sql"
-	structs "region-api/structs"
-	"region-api/runtime"
 	"encoding/base64"
-	"encoding/pem"
-	"text/template"
-	"strings"
-	"os"
-	"net/http"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
-	"crypto/x509"
-	"time"
+	"net/http"
+	"os"
+	"region-api/runtime"
+	structs "region-api/structs"
 	"strconv"
+	"strings"
+	"text/template"
+	"time"
 )
 
 type Matchspec struct {
 	URI struct {
-        Prefix string `json:"prefix"`
-    } `json:"uri"`
+		Prefix string `json:"prefix"`
+	} `json:"uri"`
 }
 
 type Rewritespec struct {
@@ -31,79 +31,79 @@ type Rewritespec struct {
 }
 
 type Routespec struct {
-    Destination struct {
-        Host string `json:"host"`
-        Port struct {
-            Number int32 `json:"number"`
-        } `json:"port"`
-    } `json:"destination"`
+	Destination struct {
+		Host string `json:"host"`
+		Port struct {
+			Number int32 `json:"number"`
+		} `json:"port"`
+	} `json:"destination"`
 }
 
 type HTTPSpec struct {
-	Match []Matchspec `json:"match"`
-    Route []Routespec `json:"route"`
-    Rewrite Rewritespec `json:"rewrite"`
+	Match   []Matchspec `json:"match"`
+	Route   []Routespec `json:"route"`
+	Rewrite Rewritespec `json:"rewrite"`
 }
 
 type VirtualService struct {
-    APIVersion string `json:"apiVersion"`
-    Kind       string `json:"kind"`
-    Metadata   struct {
-        Name            string `json:"name"`
-        Namespace       string `json:"namespace"`
-        ResourceVersion string `json:"resourceVersion"`
-    } `json:"metadata"`
-    Spec struct {
-        Gateways []string	`json:"gateways"`
-        Hosts    []string	`json:"hosts"`
-        HTTP     []HTTPSpec `json:"http"`
-    } `json:"spec"`
+	APIVersion string `json:"apiVersion"`
+	Kind       string `json:"kind"`
+	Metadata   struct {
+		Name            string `json:"name"`
+		Namespace       string `json:"namespace"`
+		ResourceVersion string `json:"resourceVersion"`
+	} `json:"metadata"`
+	Spec struct {
+		Gateways []string   `json:"gateways"`
+		Hosts    []string   `json:"hosts"`
+		HTTP     []HTTPSpec `json:"http"`
+	} `json:"spec"`
 }
 
 type Gateway struct {
-    APIVersion string `json:"apiVersion"`
-    Kind       string `json:"kind"`
-    Metadata   struct {
-        Name      string `json:"name"`
-        Namespace string `json:"namespace"`
-        ResourceVersion string `json:"resourceVersion,omitempty"`
-        Labels map[string]string `json:"labels"`
-        Annotations map[string]string `json:"annotations"`
-    } `json:"metadata"`
-    Spec struct {
-        Selector map[string]string `json:"selector"`
-        Servers []Server `json:"servers"`
-    } `json:"spec"`
+	APIVersion string `json:"apiVersion"`
+	Kind       string `json:"kind"`
+	Metadata   struct {
+		Name            string            `json:"name"`
+		Namespace       string            `json:"namespace"`
+		ResourceVersion string            `json:"resourceVersion,omitempty"`
+		Labels          map[string]string `json:"labels"`
+		Annotations     map[string]string `json:"annotations"`
+	} `json:"metadata"`
+	Spec struct {
+		Selector map[string]string `json:"selector"`
+		Servers  []Server          `json:"servers"`
+	} `json:"spec"`
 }
 
 type Server struct {
-    Hosts []string `json:"hosts"`
-    Port  struct {
-        Name     string `json:"name"`
-        Number   int    `json:"number"`
-        Protocol string `json:"protocol"`
-    } `json:"port"`
-    TLS struct {
-        HttpsRedirect		bool   `json:"httpsRedirect,omitempty"`
-        Mode				string `json:"mode,omitempty"`
-        ServerCertificate	string `json:"serverCertificate,omitempty"`
-        PrivateKey			string `json:"privateKey,omitempty"`
-        CaCertificates		string `json:"caCertificates,omitempty"`
-        CredentialName		string `json:"credentialName,omitempty"`
-        SubjectAlternativeNames	[]string `json:"subjectAltNames,omitempty"`
-		MinProtocolVersion	string `json:"minProtocolVersion,omitempty"`
-		MaxProtocolVersion	string `json:"maxProtocolVersion,omitempty"`
-		CipherSuites 		[]string `json:"cipherSuites,omitempty"`
-    } `json:"tls,omitempty"`
-    DefaultEndpoint string `json:"defaultEndpoint,omitempty"`
+	Hosts []string `json:"hosts"`
+	Port  struct {
+		Name     string `json:"name"`
+		Number   int    `json:"number"`
+		Protocol string `json:"protocol"`
+	} `json:"port"`
+	TLS struct {
+		HttpsRedirect           bool     `json:"httpsRedirect,omitempty"`
+		Mode                    string   `json:"mode,omitempty"`
+		ServerCertificate       string   `json:"serverCertificate,omitempty"`
+		PrivateKey              string   `json:"privateKey,omitempty"`
+		CaCertificates          string   `json:"caCertificates,omitempty"`
+		CredentialName          string   `json:"credentialName,omitempty"`
+		SubjectAlternativeNames []string `json:"subjectAltNames,omitempty"`
+		MinProtocolVersion      string   `json:"minProtocolVersion,omitempty"`
+		MaxProtocolVersion      string   `json:"maxProtocolVersion,omitempty"`
+		CipherSuites            []string `json:"cipherSuites,omitempty"`
+	} `json:"tls,omitempty"`
+	DefaultEndpoint string `json:"defaultEndpoint,omitempty"`
 }
 
 type TLSSecretData struct {
 	Certificate string
-	Key string
-	Name string
-	CertName string
-	Space string
+	Key         string
+	Name        string
+	CertName    string
+	Space       string
 }
 
 var vstemplate = `{
@@ -178,24 +178,23 @@ var vstemplate = `{
 }
 `
 
-
 type kubernetesSecretTLS struct {
 	ApiVersion string `json:"apiVersion"`
-	Data struct {
-		CaCrt string `json:"ca.crt,omitempty"`
+	Data       struct {
+		CaCrt  string `json:"ca.crt,omitempty"`
 		TlsCrt string `json:"tls.crt,omitempty"`
 		TlsKey string `json:"tls.key,omitempty"`
 	} `json:"data"`
-	Kind string `json:"kind"`
+	Kind     string `json:"kind"`
 	Metadata struct {
 		Annotations struct {
-			AltNames string `json:"akkeris.k8s.io/alt-names"`
+			AltNames    string `json:"akkeris.k8s.io/alt-names"`
 			CommonNames string `json:"akkeris.k8s.io/common-name"`
 		} `json:"annotations"`
 		Labels struct {
 			CertificateName string `json:"akkeris.k8s.io/certificate-name"`
 		} `json:"labels"`
-		Name string `json:"name"`
+		Name      string `json:"name"`
 		Namespace string `json:"namespace"`
 	} `json:"metadata"`
 	Type string `json:"type"`
@@ -267,8 +266,8 @@ func removeSlash(input string) string {
 
 type IstioIngress struct {
 	runtime runtime.Runtime
-	config *IngressConfig
-	db *sql.DB
+	config  *IngressConfig
+	db      *sql.DB
 }
 
 func GetIstioIngress(db *sql.DB, config *IngressConfig) (*IstioIngress, error) {
@@ -280,14 +279,14 @@ func GetIstioIngress(db *sql.DB, config *IngressConfig) (*IstioIngress, error) {
 		return nil, err
 	}
 	return &IstioIngress{
-		runtime:runtime,
-		config:config,
-		db:db,
+		runtime: runtime,
+		config:  config,
+		db:      db,
 	}, nil
 }
 
 func (ingress *IstioIngress) VirtualServiceExists(domain string) (bool, string, error) {
-	body, code, err := ingress.runtime.GenericRequest("get", "/apis/networking.istio.io/v1alpha3/namespaces/sites-system/virtualservices/" + domain, nil)
+	body, code, err := ingress.runtime.GenericRequest("get", "/apis/networking.istio.io/v1alpha3/namespaces/sites-system/virtualservices/"+domain, nil)
 	if err != nil {
 		return false, "", err
 	}
@@ -305,7 +304,7 @@ func (ingress *IstioIngress) VirtualServiceExists(domain string) (bool, string, 
 
 func (ingress *IstioIngress) GatewayExists(domain string) (bool, error) {
 	newdomain := strings.Replace(domain, ".", "-", -1) + "-gateway"
-	_, code, err := ingress.runtime.GenericRequest("get", "/apis/networking.istio.io/v1alpha3/namespaces/sites-system/gateways/" + newdomain, nil)
+	_, code, err := ingress.runtime.GenericRequest("get", "/apis/networking.istio.io/v1alpha3/namespaces/sites-system/gateways/"+newdomain, nil)
 	if err != nil {
 		return false, err
 	}
@@ -316,17 +315,17 @@ func (ingress *IstioIngress) GatewayExists(domain string) (bool, error) {
 	}
 }
 
-func (ingress *IstioIngress) DeleteVirtualService(domain string) (error) {
-	_, _, err := ingress.runtime.GenericRequest("delete", "/apis/networking.istio.io/v1alpha3/namespaces/sites-system/virtualservices/" + domain, nil)
+func (ingress *IstioIngress) DeleteVirtualService(domain string) error {
+	_, _, err := ingress.runtime.GenericRequest("delete", "/apis/networking.istio.io/v1alpha3/namespaces/sites-system/virtualservices/"+domain, nil)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (ingress *IstioIngress) DeleteGateway(domain string) (error) {
+func (ingress *IstioIngress) DeleteGateway(domain string) error {
 	newdomain := strings.Replace(domain, ".", "-", -1) + "-gateway"
-	_, _, err := ingress.runtime.GenericRequest("delete", "/apis/networking.istio.io/v1alpha3/namespaces/sites-system/gateways/" + newdomain, nil)
+	_, _, err := ingress.runtime.GenericRequest("delete", "/apis/networking.istio.io/v1alpha3/namespaces/sites-system/gateways/"+newdomain, nil)
 	if err != nil {
 		return err
 	}
@@ -335,7 +334,7 @@ func (ingress *IstioIngress) DeleteGateway(domain string) (error) {
 
 func (ingress *IstioIngress) AppVirtualService(space string, app string) (*VirtualService, error) {
 	var vs *VirtualService
-	body, _, err := ingress.runtime.GenericRequest("get", "/apis/networking.istio.io/v1alpha3/namespaces/sites-system/virtualservices/" + app + "-" + space, nil)
+	body, _, err := ingress.runtime.GenericRequest("get", "/apis/networking.istio.io/v1alpha3/namespaces/sites-system/virtualservices/"+app+"-"+space, nil)
 	if err != nil {
 		return vs, err
 	}
@@ -345,8 +344,8 @@ func (ingress *IstioIngress) AppVirtualService(space string, app string) (*Virtu
 	return vs, nil
 }
 
-func (ingress *IstioIngress) UpdateAppVirtualService(vs *VirtualService, space string, app string) (error) {
-	_, _, err := ingress.runtime.GenericRequest("put", "/apis/networking.istio.io/v1alpha3/namespaces/sites-system/virtualservices/" + app + "-" + space, vs)
+func (ingress *IstioIngress) UpdateAppVirtualService(vs *VirtualService, space string, app string) error {
+	_, _, err := ingress.runtime.GenericRequest("put", "/apis/networking.istio.io/v1alpha3/namespaces/sites-system/virtualservices/"+app+"-"+space, vs)
 	if err != nil {
 		return err
 	}
@@ -365,7 +364,7 @@ func (ingress *IstioIngress) InstallOrUpdateVirtualService(router structs.Router
 			return errors.New("Unable to create virtual service " + sitevs.Metadata.Name + " due to error: " + strconv.Itoa(code) + " " + string(body))
 		}
 	} else {
-		body, code, err := ingress.runtime.GenericRequest("put", "/apis/networking.istio.io/v1alpha3/namespaces/sites-system/virtualservices/" + router.Domain, sitevs)
+		body, code, err := ingress.runtime.GenericRequest("put", "/apis/networking.istio.io/v1alpha3/namespaces/sites-system/virtualservices/"+router.Domain, sitevs)
 		if err != nil {
 			return err
 		}
@@ -381,12 +380,12 @@ func (ingress *IstioIngress) InstallOrUpdateVirtualService(router structs.Router
 }
 
 func (ingress *IstioIngress) InstallOrUpdateGateway(domain string, gateway *Gateway) error {
-	_, code, err := ingress.runtime.GenericRequest("get", "/apis/networking.istio.io/v1alpha3/namespaces/sites-system/gateways/" + gateway.Metadata.Name, nil)
+	_, code, err := ingress.runtime.GenericRequest("get", "/apis/networking.istio.io/v1alpha3/namespaces/sites-system/gateways/"+gateway.Metadata.Name, nil)
 	if err != nil {
 		return err
 	}
 	if code == http.StatusOK {
-		body, code, err := ingress.runtime.GenericRequest("put", "/apis/networking.istio.io/v1alpha3/namespaces/sites-system/gateways/" + gateway.Metadata.Name, gateway)
+		body, code, err := ingress.runtime.GenericRequest("put", "/apis/networking.istio.io/v1alpha3/namespaces/sites-system/gateways/"+gateway.Metadata.Name, gateway)
 		if err != nil {
 			return err
 		}
@@ -447,7 +446,7 @@ func RemoveHostsAndServers(domain string, certificate string, gateway *Gateway) 
 			if dirty {
 				out.Spec.Servers[i].Hosts = newHosts
 			} else {
-				return fmt.Errorf("WARNING: We were instructed to remove host (%s) but it was not found on server %#+v\n", removeHostRecord, server), false, nil;
+				return fmt.Errorf("WARNING: We were instructed to remove host (%s) but it was not found on server %#+v\n", removeHostRecord, server), false, nil
 			}
 		}
 	}
@@ -464,7 +463,7 @@ func RemoveHostsAndServers(domain string, certificate string, gateway *Gateway) 
 		if dirty {
 			out.Spec.Servers = newServers
 		} else {
-			return fmt.Errorf("Error: We were instructed to remove server (%s) but it could not be found on gateway %#+v\n", removeServerWithTLSPortName, gateway), false, nil;
+			return fmt.Errorf("Error: We were instructed to remove server (%s) but it could not be found on gateway %#+v\n", removeServerWithTLSPortName, gateway), false, nil
 		}
 	}
 	if removeServerWithHttpPortName != "" {
@@ -479,7 +478,7 @@ func RemoveHostsAndServers(domain string, certificate string, gateway *Gateway) 
 		if dirty {
 			out.Spec.Servers = newServers
 		} else {
-			return fmt.Errorf("Error: We were instructed to remove server (%s) but it could not be found on gateway %#+v\n", removeServerWithHttpPortName, gateway), false, nil;
+			return fmt.Errorf("Error: We were instructed to remove server (%s) but it could not be found on gateway %#+v\n", removeServerWithHttpPortName, gateway), false, nil
 		}
 	}
 	return nil, dirty, out
@@ -545,14 +544,13 @@ func AddHostsAndServers(domain string, certificate string, gateway *Gateway) (er
 	return nil, dirty, out
 }
 
-
 func (ingress *IstioIngress) DeleteUberSiteGateway(domain string, certificate string, internal bool) error {
 	var gateway Gateway
 	gatewayType := "public"
 	if internal {
 		gatewayType = "private"
 	}
-	body, code, err := ingress.runtime.GenericRequest("get", "/apis/networking.istio.io/v1alpha3/namespaces/sites-system/gateways/sites-" + gatewayType, nil)
+	body, code, err := ingress.runtime.GenericRequest("get", "/apis/networking.istio.io/v1alpha3/namespaces/sites-system/gateways/sites-"+gatewayType, nil)
 	if err != nil {
 		return err
 	}
@@ -564,7 +562,7 @@ func (ingress *IstioIngress) DeleteUberSiteGateway(domain string, certificate st
 		return errors.New("The specified gateway sites-" + gatewayType + " was not found " + strconv.Itoa(code))
 	}
 
-	err, dirty, updated_gateway := RemoveHostsAndServers(domain, certificate, &gateway) 
+	err, dirty, updated_gateway := RemoveHostsAndServers(domain, certificate, &gateway)
 	if err != nil {
 		return err
 	}
@@ -580,7 +578,7 @@ func (ingress *IstioIngress) InstallOrUpdateUberSiteGateway(domain string, certi
 	if internal {
 		gatewayType = "private"
 	}
-	body, code, err := ingress.runtime.GenericRequest("get", "/apis/networking.istio.io/v1alpha3/namespaces/sites-system/gateways/sites-" + gatewayType, nil)
+	body, code, err := ingress.runtime.GenericRequest("get", "/apis/networking.istio.io/v1alpha3/namespaces/sites-system/gateways/sites-"+gatewayType, nil)
 	if err != nil {
 		return err
 	}
@@ -599,7 +597,7 @@ func (ingress *IstioIngress) InstallOrUpdateUberSiteGateway(domain string, certi
 	} else {
 		return errors.New("Response from request for sites gateway did not make sense: " + strconv.Itoa(code) + " " + string(body))
 	}
-	err, dirty, updated_gateway := RemoveHostsAndServers(domain, certificate, &gateway) 
+	err, dirty, updated_gateway := RemoveHostsAndServers(domain, certificate, &gateway)
 	if err != nil {
 		return err
 	}
@@ -613,7 +611,7 @@ func (ingress *IstioIngress) InstallOrUpdateUberSiteGateway(domain string, certi
 	return nil
 }
 
-func (ingress *IstioIngress) GetCertificateFromDomain(domain string) (string) {
+func (ingress *IstioIngress) GetCertificateFromDomain(domain string) string {
 	// See if any certificates are available, search is in this order:
 	//
 	// 1. See if a direct certificate exists for the domain name.
@@ -627,13 +625,12 @@ func (ingress *IstioIngress) GetCertificateFromDomain(domain string) (string) {
 	} else {
 		starCert := "*." + strings.Join(strings.Split(domain, ".")[1:], ".")
 		certs, err = ingress.GetInstalledCertificates(starCert)
-		if err == nil  && len(certs) > 0 {
+		if err == nil && len(certs) > 0 {
 			certName = strings.Replace(strings.Replace(starCert, ".", "-", -1), "*", "star", -1) + "-tls"
 		}
 	}
 	return certName
 }
-
 
 // Standard Ingress Methods:
 
@@ -642,8 +639,8 @@ func (ingress *IstioIngress) GetCertificateFromDomain(domain string) (string) {
  * can likely assume that a certificate is installed, we can look for a list
  * of appropriate certificates and the most specific, unexpired one wins.
  */
-func (ingress *IstioIngress) CreateOrUpdateRouter(router structs.Routerspec) (error) {
-	exists, version, err := ingress.VirtualServiceExists(router.Domain);
+func (ingress *IstioIngress) CreateOrUpdateRouter(router structs.Routerspec) error {
+	exists, version, err := ingress.VirtualServiceExists(router.Domain)
 	if err != nil {
 		return err
 	}
@@ -684,7 +681,7 @@ func (ingress *IstioIngress) CreateOrUpdateRouter(router structs.Routerspec) (er
 	return ingress.InstallOrUpdateVirtualService(router, &sitevs, exists)
 }
 
-func (ingress *IstioIngress) SetMaintenancePage(app string, space string, value bool) (error) {
+func (ingress *IstioIngress) SetMaintenancePage(app string, space string, value bool) error {
 	virtualService, err := ingress.AppVirtualService(space, app)
 	if err != nil {
 		return err
@@ -714,18 +711,18 @@ func (ingress *IstioIngress) GetMaintenancePageStatus(app string, space string) 
 	if virtualService.Spec.HTTP[0].Route[0].Destination.Host == "akkeris-404-page.default.svc.cluster.local" {
 		return true, nil
 	} else {
-		return false, nil 
+		return false, nil
 	}
 }
 
-func (ingress *IstioIngress) DeleteRouter(router structs.Routerspec) (error) {
+func (ingress *IstioIngress) DeleteRouter(router structs.Routerspec) error {
 	if err := ingress.DeleteVirtualService(router.Domain); err != nil {
 		return err
 	}
 	return ingress.DeleteUberSiteGateway(router.Domain, ingress.GetCertificateFromDomain(router.Domain), router.Internal)
 }
 
-func (ingress *IstioIngress) InstallCertificate(server_name string, pem_cert []byte, pem_key []byte) (error) {
+func (ingress *IstioIngress) InstallCertificate(server_name string, pem_cert []byte, pem_key []byte) error {
 	block, _ := pem.Decode([]byte(pem_cert))
 	if block == nil {
 		fmt.Println("failed to parse PEM block containing the public certificate")
@@ -763,11 +760,11 @@ func (ingress *IstioIngress) InstallCertificate(server_name string, pem_cert []b
 	var b bytes.Buffer
 	wr := bufio.NewWriter(&b)
 	tlsSecret := TLSSecretData{
-		Certificate:base64.StdEncoding.EncodeToString(pem_cert),
-		Key:base64.StdEncoding.EncodeToString(pem_key),
-		Name:main_server_name,
-		CertName:main_certs_name,
-		Space:ingress.config.Environment,
+		Certificate: base64.StdEncoding.EncodeToString(pem_cert),
+		Key:         base64.StdEncoding.EncodeToString(pem_key),
+		Name:        main_server_name,
+		CertName:    main_certs_name,
+		Space:       ingress.config.Environment,
 	}
 	if err := t.Execute(wr, tlsSecret); err != nil {
 		return err
@@ -779,15 +776,15 @@ func (ingress *IstioIngress) InstallCertificate(server_name string, pem_cert []b
 		certificateNamespace = "istio-system"
 	}
 
-	_, code, err := ingress.runtime.GenericRequest("get", "/api/v1/namespaces/" + certificateNamespace + "/secrets/" + main_certs_name, nil)
+	_, code, err := ingress.runtime.GenericRequest("get", "/api/v1/namespaces/"+certificateNamespace+"/secrets/"+main_certs_name, nil)
 	if err != nil {
 		return err
 	}
 	if code == http.StatusOK {
-		_, _, err = ingress.runtime.GenericRequest("put", "/api/v1/namespaces/" + certificateNamespace + "/secrets/" + main_certs_name, b.Bytes())
+		_, _, err = ingress.runtime.GenericRequest("put", "/api/v1/namespaces/"+certificateNamespace+"/secrets/"+main_certs_name, b.Bytes())
 		return err
 	} else {
-		_, _, err = ingress.runtime.GenericRequest("post", "/api/v1/namespaces/" + certificateNamespace + "/secrets", b.Bytes())
+		_, _, err = ingress.runtime.GenericRequest("post", "/api/v1/namespaces/"+certificateNamespace+"/secrets", b.Bytes())
 		return err
 	}
 }
@@ -800,7 +797,7 @@ func (ingress *IstioIngress) GetInstalledCertificates(site string) ([]Certificat
 
 	main_server_name := strings.Replace(site, "*.", "star.", -1)
 	main_certs_name := strings.Replace(main_server_name, ".", "-", -1) + "-tls"
-	body, code, err := ingress.runtime.GenericRequest("get", "/api/v1/namespaces/" + certificateNamespace + "/secrets/" + main_certs_name, nil)
+	body, code, err := ingress.runtime.GenericRequest("get", "/api/v1/namespaces/"+certificateNamespace+"/secrets/"+main_certs_name, nil)
 
 	if err != nil {
 		return nil, err
@@ -810,7 +807,7 @@ func (ingress *IstioIngress) GetInstalledCertificates(site string) ([]Certificat
 	} else if code != http.StatusOK {
 		return nil, errors.New("Failure to lookup certificate: " + string(body))
 	}
-	var t kubernetesSecretTLS 
+	var t kubernetesSecretTLS
 	if err = json.Unmarshal(body, &t); err != nil {
 		return nil, err
 	}
@@ -818,7 +815,7 @@ func (ingress *IstioIngress) GetInstalledCertificates(site string) ([]Certificat
 	if err != nil {
 		return nil, err
 	}
-	x509_decoded_cert, _, _, err := DecodeCertificateBundle(site, pem_certs);
+	x509_decoded_cert, _, _, err := DecodeCertificateBundle(site, pem_certs)
 	if err != nil {
 		return nil, err
 	}
@@ -849,12 +846,12 @@ func (ingress *IstioIngress) GetInstalledCertificates(site string) ([]Certificat
 	}
 
 	return []Certificate{Certificate{
-		Type: certType,
-		Name: main_certs_name,
-		Expires: x509_decoded_cert.NotAfter.Unix(),
+		Type:         certType,
+		Name:         main_certs_name,
+		Expires:      x509_decoded_cert.NotAfter.Unix(),
 		Alternatives: altNames,
-		Expired: !x509_decoded_cert.NotAfter.Before(time.Now()),
-		Address: ingress.config.Address,
+		Expired:      !x509_decoded_cert.NotAfter.Before(time.Now()),
+		Address:      ingress.config.Address,
 	}}, nil
 }
 

@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
-	"net/http"
 	"github.com/nu7hatch/gouuid"
+	"net/http"
 	structs "region-api/structs"
 	utils "region-api/utils"
 )
@@ -73,7 +73,7 @@ func Createbindmap(db *sql.DB, spec structs.Bindmapspec, berr binding.Errors, r 
 		utils.ReportInvalidRequest("New name can not be blank", r)
 		return
 	}
-	
+
 	mapid, err := uuid.NewV4()
 	if err != nil {
 		utils.ReportError(err, r)
