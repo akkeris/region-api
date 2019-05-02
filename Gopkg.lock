@@ -267,6 +267,14 @@
   version = "v2.3.10"
 
 [[projects]]
+  digest = "1:d7258ee0bc1258f9cca20a8cacefee059127fa51b2399ee6bc2320f4428757f8"
+  name = "gopkg.in/guregu/null.v3"
+  packages = ["zero"]
+  pruneopts = "UT"
+  revision = "80515d440932108546bcade467bb7d6968e812e2"
+  version = "v3.4.0"
+
+[[projects]]
   digest = "1:2d1fbdc6777e5408cabeb02bf336305e724b925ff4546ded0fa8715a7267922a"
   name = "gopkg.in/inf.v0"
   packages = ["."]
@@ -309,6 +317,7 @@
     "github.com/robfig/cron",
     "github.com/smartystreets/goconvey/convey",
     "github.com/stackimpact/stackimpact-go",
+    "gopkg.in/guregu/null.v3/zero",
     "gopkg.in/mgo.v2",
     "gopkg.in/mgo.v2/bson",
   ]

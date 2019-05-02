@@ -92,3 +92,7 @@
 [prune]
   go-tests = true
   unused-packages = true
+
+[[constraint]]
+  name = "gopkg.in/guregu/null.v3"
+  version = "3.4.0"
