@@ -1,6 +1,10 @@
 package structs
 
-import "time"
+import (
+	"time"
+
+	"gopkg.in/guregu/null.v3/zero"
+)
 
 type CertificateOrder struct {
 	Id                      string   `json:"id,omitempty"`
@@ -463,9 +467,9 @@ type QoS struct {
 	Name        string       `json:"name"`
 	Resources   ResourceSpec `json:"resources"`
 	Price       int          `json:"price"`
-	Description string       `json:"description"`
+	Description zero.String  `json:"description"`
 	Deprecated  bool         `json:"deprecated"`
-	Type        string       `json:"type"`
+	Type        zero.String  `json:"type"`
 }
 
 type OneOffSpec struct {
