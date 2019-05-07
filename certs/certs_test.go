@@ -22,9 +22,9 @@ var pool *sql.DB
 func Server() *martini.ClassicMartini {
 	m := martini.Classic()
 	m.Use(render.Renderer())
-	m.Post("/v1/certs", binding.Json(structs.CertificateRequestSpec{}), CertificateRequest)
-	m.Get("/v1/certs", GetCerts)
-	m.Get("/v1/certs/:id", GetCertStatus)
+	m.Post("/v1/certs", binding.Json(structs.CertificateOrder{}), CreateCertificateOrder)
+	m.Get("/v1/certs", GetCertificateOrders)
+	m.Get("/v1/certs/:id", GetCertificateOrderStatus)
 	return m
 }
 
@@ -50,9 +50,9 @@ func TestHandlers(t *testing.T) {
 
 			})
 
-			var request structs.CertificateRequestSpec
-			request.CN = "apitest.example.com"
-			request.SAN = []string{"apitest.qa.example.com", "apitest.dev.example.com"}
+			var request structs.CertificateOrder
+			request.CommonName = "apitest.example.com"
+			request.SubjectAlternativeNames = []string{"apitest.qa.example.com", "apitest.dev.example.com"}
 			cr := new(bytes.Buffer)
 			if err := json.NewEncoder(cr).Encode(request); err != nil {
 				panic(err)
@@ -67,7 +67,7 @@ func TestHandlers(t *testing.T) {
 				w := httptest.NewRecorder()
 				m.ServeHTTP(w, r)
 				So(w.Code, ShouldEqual, http.StatusOK)
-				var certs []structs.CertificateRequestSpec
+				var certs []structs.CertificateOrder
 				decoder := json.NewDecoder(w.Body)
 				if err := decoder.Decode(&certs); err != nil {
 					panic(err)
@@ -75,8 +75,8 @@ func TestHandlers(t *testing.T) {
 				fmt.Println(certs)
 				var certid string
 				for _, cert := range certs {
-					if cert.CN == "apitest.example.com" {
-						certid = cert.ID
+					if cert.CommonName == "apitest.example.com" {
+						certid = cert.Id
 					}
 				}
 				fmt.Println("Cert ID is: " + certid)
@@ -86,13 +86,13 @@ func TestHandlers(t *testing.T) {
 					w := httptest.NewRecorder()
 					m.ServeHTTP(w, r)
 					So(w.Code, ShouldEqual, http.StatusOK)
-					var cert structs.CertificateRequestSpec
+					var cert structs.CertificateOrder
 					decoder := json.NewDecoder(w.Body)
 					if err := decoder.Decode(&cert); err != nil {
 						panic(err)
 					}
 					fmt.Println(cert)
-					So(cert.RequestStatus, ShouldEqual, "rejected")
+					So(cert.Status, ShouldEqual, "rejected")
 				})
 			})
 		})

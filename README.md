@@ -17,46 +17,41 @@ When you first run alamo-api on a brand new database it will create the necessar
 
 Ensure you've set the environment variables in the running section below.
 
-### Running
+## Running
+
+### Environment
 
 Set the following environment variables, if this is first time running it see the Setup section.
 
-* REGION - The region this region-api is running in, this should match the cloud providers definition of "region", e.g., us-west-2 for AWS Oregon Region.
-* DOMAIN_BLACKLIST - a comma delimited list of domains or regular expressions that should NOT be in the control of akkeris (region-api), this can be the provider id or domain name (provider id in aws is the hosted zone)
-* VAULT_ADDR - The https url for vault
-* VAULT_TOKEN - The vault token
-* VAULT_CERT_STORAGE - Temporary vault path where uncommited certificates may be stored. 
 * PITDB - A postgres database url formatted as postgres://user:pass@host:port/db
-* QUAY_PULL_SECRET
-* NAGIOS_ADDRESS
-* SUBSCRIPTION_URL
-* SECRETS - A comma delimited list of vault paths where shared credentials are stored
-* SERVICES - A comma delimited list of urls for open service brokers to use e.g., (https://user:pass@hostname/,https://:token@hostname/)
-* ALAMO_API_AUTH_SECRET
+* REGION - The region this region-api is running in, this should match the cloud providers definition of "region", e.g., us-west-2 for AWS Oregon Region.
+* IMAGE_PULL_SECRET - The path in vault for credentials when pulling images from the registry, if not needed, leave blank, see Image Pull Secret Format section for information how this should be formatted in vault.
+* ENABLE_AUTH - true or false value, set to false for tests
+* ALAMO_API_AUTH_SECRET - If ENABLE_AUTH is set to true, this is the path in vault to find the secret, if not needed, leave blank.
+* INTERNAL_DOMAIN - The internal domain e.g.., internalapps.example.com
+* EXTERNAL_DOMAIN - The internal domain e.g.., apps.example.com
+* ALAMO_URL_TEMPLATE - The template for external/public urls https://{name}-{space}.apps.example.com/
+* ALAMO_INTERNAL_URL_TEMPLATE - The template for internal/private urls https://{name}-{space}.internalapps.example.com/
+* NAGIOS_ADDRESS - The host to nagios to pull information on health of services.
+
+**Ingress Settings**
+
+* APPS_PUBLIC_INTERNAL=(see ingress format)
+* APPS_PUBLIC_EXTERNAL=(see ingress format)
+* APPS_PRIVATE_INTERNAL=(see ingress format)
+* SITES_PUBLIC_INTERNAL=(see ingress format)
+* SITES_PUBLIC_EXTERNAL=(see ingress format)
+* SITES_PRIVATE_INTERNAL=(see ingress format)
 * F5_SECRET - The path to the token or password in vault
 * F5_URL - The https URL of the F5 
-* F5_PARTITION - The external partition on the F5
-* F5_PARTITION_INTERNAL - The internal partition on the F5
-* F5_VIRTUAL - Public VIP name on the F5
-* F5_VIRTUAL_INTERNAL - Internal VIP name on the F5
-* FEATURE_DEFAULT_OCTHC - a true or false value to enable octhc feature
-* FEATURE_DEFAULT_OPSGENIE - a true or false value to enable opsgenie feature
-* ENABLE_AUTH - true or false value, set to false for tests
-* CERT_EMAIL - email address used when requesting new certificates
-* CERT_COUNTRY - the two letter country code used when requesting new certificates (e.g., US), all caps
-* CERT_PROVINCE - the state or province used when requesting new certificates
-* CERT_LOCALITY - the city or locality used when requested new certificates
-* CERT_ORG - the organization or company name used when requesting new certificates
-* CERT_ORG_UNIT - the organization unit or department name used when requesting new certificates
-* DIGICERT_REQUEST_URL - The digicert request url API
-* DIGICERT_SECRET - The vault path for the digicert token/login secret
-* DIGICERT_URL - The digicert url https://www.digicert.com/services/v2 
-* INTERNAL_DOMAIN - The internal domain e.g.., internalapps.example.com
-* PRIVATE_SNI_VIP - The public ip address for the F5 on the private network
-* PRIVATE_SNI_VIP_INTERNAL - The private ip address for the F5 on the private network
-* PUBLIC_SNI_VIP - The public IP address for the F5 on the public network
-* ALAMO_INTERNAL_URL_TEMPLATE - The template for internal/private urls https://{name}-{space}.internalapps.example.com/
-* ALAMO_URL_TEMPLATE - The template for external/public urls https://{name}-{space}.apps.example.com/
+* F5_UNIPOOL - When using the F5 in an ingress instruct it to use a single pool. See F5 Setup below for more information.
+* F5_CIPHER_LIST - The cipher list to use when creating TLS (SSL) client profiles, defaults to `!SSLv2:!SSLv3:!MD5:!EXPORT:!RSA+3DES:!RSA+RC4:!ECDHE+RC4:!ECDHE+3DES:ECDHE+AES:RSA+AES`
+
+If the apps or sites ingres uses an F5, the `F5_SECRET` and `F5_URL` should be set.  If using istio these may be left blank.
+
+**Broker Settings**
+
+* SERVICES - A comma delimited list of urls for open service brokers to use e.g., (https://user:pass@hostname/,https://:token@hostname/)
 * REDIS_BROKER_URL - todo, get brokers to register with alamo-api, otherwise this is the host of the broker
 * MEMCACHED_BROKER_URL - todo, get brokers to register with alamo-api, otherwise this is the host of the broker
 * RABBITMQ_BROKER_URL - todo, get brokers to register with alamo-api, otherwise this is the host of the broker
@@ -70,13 +65,47 @@ Set the following environment variables, if this is first time running it see th
 * CASSANDRA_BROKER_URL - cassandra database broker
 * KAFKA_BROKERS - The kafka brokers for this region
 
+**Vault Settings**
+
+* VAULT_ADDR - The https url for vault
+* VAULT_TOKEN - The vault token
+* VAULT_CERT_STORAGE - Temporary vault path where uncommited certificates may be stored. 
+* VAULT_PREFIX - The prefix to use for vault credentials injected as enviornment variables.
+* SECRETS - A comma delimited list of vault paths where shared credentials are stored
+
+**DigiCert Certificate Issuer**
+
+Note, if you're using digicert setting `DIGICERT_SECRET` will immediately pick DigiCert as the issuer type, and ignore certificate manager issuer settings.
+
+* DIGICERT_SECRET - The vault path for the digicert token/login secret
+* DIGICERT_REQUEST_URL - The digicert request url API
+* DIGICERT_URL - The digicert url https://www.digicert.com/services/v2 
+* CERT_EMAIL - DigiCert - email address used when requesting new certificates
+* CERT_COUNTRY -  DigiCert - the two letter country code used when requesting new certificates (e.g., US), all caps
+* CERT_PROVINCE -  DigiCert - the state or province used when requesting new certificates
+* CERT_LOCALITY -  DigiCert - the city or locality used when requested new certificates
+* CERT_ORG -  DigiCert - the organization or company name used when requesting new certificates
+* CERT_ORG_UNIT -  DigiCert - the organization unit or department name used when requesting new certificates
+* CERT_VALIDITY_YEARS=2 - The length of time certificates issued will last (in years).
+
+**Cert Manager Certificate Issuer**
+
+This uses jetstack's cert-manager (if installed) to issue certificates. Note above, you may only have the settings for digicert or cert manager set.  For example setting `DIGICERT_SECRET` will automatically pick it as the certificate issuer and these settings will be ignored.
+
+* CERTMANAGER_ISSUER_NAME - The cluster issuer name to use when requesting certificates. The issuer must be a cluster wide issuer.
+* CERTMANAGER_PROVIDER_NAME - The provider name to use when requesting certificates, this should match at least one provider in the cluster-wide issuer.
+* CERT_NAMESPACE - The namespace to store certificates.  This defaults to `istio-system` to make the certificates (and their secrets) mountable by istio. This has no affect on DigiCert Certificate Issuer as it stores its certificates in vault.
+
 **Optional Environment Variables:**
 
 * DEFAULT_STACK=ds1 - the name of the default stack. If none is specified it assumes the name ds1.
-* CERT_VALIDITY_YEARS=2 - The length of time certificates issued will last (in years).
 * REVISION_HISTORY_LIMIT=10 - the amount of revisions to keep in replica sets
 * LOGSHUTTLE_SERVICE_HOST, LOGSHUTTLE_SERVICE_PORT - where to find the logshuttle
 * LOGSESSION_SERVICE_HOST, LOGSESSION_SERVICE_PORT - where to find the logsession
+* DOMAIN_BLACKLIST - a comma delimited list of domains or regular expressions that should NOT be in the control of akkeris (region-api), this can be the provider id or domain name (provider id in aws is the hosted zone)
+* SUBSCRIPTION_URL
+* FEATURE_DEFAULT_OCTHC - a true or false value to enable octhc feature
+* FEATURE_DEFAULT_OPSGENIE - a true or false value to enable opsgenie feature
 
 **Debugging Environment Variables:**
 
@@ -90,6 +119,29 @@ Note that dependencies are managed via `dep` command line tool, run `dep ensure`
 $ docker build -t region-api .
 $ docker run -p 3000:3000 -e <see below> region-api
 ```
+
+### Ingress Formats
+
+f5://ip-address-of-ingress/partition/vip
+istio://host-of-ingress/namespace/ingress-gateway-name (its `istio` label on the deployment)
+
+### Image Pull Secret Formats
+
+ Image pull secrets should be held in vault (with the path in vault saved into the environment variable). The secret should have one key called "base64" which contains the base64 encoded JSON objecet in the format of `{"auths":{"registry.hostname.com":{"auth":"...base64authinfo..."},"email":""}}` the "auth" field should have a base64 encoded username:password. The other key should be "name" which contains the name of the secret, usually in the format of `registry.hostname.com-user`. See https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/#log-in-to-docker for an example of the JSON structure that should be base64 encoded and stored in the `base64` field.
+
+### F5 Setup
+
+***Pre-requisetes***
+
+You must have two partitions with two virtual devices on each partition. One for inside and one for outside. The virtual devices are for a application vs site ingresses (e.g, myapp.app.example.io and www.example.io). Each VIP should be configured with the following TLS cipher rules `!SSLv2:!SSLv3:!MD5:!EXPORT:!RSA+3DES:!RSA+RC4:!ECDHE+RC4:!ECDHE+3DES:ECDHE+AES:RSA+AES`.  They should be setup as SNI with a healthy default. Once established configrue the node-watcher and service-watcher apps then continue on to the unipool vs multirule setup below.
+
+*** Unipool vs. Multipool***
+
+The region api works by updating (and adding) ssl client profiles, irules and pools to the F5.  It can operate in two different modes. The multipool mode or unipool mode. The multipool creates a different pool of nodes + ports for each application, where as the unipool uses one pool of nodes and switches the port dynamically in the irule.  These operating modes can be flipped on and off by setting `F5_UNIPOOL` to any value. The service (and node) watcher app is responsible for creating and updating these pools dynamically, while the region api must update and attach the irules to the necessary VIPs. 
+
+For unipool mode you must have one pool named `unipool` with all nodes (kubernetes worker IP addresses) added to it.  The node watcher (when in unipool mode) will update the nodes in this pool automatically.
+
+For multi-pool (non-unipool) mode, both the service watcher and node watcher must not be set in unipool mode. This will create a single pool for each app. Non-unipool mode is not recommended as it does provide higher isolation and fault tolerance (in theory), in practice it has severly taxed the CPU and memory resources of an F5 load balancer.
 
 ## Testing
 

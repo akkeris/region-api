@@ -2,13 +2,13 @@ package app
 
 import (
 	"database/sql"
+	"fmt"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/render"
 	"net/http"
 	structs "region-api/structs"
 	utils "region-api/utils"
 	"strings"
-	"fmt"
 )
 
 func Unbindapp(db *sql.DB, params martini.Params, r render.Render) {

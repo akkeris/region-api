@@ -2,9 +2,9 @@ package app
 
 import (
 	"database/sql"
+	"github.com/go-martini/martini"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
-	"github.com/go-martini/martini"
 	"log"
 	"os"
 	config "region-api/config"
@@ -46,9 +46,9 @@ func GetServiceConfigVars(db *sql.DB, params martini.Params, r render.Render) {
 	appname := params["appname"]
 	bindtype := params["bindtype"]
 	bindname := params["bindname"]
-	
+
 	// add service vars
-	err, servicevars := service.GetServiceConfigVars(db, appname, space, []structs.Bindspec{structs.Bindspec{App:appname, Space:space, Bindtype:bindtype, Bindname:bindname}})
+	err, servicevars := service.GetServiceConfigVars(db, appname, space, []structs.Bindspec{structs.Bindspec{App: appname, Space: space, Bindtype: bindtype, Bindname: bindname}})
 	if err != nil {
 		utils.ReportError(err, r)
 		return
@@ -60,7 +60,7 @@ func GetServiceConfigVars(db *sql.DB, params martini.Params, r render.Render) {
 func GetAllConfigVars(db *sql.DB, params martini.Params, r render.Render) {
 	space := params["space"]
 	appname := params["appname"]
-	
+
 	var (
 		appport     int
 		instances   int

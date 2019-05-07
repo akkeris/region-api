@@ -1,6 +1,27 @@
 package structs
 
-import "time"
+import (
+	"time"
+
+	"gopkg.in/guregu/null.v3/zero"
+)
+
+type CertificateOrder struct {
+	Id                      string   `json:"id,omitempty"`
+	CommonName              string   `json:"common_name"`
+	SubjectAlternativeNames []string `json:"subject_alternative_names"`
+	Status                  string   `json:"status,omitempty"` // can be pending, approved, issued, rejected
+	Comment                 string   `json:"comment,omitempty"`
+	Requestor               string   `json:"requestor,omitempty"`
+	Issued                  string   `json:"issued,omitempty"`
+	Expires                 string   `json:"issued,omitempty"`
+}
+
+type Certificate struct {
+	Order       string `json:"order"`
+	Key         string `json:"key"`
+	Certificate string `json:"certificate"`
+}
 
 type Namespec struct {
 	Name string `json:"name"`
@@ -11,28 +32,21 @@ type KV struct {
 	Value string `json:"value"`
 }
 
-type Virtualspec struct {
-	Rules []string `json:"rules"`
-}
-
-type Rulespec struct {
-	Name         string `json:"name"`
-	Partition    string `json:"partition"`
-	ApiAnonymous string `json:"apiAnonymous"`
-}
-
 type Routerpathspec struct {
 	Domain      string `json:"domain"`
 	Path        string `json:"path"`
 	Space       string `json:"space"`
 	App         string `json:"app"`
 	ReplacePath string `json:"replacepath"`
+	Port        string `json:"port"`
 }
 
 type Routerspec struct {
-	Domain   string           `json:"domain"`
-	Internal bool             `json:"internal"`
-	Paths    []Routerpathspec `json:"paths"`
+	Domain          string           `json:"domain"`
+	Internal        bool             `json:"internal"`
+	VSNamespace     string           `json:"vsnamespace"`
+	ResourceVersion string           `json:"resourceVersion"`
+	Paths           []Routerpathspec `json:"paths"`
 }
 
 //Deployspec deployment spec
@@ -47,6 +61,7 @@ type Deployspec struct {
 
 type Features struct {
 	ServiceMesh bool `json:"serviceMesh,omitempty"`
+	IstioInject bool `json:"istioInject,omitempty"`
 }
 
 //Setspec setspec
@@ -155,8 +170,9 @@ type Esspec struct {
 
 //Rabbitmqspec  spec
 type Rabbitmqspec struct {
-	RabbitmqUrl string `json:"RABBITMQ_URL"`
-	Spec        string `json:"spec"`
+	RabbitmqUrl   string `json:"RABBITMQ_URL"`
+	RabbitmqUiUrl string `json:"RABBITMQUI_URL"`
+	Spec          string `json:"spec"`
 }
 
 //S3spec  spec
@@ -178,7 +194,7 @@ type Postgresspec struct {
 //Mongodbspec Postgres spec
 type Mongodbspec struct {
 	MongodbUrl string `json:"MONGODB_URL"`
-	Spec        string `json:"spec"`
+	Spec       string `json:"spec"`
 }
 
 //Auroramysqlspec mysql spec
@@ -198,20 +214,19 @@ type Neptunespec struct {
 }
 
 type Influxdbspec struct {
-        Name  string `json:"INFLUX_DB"`
-        Url   string `json:"INFLUX_URL"`
-        Username    string `json:"INFLUX_USERNAME"`
-        Password string `json:"INFLUX_PASSWORD"`
-        Spec               string `json:"spec"`
-
+	Name     string `json:"INFLUX_DB"`
+	Url      string `json:"INFLUX_URL"`
+	Username string `json:"INFLUX_USERNAME"`
+	Password string `json:"INFLUX_PASSWORD"`
+	Spec     string `json:"spec"`
 }
 
 type Cassandraspec struct {
-        Keyspace string `json:"CASSANDRA_KEYSPACE"`
-        Location string `json:"CASSANDRA_LOCATION"`
-        Password string `json:"CASSANDRA_PASSWORD"`
-        Username string `json:"CASSANDRA_USERNAME"`
-        Spec     string `json:"spec"`
+	Keyspace string `json:"CASSANDRA_KEYSPACE"`
+	Location string `json:"CASSANDRA_LOCATION"`
+	Password string `json:"CASSANDRA_PASSWORD"`
+	Username string `json:"CASSANDRA_USERNAME"`
+	Spec     string `json:"spec"`
 }
 
 type Deployment struct {
@@ -449,9 +464,12 @@ type ResourceSpec struct {
 }
 
 type QoS struct {
-	Name      string       `json:"name"`
-	Resources ResourceSpec `json:"resources"`
-	Price     int          `json:"price"`
+	Name        string       `json:"name"`
+	Resources   ResourceSpec `json:"resources"`
+	Price       int          `json:"price"`
+	Description zero.String  `json:"description"`
+	Deprecated  bool         `json:"deprecated"`
+	Type        zero.String  `json:"type"`
 }
 
 type OneOffSpec struct {
@@ -538,232 +556,18 @@ type Rules struct {
 	SelfLink string `json:"selfLink"`
 }
 
-type Rule struct {
-	Kind         string `json:"kind"`
-	Name         string `json:"name"`
-	Partition    string `json:"partition"`
-	FullPath     string `json:"fullPath"`
-	Generation   int    `json:"generation"`
-	SelfLink     string `json:"selfLink"`
-	APIAnonymous string `json:"apiAnonymous"`
-}
-
 type Switch struct {
 	Path        string
 	ReplacePath string
 	NewHost     string
 	Pool        string
-        Nodeport    string
-        Unipool     string
+	Nodeport    string
+	Unipool     string
 }
 
 type RuleInfo struct {
 	Domain   string
 	Switches []Switch
-}
-
-type CertificateRequest struct {
-	Response CertificateRequestResponseSpec `json:request`
-	ID       string                         `json:"id"`
-}
-
-type CertificateRequestResponseSpec struct {
-	ID       int `json:"id"`
-	Requests []struct {
-		ID     int    `json:"id"`
-		Status string `json:"status"`
-	} `json:"requests"`
-}
-
-type CertificateRequestObject struct {
-	ID            int       `json:"id"`
-	Date          time.Time `json:"date"`
-	Type          string    `json:"type"`
-	Status        string    `json:"status"`
-	DateProcessed time.Time `json:"date_processed"`
-	Requester     struct {
-		ID        int    `json:"id"`
-		FirstName string `json:"first_name"`
-		LastName  string `json:"last_name"`
-		Email     string `json:"email"`
-	} `json:"requester"`
-	Processor struct {
-		ID        int    `json:"id"`
-		FirstName string `json:"first_name"`
-		LastName  string `json:"last_name"`
-		Email     string `json:"email"`
-	} `json:"processor"`
-	Order struct {
-		ID          int `json:"id"`
-		Certificate struct {
-			ID           int       `json:"id"`
-			CommonName   string    `json:"common_name"`
-			DNSNames     []string  `json:"dns_names"`
-			DateCreated  time.Time `json:"date_created"`
-			Csr          string    `json:"csr"`
-			Organization struct {
-				ID      int    `json:"id"`
-				Name    string `json:"name"`
-				City    string `json:"city"`
-				State   string `json:"state"`
-				Country string `json:"country"`
-			} `json:"organization"`
-			ServerPlatform struct {
-				ID         int    `json:"id"`
-				Name       string `json:"name"`
-				InstallURL string `json:"install_url"`
-				CsrURL     string `json:"csr_url"`
-			} `json:"server_platform"`
-			SignatureHash string `json:"signature_hash"`
-			KeySize       int    `json:"key_size"`
-			CaCert        struct {
-				ID   string `json:"id"`
-				Name string `json:"name"`
-			} `json:"ca_cert"`
-		} `json:"certificate"`
-		Status       string    `json:"status"`
-		IsRenewal    bool      `json:"is_renewal"`
-		DateCreated  time.Time `json:"date_created"`
-		Organization struct {
-			ID      int    `json:"id"`
-			Name    string `json:"name"`
-			City    string `json:"city"`
-			State   string `json:"state"`
-			Country string `json:"country"`
-		} `json:"organization"`
-		ValidityYears               int  `json:"validity_years"`
-		DisableRenewalNotifications bool `json:"disable_renewal_notifications"`
-		AutoRenew                   int  `json:"auto_renew"`
-		Container                   struct {
-			ID   int    `json:"id"`
-			Name string `json:"name"`
-		} `json:"container"`
-		Product struct {
-			NameID                string `json:"name_id"`
-			Name                  string `json:"name"`
-			Type                  string `json:"type"`
-			ValidationType        string `json:"validation_type"`
-			ValidationName        string `json:"validation_name"`
-			ValidationDescription string `json:"validation_description"`
-		} `json:"product"`
-		OrganizationContact struct {
-			FirstName string `json:"first_name"`
-			LastName  string `json:"last_name"`
-			Email     string `json:"email"`
-			JobTitle  string `json:"job_title"`
-			Telephone string `json:"telephone"`
-		} `json:"organization_contact"`
-		TechnicalContact struct {
-			FirstName string `json:"first_name"`
-			LastName  string `json:"last_name"`
-			Email     string `json:"email"`
-			JobTitle  string `json:"job_title"`
-			Telephone string `json:"telephone"`
-		} `json:"technical_contact"`
-		User struct {
-			ID        int    `json:"id"`
-			FirstName string `json:"first_name"`
-			LastName  string `json:"last_name"`
-			Email     string `json:"email"`
-		} `json:"user"`
-		Requests []struct {
-			ID       int       `json:"id"`
-			Date     time.Time `json:"date"`
-			Type     string    `json:"type"`
-			Status   string    `json:"status"`
-			Comments string    `json:"comments"`
-		} `json:"requests"`
-		CsProvisioningMethod string `json:"cs_provisioning_method"`
-		ShipInfo             struct {
-			Name    string `json:"name"`
-			Addr1   string `json:"addr1"`
-			Addr2   string `json:"addr2"`
-			City    string `json:"city"`
-			State   string `json:"state"`
-			Zip     int    `json:"zip"`
-			Country string `json:"country"`
-			Method  string `json:"method"`
-		} `json:"ship_info"`
-	} `json:"order"`
-	Comments         string `json:"comments"`
-	ProcessorComment string `json:"processor_comment"`
-}
-
-type CertificateRequestSpec struct {
-	ID            string   `json:"id"`
-	Comment       string   `json:"comment,omitempty"`
-	CN            string   `json:"cn"`
-	SAN           []string `json:"san"`
-	Key           string   `json:"key,omitempty"`
-	CSR           string   `json:"csr,omitempty"`
-	Request       string   `json:"request,omitempty"`
-	Requestedby   string   `json:"requestedby,omitempty"`
-	Requesteddate string   `json:"requesteddate,omitempty"`
-	RequestStatus string   `json:"requeststatus,omitempty"`
-	Order         string   `json:"order,omitempty"`
-	OrderStatus   string   `json:"orderstatus,omitempty"`
-	Installed     bool     `json:"installed,omitempty"`
-	Installeddate string   `json:"installeddate,omitempty"`
-	ValidFrom     string   `json:"validfrom,omitempty"`
-	ValidTo       string   `json:"validto,omitempty"`
-	VIP           string   `json:"vip,omitempty"`
-	SignatureHash string   `json:"signature,omitempty"`
-}
-
-type DigicertRequest struct {
-	Certificate struct {
-		CommonName        string   `json:"common_name"`
-		DNSNames          []string `json:"dns_names,omitempty"`
-		Csr               string   `json:"csr"`
-		OrganizationUnits []string `json:"organization_units"`
-		ServerPlatform    struct {
-			ID int `json:"id"`
-		} `json:"server_platform"`
-		SignatureHash string `json:"signature_hash"`
-	} `json:"certificate"`
-	Organization struct {
-		ID int `json:"id"`
-	} `json:"organization"`
-	ValidityYears int    `json:"validity_years"`
-	Comments      string `json:"comments,omitempty"`
-}
-
-type OrderList struct {
-	Orders []struct {
-		ID          int `json:"id"`
-		Certificate struct {
-			ID            int      `json:"id"`
-			CommonName    string   `json:"common_name"`
-			DNSNames      []string `json:"dns_names"`
-			ValidTill     string   `json:"valid_till"`
-			SignatureHash string   `json:"signature_hash"`
-		} `json:"certificate"`
-		Status       string    `json:"status"`
-		IsRenewed    bool      `json:"is_renewed"`
-		DateCreated  time.Time `json:"date_created"`
-		Organization struct {
-			ID   int    `json:"id"`
-			Name string `json:"name"`
-		} `json:"organization"`
-		ValidityYears int `json:"validity_years"`
-		Container     struct {
-			ID   int    `json:"id"`
-			Name string `json:"name"`
-		} `json:"container"`
-		Product struct {
-			NameID string `json:"name_id"`
-			Name   string `json:"name"`
-			Type   string `json:"type"`
-		} `json:"product"`
-		HasDuplicates bool   `json:"has_duplicates"`
-		Price         int    `json:"price"`
-		ProductNameID string `json:"product_name_id"`
-	} `json:"orders"`
-	Page struct {
-		Total  int `json:"total"`
-		Limit  int `json:"limit"`
-		Offset int `json:"offset"`
-	} `json:"page"`
 }
 
 type EnvVar struct {
@@ -809,38 +613,6 @@ type Secret struct {
 	SecretName string `json:"secretName,omitempty"`
 }
 
-type OrderSpec struct {
-	ID          int `json:"id"`
-	Certificate struct {
-		ID           int       `json:"id"`
-		Thumbprint   string    `json:"thumbprint"`
-		SerialNumber string    `json:"serial_number"`
-		CommonName   string    `json:"common_name"`
-		DNSNames     []string  `json:"dns_names"`
-		DateCreated  time.Time `json:"date_created"`
-		ValidFrom    string    `json:"valid_from"`
-		ValidTill    string    `json:"valid_till"`
-		Csr          string    `json:"csr"`
-		Organization struct {
-			ID int `json:"id"`
-		} `json:"organization"`
-		OrganizationUnits []string `json:"organization_units"`
-		ServerPlatform    struct {
-			ID         int    `json:"id"`
-			Name       string `json:"name"`
-			InstallURL string `json:"install_url"`
-			CsrURL     string `json:"csr_url"`
-		} `json:"server_platform"`
-		SignatureHash string `json:"signature_hash"`
-		KeySize       int    `json:"key_size"`
-		CaCert        struct {
-			ID   string `json:"id"`
-			Name string `json:"name"`
-		} `json:"ca_cert"`
-	} `json:"certificate"`
-	Status string `json:"status"`
-}
-
 type KubeNodeItems struct {
 	Metadata struct {
 		Name string `json:"name"`
@@ -868,57 +640,56 @@ type URLTemplates struct {
 	External string `json:"external"`
 }
 
-
 type KafkaTopic struct {
 	Topic struct {
-		Name         string `json:"name"`
-		Config       struct {
-		    Name          string `json:"name"`
+		Name   string `json:"name"`
+		Config struct {
+			Name          string `json:"name"`
 			Cleanuppolicy string `json:"cleanup.policy,omitempty"`
-			Partitions    *int    `json:"partitions,omitempty"`
-			Retentionms   *int    `json:"retention.ms,omitempty"`
-			Replicas      *int    `json:"replicas,omitempty"`
+			Partitions    *int   `json:"partitions,omitempty"`
+			Retentionms   *int   `json:"retention.ms,omitempty"`
+			Replicas      *int   `json:"replicas,omitempty"`
 		} `json:"config"`
 	} `json:"topic"`
 }
 
 type KafkaAclCredentials struct {
-    AclCredentials struct {
-        Username   string `json:"username"`
-    } `json:"aclCredentials"`
+	AclCredentials struct {
+		Username string `json:"username"`
+	} `json:"aclCredentials"`
 }
 
 type Kafkaspec struct {
-    Spec string `json:"spec"`
+	Spec string `json:"spec"`
 }
 
 type TopicSchemaMapping struct {
-    Topic         string `json:"topic"`
-    Schema        struct {
-        Name      string `json:"name"`
-    } `json:"schema"`
+	Topic  string `json:"topic"`
+	Schema struct {
+		Name string `json:"name"`
+	} `json:"schema"`
 }
 
 type TopicKeyMapping struct {
-    Topic         string `json:"topic"`
-    KeyType       string `json:"keyType"`
-    Schema        *struct {
-        Name      string `json:"name"`
-    } `json:"schema,omitempty"`
+	Topic   string `json:"topic"`
+	KeyType string `json:"keyType"`
+	Schema  *struct {
+		Name string `json:"name"`
+	} `json:"schema,omitempty"`
 }
 
 type AclRequest struct {
-    Topic         string `json:"topic"`
-    User          string `json:"user,omitempty"`
-    Space         string `json:"space"`
-    Appname       string `json:"app"`
-    Role          string `json:"role"`
-    ConsumerGroupName string `json:"consumerGroupName,omitempty"`
+	Topic             string `json:"topic"`
+	User              string `json:"user,omitempty"`
+	Space             string `json:"space"`
+	Appname           string `json:"app"`
+	Role              string `json:"role"`
+	ConsumerGroupName string `json:"consumerGroupName,omitempty"`
 }
 
 type KafkaConsumerGroupSeekRequest struct {
-    Topic         string `json:"topic"`
-    Partitions    []int  `json:"partitions,omitempty"`
-    SeekTo        string `json:"seekTo"`
-    AllPartitions bool   `json:"allPartitions,omitempty"`
+	Topic         string `json:"topic"`
+	Partitions    []int  `json:"partitions,omitempty"`
+	SeekTo        string `json:"seekTo"`
+	AllPartitions bool   `json:"allPartitions,omitempty"`
 }

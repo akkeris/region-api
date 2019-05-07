@@ -10,7 +10,7 @@
   revision = "6788ec8d19257929fbc71552b5e015a6a9d515ec"
 
 [[projects]]
-  digest = "1:567d05fa1340f5364b4cb1ffbb006c66e04cebc95dfe87316ed509ddf96c7977"
+  digest = "1:e08407fa92753265eb8eb9169851e2dddac2b280f8f6bef1ff58c08ecf36f9a1"
   name = "github.com/aws/aws-sdk-go"
   packages = [
     "aws",
@@ -89,7 +89,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:45be312094ed57afedb4871fe8c2f3d64c5f9d2f6b25e1e6eec00b2be23f602b"
+  digest = "1:7a8e0f3e6962bfd8dc3b2f0395960cd36f32eb94ec7220cf7f6a2cd18bf02e59"
   name = "github.com/gocql/gocql"
   packages = [
     ".",
@@ -148,15 +148,15 @@
   revision = "0b12d6b5"
 
 [[projects]]
-  digest = "1:1e15f4e455f94aeaedfcf9c75b3e1c449b5acba1551c58446b4b45be507c707b"
+  digest = "1:4b63210654b1f2b664f74ec434a1bb1cb442b3d75742cc064a10808d1cca6361"
   name = "github.com/jtolds/gls"
   packages = ["."]
   pruneopts = "UT"
-  revision = "77f18212c9c7edc9bd6a33d383a7b545ce62f064"
-  version = "v4.2.1"
+  revision = "b4936e06046bbecbb94cae9c18127ebe510a2cb9"
+  version = "v4.20"
 
 [[projects]]
-  digest = "1:b8ce08d470e11c14084572e7a83e2d91b835c357999a157c1fe94d6538f6fcce"
+  digest = "1:8ef506fc2bb9ced9b151dafa592d4046063d744c646c1bbe801982ce87e4bc24"
   name = "github.com/lib/pq"
   packages = [
     ".",
@@ -231,7 +231,7 @@
   version = "v1.1"
 
 [[projects]]
-  digest = "1:12f4e78cd664ec46c74735379f07d35b4fbc9b55e74c2c565009143c87581cc4"
+  digest = "1:cc1c574c9cb5e99b123888c12b828e2d19224ab6c2244bda34647f230bf33243"
   name = "github.com/smartystreets/assertions"
   packages = [
     ".",
@@ -243,7 +243,7 @@
   version = "1.8.3"
 
 [[projects]]
-  digest = "1:52fe67b62ac538e99a684af3691946fffde2de8683f2a934cf239f53fb96e2c2"
+  digest = "1:a3e081e593ee8e3b0a9af6a5dcac964c67a40c4f2034b5345b2ad78d05920728"
   name = "github.com/smartystreets/goconvey"
   packages = [
     "convey",
@@ -255,7 +255,7 @@
   version = "1.6.3"
 
 [[projects]]
-  digest = "1:713837454a1bc1872aa67934760e796874b1dc4cd15ab536cf604fd4262544d0"
+  digest = "1:e7971bcafd2257eaf2eb0a7f40c89d73c5ed736ddd34b833590d4787ae148c20"
   name = "github.com/stackimpact/stackimpact-go"
   packages = [
     ".",
@@ -267,6 +267,14 @@
   version = "v2.3.10"
 
 [[projects]]
+  digest = "1:d7258ee0bc1258f9cca20a8cacefee059127fa51b2399ee6bc2320f4428757f8"
+  name = "gopkg.in/guregu/null.v3"
+  packages = ["zero"]
+  pruneopts = "UT"
+  revision = "80515d440932108546bcade467bb7d6968e812e2"
+  version = "v3.4.0"
+
+[[projects]]
   digest = "1:2d1fbdc6777e5408cabeb02bf336305e724b925ff4546ded0fa8715a7267922a"
   name = "gopkg.in/inf.v0"
   packages = ["."]
@@ -276,7 +284,7 @@
 
 [[projects]]
   branch = "v2"
-  digest = "1:29bf5c8251ed1689ddb48fa672d6154694cd4a43975e69f151507e67071e3741"
+  digest = "1:988de7520a09024d5d94cd99bd545afbf194893994ec759b1cda0a0bbb6adb80"
   name = "gopkg.in/mgo.v2"
   packages = [
     ".",
@@ -309,6 +317,7 @@
     "github.com/robfig/cron",
     "github.com/smartystreets/goconvey/convey",
     "github.com/stackimpact/stackimpact-go",
+    "gopkg.in/guregu/null.v3/zero",
     "gopkg.in/mgo.v2",
     "gopkg.in/mgo.v2/bson",
   ]

@@ -139,7 +139,7 @@ func GetBindings(db *sql.DB, space string, app string) (configset string, servic
 			configset = bindname
 		}
 		if bindtype != "config" {
-			services = append(services, structs.Bindspec{App:app, Space:space, Bindtype:bindtype, Bindname:bindname})
+			services = append(services, structs.Bindspec{App: app, Space: space, Bindtype: bindtype, Bindname: bindname})
 		}
 	}
 	err = rows.Err()

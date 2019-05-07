@@ -83,7 +83,7 @@ func TestInfluxService(t *testing.T) {
 					results, err := hitInfluxDB(influxdb.Url, influxdb.Name, influxdb.Username, influxdb.Password)
 					fmt.Println(err)
 					fmt.Println(results)
-                                        So(err, ShouldBeNil)
+					So(err, ShouldBeNil)
 					So(results, ShouldEqual, "{\"results\":[{\"statement_id\":0}]}\n")
 					Convey("When we want to remove a database\n", func() {
 						r, _ := http.NewRequest("DELETE", "/v1/service/influxdb/instance/"+influxdbname, nil)

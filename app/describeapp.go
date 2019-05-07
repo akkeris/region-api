@@ -2,13 +2,13 @@ package app
 
 import (
 	"database/sql"
+	"fmt"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/render"
 	"net/http"
 	runtime "region-api/runtime"
 	structs "region-api/structs"
 	utils "region-api/utils"
-	"fmt"
 )
 
 func Getbindmaps(db *sql.DB, params martini.Params, r render.Render) {
@@ -37,7 +37,7 @@ func Getbindmaps(db *sql.DB, params martini.Params, r render.Render) {
 			utils.ReportError(err, r)
 			return
 		}
-		configvarmaps = append(configvarmaps, structs.Bindmapspec{App:appname, Space:space, Bindtype:bindtype, Bindname:bindname, Action:action, VarName:varname, NewName:newname, Id:mapid})
+		configvarmaps = append(configvarmaps, structs.Bindmapspec{App: appname, Space: space, Bindtype: bindtype, Bindname: bindname, Action: action, VarName: varname, NewName: newname, Id: mapid})
 	}
 	r.JSON(http.StatusOK, configvarmaps)
 }

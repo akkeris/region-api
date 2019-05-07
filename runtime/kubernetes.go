@@ -135,6 +135,16 @@ func (rt Kubernetes) k8sRequest(method string, path string, payload interface{})
 	return &KubeRequest{Body: respBody, Status: resp.Status, StatusCode: resp.StatusCode}, nil
 }
 
+// This is external to provide functionality for specific types of systems (istio for example)
+// can make requests, rather than using k8s we use this as its more generic
+func (rt Kubernetes) GenericRequest(method string, path string, payload interface{}) ([]byte, int, error) {
+	req, err := rt.k8sRequest(method, path, payload)
+	if err != nil {
+		return []byte{}, 0, err
+	}
+	return req.Body, req.StatusCode, nil
+}
+
 func (rt Kubernetes) Scale(space string, app string, amount int) (e error) {
 	if space == "" {
 		return errors.New("FATAL ERROR: Unable to scale app, space is blank.")
@@ -195,153 +205,6 @@ func deploymentToDeploymentSpec(deployment *structs.Deployment) (dp Deploymentsp
 
 	var krc Deploymentspec
 
-	//Check for ServiceMesh
-	if deployment.Features.ServiceMesh {
-
-		var c2 ContainerItem
-		var ic ContainerItem
-
-		// Add Metadata
-		krc.Spec.Metadata.Annotations.SidecarIstioIOStatus = "{\"version\":\"55c9e544b52e1d4e45d18a58d0b34ba4b72531e45fb6d1572c77191422556ffc\",\"initContainers\":[\"istio-init\"],\"containers\":[\"istio-proxy\"],\"volumes\":[\"istio-envoy\",\"istio-certs\"],\"imagePullSecrets\":null}"
-
-		// Istio Proxy
-		c2.Name = "istio-proxy"
-		c2.Image = "docker.io/istio/proxyv2:0.8.0"
-		c2.Args = []string{
-			"proxy",
-			"sidecar",
-			"--configPath",
-			"/etc/istio/proxy",
-			"--binaryPath",
-			"/usr/local/bin/envoy",
-			"--serviceCluster",
-			deployment.App,
-			"--drainDuration",
-			"45s",
-			"--parentShutdownDuration",
-			"1m0s",
-			"--discoveryAddress",
-			"istio-pilot.istio-system:15007",
-			"--discoveryRefreshDelay",
-			"10s",
-			"--zipkinAddress",
-			"zipkin.istio-system:9411",
-			"--connectTimeout",
-			"10s",
-			"--statsdUdpAddress",
-			"istio-statsd-prom-bridge.istio-system:9125",
-			"--proxyAdminPort",
-			"15000",
-			"--controlPlaneAuthPolicy",
-			"NONE",
-		}
-
-		envList := []structs.EnvVar{
-			structs.EnvVar{
-				Name: "POD_NAME",
-				ValueFrom: &structs.ValueFrom{
-					FieldRef: structs.FieldRef{
-						FieldPath: "metadata.name",
-					},
-				},
-			},
-			structs.EnvVar{
-				Name: "POD_NAMESPACE",
-				ValueFrom: &structs.ValueFrom{
-					FieldRef: structs.FieldRef{
-						FieldPath: "metadata.namespace",
-					},
-				},
-			},
-			structs.EnvVar{
-				Name: "INSTANCE_IP",
-				ValueFrom: &structs.ValueFrom{
-					FieldRef: structs.FieldRef{
-						FieldPath: "status.podIP",
-					},
-				},
-			},
-			structs.EnvVar{
-				Name:  "ISTIO_META_POD_NAME",
-				Value: "REDIRECT",
-			},
-			structs.EnvVar{
-				Name: "ISTIO_META_POD_NAME",
-				ValueFrom: &structs.ValueFrom{
-					FieldRef: structs.FieldRef{
-						FieldPath: "metadata.name",
-					},
-				},
-			},
-		}
-		c2.Env = envList
-
-		c2.VolumeMounts = []structs.VolumeMounts{
-			structs.VolumeMounts{
-				Name:      "istio-envoy",
-				MountPath: "/etc/istio/proxy",
-			},
-			structs.VolumeMounts{
-				Name:      "istio-certs",
-				MountPath: "/etc/certs/",
-				ReadOnly:  true,
-			},
-		}
-
-		c2.SecurityContext.Privileged = false
-		c2.SecurityContext.ReadOnlyRootFilesystem = true
-		c2.SecurityContext.RunAsUser = 1337
-
-		clist = append(clist, c2)
-
-		// Istio Init
-		ic.Name = "istio-init"
-		ic.Image = "docker.io/istio/proxy_init:0.8.0"
-		ic.Args = []string{
-			"-p",
-			"15001",
-			"-u",
-			"1337",
-			"-m",
-			"REDIRECT",
-			"-i",
-			"10.2.0.0/16,10.3.0.0/16",
-			"-x",
-			"",
-			"-b",
-			"9080",
-			"-d",
-			"",
-		}
-
-		ic.SecurityContext.Capabilities.Add = []string{"NET_ADMIN"}
-		ic.SecurityContext.Privileged = true
-
-		krc.Spec.Template.Spec.InitContainers = &[]ContainerItem{
-			ic,
-		}
-		krc.Spec.Selector.MatchLabels.App = deployment.App
-		krc.Spec.Selector.MatchLabels.Version = "v1"
-		// Volumes
-		krc.Spec.Template.Spec.Volumes = &[]structs.Volumes{
-			structs.Volumes{
-				Name: "istio-envoy",
-				EmptyDir: &structs.EmptyDir{
-					Medium: "Memory",
-				},
-			},
-			structs.Volumes{
-				Name: "istio-certs",
-				Secret: &structs.Secret{
-					Optional:   true,
-					SecretName: "istio.default",
-				},
-			},
-		}
-	}
-
-	// Assemble kubernetes deployme, appname, space, instances, revisionhistorylimit, secrets, containers
-
 	krc.Metadata.Name = deployment.App
 	krc.Metadata.Namespace = deployment.Space
 	krc.Spec.Replicas = deployment.Amount
@@ -353,12 +216,15 @@ func deploymentToDeploymentSpec(deployment *structs.Deployment) (dp Deploymentsp
 	krc.Spec.Template.Metadata.Labels.App = deployment.App
 	krc.Spec.Template.Metadata.Labels.Version = "v1"
 
+	if os.Getenv("FF_ISTIOINJECT") == "true" || deployment.Features.IstioInject {
+		krc.Spec.Template.Metadata.Annotations.SidecarIstioIoInject = "true"
+	}
+
 	krc.Spec.Strategy.RollingUpdate.MaxUnavailable = 0
 	krc.Spec.Template.Spec.ImagePullSecrets = deployment.Secrets
 	krc.Spec.Template.Spec.Containers = clist
 	krc.Spec.Template.Spec.ImagePullPolicy = "Always"
 	krc.Spec.Template.Spec.TerminationGracePeriodSeconds = 60
-	// krc.Spec.Template.Spec.DnsPolicy = "Default"
 
 	return krc
 }
@@ -372,7 +238,9 @@ func (rt Kubernetes) UpdateDeployment(deployment *structs.Deployment) (err error
 	}
 
 	// Assemble secrets
-	deployment.Secrets = append(deployment.Secrets, structs.Namespec{Name:rt.imagePullSecret})
+	if os.Getenv("FF_QUAY") == "true" || os.Getenv("IMAGE_PULL_SECRET") != "" {
+		deployment.Secrets = append(deployment.Secrets, structs.Namespec{Name: rt.imagePullSecret})
+	}
 
 	resp, err := rt.k8sRequest("PUT", "/apis/extensions/v1beta1/namespaces/"+deployment.Space+"/deployments/"+deployment.App,
 		deploymentToDeploymentSpec(deployment))
@@ -388,7 +256,9 @@ func (rt Kubernetes) UpdateDeployment(deployment *structs.Deployment) (err error
 func (rt Kubernetes) CreateDeployment(deployment *structs.Deployment) (err error) {
 
 	// Assemble secrets
-	deployment.Secrets = append(deployment.Secrets, structs.Namespec{Name:rt.imagePullSecret})
+	if os.Getenv("FF_QUAY") == "true" || os.Getenv("IMAGE_PULL_SECRET") != "" {
+		deployment.Secrets = append(deployment.Secrets, structs.Namespec{Name: rt.imagePullSecret})
+	}
 	resp, err := rt.k8sRequest("POST", "/apis/extensions/v1beta1/namespaces/"+deployment.Space+"/deployments", deploymentToDeploymentSpec(deployment))
 	if err != nil {
 		return err
@@ -594,7 +464,9 @@ func (rt Kubernetes) CreateOneOffPod(deployment *structs.Deployment) (e error) {
 		return errors.New("FATAL ERROR: Unable to create one off deployment, the app is blank.")
 	}
 	// Assemble secrets
-	deployment.Secrets = append(deployment.Secrets, structs.Namespec{Name:rt.imagePullSecret})
+	if os.Getenv("FF_QUAY") == "true" || os.Getenv("IMAGE_PULL_SECRET") != "" {
+		deployment.Secrets = append(deployment.Secrets, structs.Namespec{Name: rt.imagePullSecret})
+	}
 
 	var koneoff OneOffPod
 	koneoff.Metadata.Name = deployment.App
@@ -1064,8 +936,9 @@ func (rt Kubernetes) CreateCronJob(deployment *structs.Deployment) (*structs.Cro
 		return nil, errors.New("FATAL ERROR: Unable to create cronjob, space is blank.")
 	}
 
-	// Image Secret
-	deployment.Secrets = append(deployment.Secrets, structs.Namespec{Name:rt.imagePullSecret})
+	if os.Getenv("FF_QUAY") == "true" || os.Getenv("IMAGE_PULL_SECRET") != "" {
+		deployment.Secrets = append(deployment.Secrets, structs.Namespec{Name: rt.imagePullSecret})
+	}
 
 	// Update or Create Job
 	resp, err := rt.k8sRequest("post", "/apis/batch/v2alpha1/namespaces/"+deployment.Space+"/cronjobs", deploymentToCronJob(deployment))
@@ -1090,9 +963,10 @@ func (rt Kubernetes) UpdateCronJob(deployment *structs.Deployment) (*structs.Cro
 	if deployment.App == "" {
 		return nil, errors.New("FATAL ERROR: Unable to update cron job, the app is blank.")
 	}
-	
-	// Image Secret
-	deployment.Secrets = append(deployment.Secrets, structs.Namespec{Name:rt.imagePullSecret})
+
+	if os.Getenv("FF_QUAY") == "true" || os.Getenv("IMAGE_PULL_SECRET") != "" {
+		deployment.Secrets = append(deployment.Secrets, structs.Namespec{Name: rt.imagePullSecret})
+	}
 
 	resp, err := rt.k8sRequest("put", "/apis/batch/v2alpha1/namespaces/"+deployment.Space+"/cronjobs/"+deployment.App, deploymentToCronJob(deployment))
 	if err != nil {
@@ -1116,9 +990,11 @@ func (rt Kubernetes) CreateJob(deployment *structs.Deployment) (*structs.JobStat
 	if deployment.App == "" {
 		return nil, errors.New("FATAL ERROR: Unable to create job, the job name is blank.")
 	}
-	
+
 	// Image Secret
-	deployment.Secrets = append(deployment.Secrets, structs.Namespec{Name:rt.imagePullSecret})
+	if os.Getenv("FF_QUAY") == "true" || os.Getenv("IMAGE_PULL_SECRET") != "" {
+		deployment.Secrets = append(deployment.Secrets, structs.Namespec{Name: rt.imagePullSecret})
+	}
 
 	var resources structs.ResourceSpec
 	resources.Requests.Memory = deployment.MemoryRequest
@@ -1127,6 +1003,7 @@ func (rt Kubernetes) CreateJob(deployment *structs.Deployment) (*structs.JobStat
 	var container ContainerItem
 	container.Name = deployment.App
 	container.Image = deployment.Image + ":" + deployment.Tag
+	container.ImagePullPolicy = "Always"
 	container.ImagePullSecrets = deployment.Secrets
 	container.Env = deployment.ConfigVars
 	container.Resources = resources

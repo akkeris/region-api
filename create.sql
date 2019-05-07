@@ -217,7 +217,7 @@ begin
         INSERT INTO public.plans (name, memrequest, memlimit, price, "description") 
             VALUES ('akira', '768Mi', '1024Mi', 30, '768MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking');
         INSERT INTO public.plans (name, memrequest, memlimit, price, "description") 
-            VALUES ('akria-prod', '1024Mi', '1024Mi', 35, '1024MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking');
+            VALUES ('akira-prod', '1024Mi', '1024Mi', 35, '1024MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking');
         INSERT INTO public.plans (name, memrequest, memlimit, price, "description") 
             VALUES ('galaxy', '1024Mi', '1536Mi', 40, '1024MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking');
         INSERT INTO public.plans (name, memrequest, memlimit, price, "description") 
@@ -225,7 +225,7 @@ begin
         INSERT INTO public.plans (name, memrequest, memlimit, price, "description") 
             VALUES ('sovereign', '1536Mi', '2048Mi', 50, '1536MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking');
         INSERT INTO public.plans (name, memrequest, memlimit, price, "description") 
-            VALUES ('sovereign-prod', '2048Mi', '2048Mi', '2048MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking');
+            VALUES ('sovereign-prod', '2048Mi', '2048Mi', 55, '2048MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking');
     end if;
 
     if (select count(*) from plans where name = 'scout' and description is null) > 0 then

@@ -1,30 +1,30 @@
 package service
 
 import (
-	"time"
+	"database/sql"
 	"errors"
+	"github.com/go-martini/martini"
+	"github.com/martini-contrib/binding"
+	"github.com/martini-contrib/render"
+	osb "github.com/pmorie/go-open-service-broker-client/v2"
+	"log"
 	"net/http"
 	"net/http/httputil"
-	utils "region-api/utils"
-	osb "github.com/pmorie/go-open-service-broker-client/v2"
-	"github.com/go-martini/martini"
-	"github.com/martini-contrib/render"
-	"github.com/martini-contrib/binding"
 	"net/url"
-	"log"
-	"database/sql"
+	utils "region-api/utils"
+	"time"
 )
 
 type providerInfo struct {
 	serviceUrl string
-	client osb.Client
-	services []osb.Service
+	client     osb.Client
+	services   []osb.Service
 }
 
 type OSBClientServices struct {
 	providersCache []providerInfo
-	serviceUrls []string
-	db *sql.DB
+	serviceUrls    []string
+	db             *sql.DB
 }
 
 type BindResource struct {
@@ -34,7 +34,7 @@ type BindResource struct {
 type BindRequestBody struct {
 	ServiceID    string                 `json:"service_id"`
 	PlanID       string                 `json:"plan_id"`
-	BindResource *BindResource 			`json:"bind_resource,omitempty"`
+	BindResource *BindResource          `json:"bind_resource,omitempty"`
 	Parameters   map[string]interface{} `json:"parameters,omitempty"`
 	Context      map[string]interface{} `json:"context,omitempty"`
 }
@@ -49,10 +49,10 @@ type ProvisionRequestBody struct {
 }
 
 type PreviousValues struct {
-	PlanID string `json:"plan_id,omitempty"`
+	PlanID    string `json:"plan_id,omitempty"`
 	ServiceID string `json:"service_id,omitempty"`
-	OrgID string `json:"organization_id,omitempty"`
-	SpaceID string `json:"space_id,omitempty"`
+	OrgID     string `json:"organization_id,omitempty"`
+	SpaceID   string `json:"space_id,omitempty"`
 }
 
 type UpdateRequestBody struct {
@@ -64,30 +64,30 @@ type UpdateRequestBody struct {
 }
 
 type updateInstanceResponseBody struct {
-	DashboardURL *string `json:"dashboard_url"`
+	DashboardURL *string           `json:"dashboard_url"`
 	Operation    *osb.OperationKey `json:"operation"`
 }
 
 type provisionSuccessResponseBody struct {
-	DashboardURL *string `json:"dashboard_url"`
+	DashboardURL *string           `json:"dashboard_url"`
 	Operation    *osb.OperationKey `json:"operation"`
 }
 
 type osbErrors struct {
 	ErrorMessage *string `json:"error"`
-	Description *string `json:"description"`
+	Description  *string `json:"description"`
 }
 
 func ProcessErrors(err error, r render.Render) {
 	if herr, is_http := osb.IsHTTPError(err); is_http {
-		r.JSON(herr.StatusCode, osbErrors{ErrorMessage:herr.ErrorMessage, Description:herr.Description})
+		r.JSON(herr.StatusCode, osbErrors{ErrorMessage: herr.ErrorMessage, Description: herr.Description})
 	} else {
-		utils.ReportError(err,r)		
+		utils.ReportError(err, r)
 	}
 }
 
 func NewOSBClientServices(serviceUrls []string, db *sql.DB) (*OSBClientServices, error) {
-	var osbClientServices OSBClientServices = OSBClientServices{serviceUrls:serviceUrls, db:db}
+	var osbClientServices OSBClientServices = OSBClientServices{serviceUrls: serviceUrls, db: db}
 	osbClientServices.init()
 	osbClientServices.GetProviders()
 	return &osbClientServices, nil
@@ -115,10 +115,10 @@ func (cserv *OSBClientServices) GetProviders() ([]providerInfo, error) {
 			config.URL = serviceUrl
 			if sUrl.User != nil && sUrl.User.Username() != "" {
 				pwd, _ := sUrl.User.Password()
-				config.AuthConfig = &osb.AuthConfig{BasicAuthConfig:&osb.BasicAuthConfig{Username:sUrl.User.Username(), Password:pwd}}
+				config.AuthConfig = &osb.AuthConfig{BasicAuthConfig: &osb.BasicAuthConfig{Username: sUrl.User.Username(), Password: pwd}}
 			} else if sUrl.User != nil && sUrl.User.Username() == "" {
 				pwd, _ := sUrl.User.Password()
-				config.AuthConfig = &osb.AuthConfig{BearerConfig:&osb.BearerConfig{Token:pwd}}
+				config.AuthConfig = &osb.AuthConfig{BearerConfig: &osb.BearerConfig{Token: pwd}}
 			}
 			config.EnableAlphaFeatures = true // necessary for GetBinding
 			client, err := osb.NewClient(config)
@@ -129,7 +129,7 @@ func (cserv *OSBClientServices) GetProviders() ([]providerInfo, error) {
 			if err != nil {
 				return nil, err
 			}
-			service := providerInfo{serviceUrl:serviceUrl, client:client, services:s.Services}
+			service := providerInfo{serviceUrl: serviceUrl, client: client, services: s.Services}
 			services = append(services, service)
 		} else {
 			log.Printf("ERROR: Unable to parse service url %s\n", serviceUrl)
@@ -269,12 +269,12 @@ func (cserv *OSBClientServices) RemoveInstanceInfo(instanceId string) (err error
 
 func (cserv *OSBClientServices) Provision(instanceId string, service *osb.Service, plan *osb.Plan, orgGuid string, spaceGuid string) (*osb.ProvisionResponse, error) {
 	request := &osb.ProvisionRequest{
-		InstanceID: instanceId,
-		ServiceID:  service.ID,
-		PlanID:     plan.ID,
-		OrganizationGUID: orgGuid,
-		SpaceGUID: spaceGuid,
-		Parameters: map[string]interface{}{},
+		InstanceID:        instanceId,
+		ServiceID:         service.ID,
+		PlanID:            plan.ID,
+		OrganizationGUID:  orgGuid,
+		SpaceGUID:         spaceGuid,
+		Parameters:        map[string]interface{}{},
 		AcceptsIncomplete: true,
 	}
 
@@ -307,10 +307,10 @@ func (cserv *OSBClientServices) Provision(instanceId string, service *osb.Servic
 
 func (cserv *OSBClientServices) Update(instanceId string, service *osb.Service, plan *osb.Plan) (*osb.UpdateInstanceResponse, error) {
 	request := &osb.UpdateInstanceRequest{
-		InstanceID: instanceId,
-		ServiceID:  service.ID,
-		PlanID:     &plan.ID,
-		Parameters: map[string]interface{}{},
+		InstanceID:        instanceId,
+		ServiceID:         service.ID,
+		PlanID:            &plan.ID,
+		Parameters:        map[string]interface{}{},
 		AcceptsIncomplete: true,
 	}
 
@@ -364,12 +364,12 @@ func (cserv *OSBClientServices) CreateBinding(bindingId string, instanceId strin
 		AppGUID: appGuid,
 	}
 	request := &osb.BindRequest{
-		BindingID:  bindingId,
-		InstanceID: instanceId,
-		ServiceID:  serviceId,
-		PlanID:     planId,
+		BindingID:    bindingId,
+		InstanceID:   instanceId,
+		ServiceID:    serviceId,
+		PlanID:       planId,
 		BindResource: resource,
-		Parameters: map[string]interface{}{},
+		Parameters:   map[string]interface{}{},
 	}
 
 	svc, err := cserv.GetProviderByID(serviceId)
@@ -432,12 +432,12 @@ func (cserv *OSBClientServices) GetInstanceStatus(instanceId string) (*osb.LastO
 		opkey = &tmpopkey
 	}
 	request := &osb.LastOperationRequest{
-		InstanceID: instanceId,
-		ServiceID:  &serviceId,
-		PlanID:     &planId,
+		InstanceID:   instanceId,
+		ServiceID:    &serviceId,
+		PlanID:       &planId,
 		OperationKey: opkey,
 	}
-	
+
 	response, err := svc.client.PollLastOperation(request)
 	if err != nil {
 		return nil, err
@@ -482,15 +482,15 @@ func (cserv *OSBClientServices) HttpPartialUpdateInstance(params martini.Params,
 		return
 	}
 	if spec.PlanID == nil {
-		r.JSON(http.StatusNotFound, map[string]interface{}{"error":"PlanNotFound", "description":"The specified plan was not found."})
+		r.JSON(http.StatusNotFound, map[string]interface{}{"error": "PlanNotFound", "description": "The specified plan was not found."})
 		return
 	}
 	plan, err := cserv.GetPlanByID(spec.ServiceID, *spec.PlanID)
 	if err != nil && err.Error() == "Unable to find service" {
-		r.JSON(http.StatusNotFound, map[string]interface{}{"error":"ServiceNotFound", "description":"The specified service was not found."})
+		r.JSON(http.StatusNotFound, map[string]interface{}{"error": "ServiceNotFound", "description": "The specified service was not found."})
 		return
 	} else if err != nil && err.Error() == "Unable to find plan" {
-		r.JSON(http.StatusNotFound, map[string]interface{}{"error":"PlanNotFound", "description":"The specified plan was not found."})
+		r.JSON(http.StatusNotFound, map[string]interface{}{"error": "PlanNotFound", "description": "The specified plan was not found."})
 		return
 	} else if err != nil {
 		ProcessErrors(err, r)
@@ -508,12 +508,11 @@ func (cserv *OSBClientServices) HttpPartialUpdateInstance(params martini.Params,
 			ProcessErrors(err, r)
 			return
 		}
-		r.JSON(http.StatusOK, updateInstanceResponseBody{DashboardURL:nil, Operation:resp.OperationKey})
+		r.JSON(http.StatusOK, updateInstanceResponseBody{DashboardURL: nil, Operation: resp.OperationKey})
 	} else {
-		r.JSON(http.StatusConflict, map[string]interface{}{"error":"ProvisionInProgress", "description":"This instance cannot be provisioned or updated because a provision is already in progress."})
+		r.JSON(http.StatusConflict, map[string]interface{}{"error": "ProvisionInProgress", "description": "This instance cannot be provisioned or updated because a provision is already in progress."})
 	}
 }
-
 
 func (cserv *OSBClientServices) HttpGetCreateOrUpdateInstance(params martini.Params, spec ProvisionRequestBody, berr binding.Errors, r render.Render) {
 	if berr != nil {
@@ -530,7 +529,7 @@ func (cserv *OSBClientServices) HttpGetCreateOrUpdateInstance(params martini.Par
 	if spec.SpaceGUID == "" {
 		spec.SpaceGUID = "00000000-0000-0000-0000-000000000000"
 	}
-	
+
 	service, err := cserv.GetServiceByID(spec.ServiceID)
 	if err != nil {
 		ProcessErrors(err, r)
@@ -539,10 +538,10 @@ func (cserv *OSBClientServices) HttpGetCreateOrUpdateInstance(params martini.Par
 
 	plan, err := cserv.GetPlanByID(spec.ServiceID, spec.PlanID)
 	if err != nil && err.Error() == "Unable to find service" {
-		r.JSON(http.StatusNotFound, map[string]interface{}{"error":"ServiceNotFound", "description":"The specified service was not found."})
+		r.JSON(http.StatusNotFound, map[string]interface{}{"error": "ServiceNotFound", "description": "The specified service was not found."})
 		return
 	} else if err != nil && err.Error() == "Unable to find plan" {
-		r.JSON(http.StatusNotFound, map[string]interface{}{"error":"PlanNotFound", "description":"The specified plan was not found."})
+		r.JSON(http.StatusNotFound, map[string]interface{}{"error": "PlanNotFound", "description": "The specified plan was not found."})
 		return
 	} else if err != nil {
 		ProcessErrors(err, r)
@@ -560,9 +559,9 @@ func (cserv *OSBClientServices) HttpGetCreateOrUpdateInstance(params martini.Par
 		}
 
 		if resp.Async {
-			r.JSON(http.StatusOK, provisionSuccessResponseBody{DashboardURL:nil, Operation:resp.OperationKey})
+			r.JSON(http.StatusOK, provisionSuccessResponseBody{DashboardURL: nil, Operation: resp.OperationKey})
 		} else {
-			r.JSON(http.StatusCreated, provisionSuccessResponseBody{DashboardURL:nil, Operation:resp.OperationKey})
+			r.JSON(http.StatusCreated, provisionSuccessResponseBody{DashboardURL: nil, Operation: resp.OperationKey})
 		}
 	} else if status != string(osb.StateInProgress) {
 		resp, err := cserv.Update(instanceId, service, plan)
@@ -570,9 +569,9 @@ func (cserv *OSBClientServices) HttpGetCreateOrUpdateInstance(params martini.Par
 			ProcessErrors(err, r)
 			return
 		}
-		r.JSON(http.StatusOK, provisionSuccessResponseBody{DashboardURL:nil, Operation:resp.OperationKey})
+		r.JSON(http.StatusOK, provisionSuccessResponseBody{DashboardURL: nil, Operation: resp.OperationKey})
 	} else {
-		r.JSON(http.StatusConflict, map[string]interface{}{"error":"ProvisionInProgress", "description":"This instance cannot be provisioned or updated because a provision is already in progress."})
+		r.JSON(http.StatusConflict, map[string]interface{}{"error": "ProvisionInProgress", "description": "This instance cannot be provisioned or updated because a provision is already in progress."})
 	}
 }
 
@@ -625,7 +624,7 @@ func (cserv *OSBClientServices) HttpCreateOrUpdateBinding(params martini.Params,
 func (cserv *OSBClientServices) HttpGetBinding(params martini.Params, r render.Render) {
 	serviceId, _, _, _, err := cserv.GetInstanceInfoByID(params["instance_id"])
 	if err != nil && err.Error() == "sql: no rows in result set" {
-		r.JSON(http.StatusNotFound, map[string]interface{}{"error":"NotFound", "description":"The instance could not be found."})
+		r.JSON(http.StatusNotFound, map[string]interface{}{"error": "NotFound", "description": "The instance could not be found."})
 		return
 	}
 	if err != nil {
@@ -643,8 +642,8 @@ func (cserv *OSBClientServices) HttpGetBinding(params martini.Params, r render.R
 }
 
 func (cserv *OSBClientServices) HttpGetBindingLastOperation(params martini.Params, r render.Render) {
-	r.JSON(http.StatusOK, 
-		map[string]interface{}{"status":"succeeded", "description":""}) // TOOD ? Does this interface really exist
+	r.JSON(http.StatusOK,
+		map[string]interface{}{"status": "succeeded", "description": ""}) // TOOD ? Does this interface really exist
 }
 
 func (cserv *OSBClientServices) HttpRemoveBinding(params martini.Params, r render.Render) {
@@ -679,8 +678,8 @@ func (cserv *OSBClientServices) HttpForwardAction(params martini.Params, res htt
 		res.Write([]byte("Internal Server Error"))
 		return
 	}
-	uri, err  := url.Parse(provider.serviceUrl)
-	if err != nil { 
+	uri, err := url.Parse(provider.serviceUrl)
+	if err != nil {
 		log.Println("Error: " + err.Error())
 		res.WriteHeader(500)
 		res.Write([]byte("Internal Server Error"))
@@ -725,7 +724,7 @@ func GetOSBBindingCredentials(servicetype string, instanceId string, bindingId s
 	return resp.Credentials, nil
 }
 
-func IsOSBService(servicetype string) (bool) {
+func IsOSBService(servicetype string) bool {
 	if globalClientService == nil {
 		return false
 	}

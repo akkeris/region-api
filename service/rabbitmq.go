@@ -3,17 +3,17 @@ package service
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"github.com/bitly/go-simplejson"
+	"github.com/go-martini/martini"
+	"github.com/martini-contrib/binding"
+	"github.com/martini-contrib/render"
 	"io/ioutil"
 	"net/http"
 	"os"
 	structs "region-api/structs"
 	utils "region-api/utils"
 	"strings"
-	"errors"
-	"github.com/bitly/go-simplejson"
-	"github.com/go-martini/martini"
-	"github.com/martini-contrib/binding"
-	"github.com/martini-contrib/render"
 )
 
 //Tagrabbitmq centralized
@@ -86,11 +86,13 @@ func Provisionrabbitmq(spec structs.Provisionspec, berr binding.Errors, r render
 	bodyj, _ := simplejson.NewFromReader(resp.Body)
 
 	rabbitmqurl, _ := bodyj.Get("RABBITMQ_URL").String()
+	rabbitmquiurl, _ := bodyj.Get("RABBITMQUI_URL").String()
 	location := rabbitmqurl
 	parts := strings.Split(location, "/")
 	name := parts[len(parts)-1]
 	toreturn := make(map[string]interface{})
 	toreturn["RABBITMQ_URL"] = rabbitmqurl
+	toreturn["RABBITMQUI_URL"] = rabbitmquiurl
 	toreturn["spec"] = "rabbitmq:" + name
 
 	r.JSON(201, toreturn)

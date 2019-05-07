@@ -144,7 +144,6 @@ func DeleteInfluxdb(params martini.Params, r render.Render) {
 	r.JSON(200, bodyj)
 }
 
-
 func GetInfluxdbVars(servicename string) (map[string]interface{}, error) {
 	config := make(map[string]interface{})
 	client := &http.Client{}

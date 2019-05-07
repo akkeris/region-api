@@ -235,8 +235,8 @@ func DeployJob(db *sql.DB, params martini.Params, req structs.JobDeploy, berr bi
 	space := params["space"]
 
 	var (
-		cmd     string
-		plan    string
+		cmd  string
+		plan string
 	)
 
 	if req.Image == "" {

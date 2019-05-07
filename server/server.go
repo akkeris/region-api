@@ -2,6 +2,11 @@ package server
 
 import (
 	"database/sql"
+	"github.com/go-martini/martini"
+	"github.com/martini-contrib/auth"
+	"github.com/martini-contrib/binding"
+	"github.com/martini-contrib/render"
+	"github.com/robfig/cron"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -22,18 +27,13 @@ import (
 	"region-api/templates"
 	"region-api/utils"
 	"region-api/vault"
-	"time"
 	"strings"
-	"github.com/go-martini/martini"
-	"github.com/martini-contrib/auth"
-	"github.com/martini-contrib/binding"
-	"github.com/martini-contrib/render"
-        "github.com/robfig/cron"
+	"time"
 )
 
 func GetInfo(db *sql.DB, params martini.Params, r render.Render) {
 	r.JSON(http.StatusOK, map[string]string{
-		"kafka_hosts":os.Getenv("KAFKA_BROKERS"),
+		"kafka_hosts": os.Getenv("KAFKA_BROKERS"),
 	})
 }
 
@@ -41,10 +41,10 @@ func singleJoiningSlash(a, b string) string {
 	aslash := strings.HasSuffix(a, "/")
 	bslash := strings.HasPrefix(b, "/")
 	switch {
-		case aslash && bslash:
-			return a + b[1:]
-		case !aslash && !bslash:
-			return a + "/" + b
+	case aslash && bslash:
+		return a + b[1:]
+	case !aslash && !bslash:
+		return a + "/" + b
 	}
 	return a + b
 }
@@ -58,7 +58,7 @@ func Proxy(uri string, message string) *httputil.ReverseProxy {
 	}
 	log.Println("Proxying to", target)
 	targetQuery := target.RawQuery
-   	director := func(req *http.Request) {
+	director := func(req *http.Request) {
 		req.URL.Scheme = target.Scheme
 		req.URL.Host = target.Host
 		req.Host = target.Host
@@ -199,9 +199,10 @@ func InitOldServiceEndpoints(m *martini.ClassicMartini) {
 }
 
 var catalogOSBProvider *service.OSBClientServices
+
 func InitOpenServiceBrokerEndpoints(db *sql.DB, m *martini.ClassicMartini) {
 	var err error
-	catalogOSBProvider, err = service.NewOSBClientServices(strings.Split(os.Getenv("SERVICES"),","), db)
+	catalogOSBProvider, err = service.NewOSBClientServices(strings.Split(os.Getenv("SERVICES"), ","), db)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -211,7 +212,7 @@ func InitOpenServiceBrokerEndpoints(db *sql.DB, m *martini.ClassicMartini) {
 	m.Put("/v2/service_instances/:instance_id", binding.Json(service.ProvisionRequestBody{}), catalogOSBProvider.HttpGetCreateOrUpdateInstance)
 	m.Delete("/v2/service_instances/:instance_id", catalogOSBProvider.HttpDeleteInstance)
 	m.Patch("/v2/service_instances/:instance_id", binding.Json(service.UpdateRequestBody{}), catalogOSBProvider.HttpPartialUpdateInstance)
-	m.Put("/v2/service_instances/:instance_id/service_bindings/:binding_id",  binding.Json(service.BindRequestBody{}), catalogOSBProvider.HttpCreateOrUpdateBinding)
+	m.Put("/v2/service_instances/:instance_id/service_bindings/:binding_id", binding.Json(service.BindRequestBody{}), catalogOSBProvider.HttpCreateOrUpdateBinding)
 	m.Get("/v2/service_instances/:instance_id/service_bindings/:binding_id", catalogOSBProvider.HttpGetBinding)
 	m.Get("/v2/service_instances/:instance_id/service_bindings/:binding_id/last_operation", catalogOSBProvider.HttpGetBindingLastOperation)
 	m.Delete("/v2/service_instances/:instance_id/service_bindings/:binding_id", catalogOSBProvider.HttpRemoveBinding)
@@ -370,10 +371,10 @@ func Server(db *sql.DB) *martini.ClassicMartini {
 	m.Delete("/v1/space/:space/app/:app/maintenance", maintenance.DisableMaintenancePage)
 	m.Get("/v1/space/:space/app/:app/maintenance", maintenance.MaintenancePageStatus)
 
-	m.Post("/v1/certs", binding.Json(structs.CertificateRequestSpec{}), certs.CertificateRequest)
-	m.Get("/v1/certs", certs.GetCerts)
-	m.Get("/v1/certs/:id", certs.GetCertStatus)
-	m.Post("/v1/certs/:id/install", certs.InstallCert)
+	m.Post("/v1/certs", binding.Json(structs.CertificateOrder{}), certs.CreateCertificateOrder)
+	m.Get("/v1/certs", certs.GetCertificateOrders)
+	m.Get("/v1/certs/:id", certs.GetCertificateOrderStatus)
+	m.Post("/v1/certs/:id/install", certs.InstallCertificate)
 
 	m.Get("/v1/utils/service/space/:space/app/:app", utils.GetService)
 	m.Get("/v1/utils/nodes", utils.GetNodes)
@@ -382,10 +383,10 @@ func Server(db *sql.DB) *martini.ClassicMartini {
 	InitOpenServiceBrokerEndpoints(db, m)
 	InitOldServiceEndpoints(m)
 
-        vault.GetVaultListPeriodic()
-        c := cron.New()
-        c.AddFunc("@every 10m", func() { go vault.GetVaultListPeriodic() })
-        c.Start()
+	vault.GetVaultListPeriodic()
+	c := cron.New()
+	c.AddFunc("@every 10m", func() { go vault.GetVaultListPeriodic() })
+	c.Start()
 
 	// proxy to log shuttle
 	if os.Getenv("LOGSHUTTLE_SERVICE_HOST") != "" && os.Getenv("LOGSHUTTLE_SERVICE_PORT") != "" {

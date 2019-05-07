@@ -497,7 +497,7 @@ func (dnsProvider *AwsDNSProvider) CreateDomainRecord(domain Domain, recordType 
 		domains := make([]DomainRecord, 0)
 		prev := (*provider.domainRecordsCache)[domain.ProviderId]
 		for _, d := range prev {
-			if(d.Name != name && d.Type != recordType) {
+			if d.Name != name && d.Type != recordType {
 				domains = append(domains, d)
 			}
 		}
@@ -505,8 +505,8 @@ func (dnsProvider *AwsDNSProvider) CreateDomainRecord(domain Domain, recordType 
 
 		// now add the new record
 		(*provider.domainRecordsCache)[domain.ProviderId] = append((*provider.domainRecordsCache)[domain.ProviderId], DomainRecord{
-			Type: recordType,
-			Name: name,
+			Type:   recordType,
+			Name:   name,
 			Values: values,
 			Domain: &domain,
 		})
@@ -542,7 +542,7 @@ func (dnsProvider *AwsDNSProvider) RemoveDomainRecord(domain Domain, recordType 
 		domains := make([]DomainRecord, 0)
 		prev := (*provider.domainRecordsCache)[domain.ProviderId]
 		for _, d := range prev {
-			if(d.Name != name && d.Type != recordType) {
+			if d.Name != name && d.Type != recordType {
 				domains = append(domains, d)
 			}
 		}
