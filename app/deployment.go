@@ -11,7 +11,6 @@ import (
 	runtime "region-api/runtime"
 	service "region-api/service"
 	structs "region-api/structs"
-	spacepkg "region-api/space"
 	utils "region-api/utils"
 	"strconv"
 	"strings"
@@ -179,7 +178,7 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 		return
 	}
 
-	internal, err := spacepkg.IsInternalSpace(db, space)
+	internal, err := utils.IsInternalSpace(db, space)
 	if err != nil {
 		utils.ReportError(err, r)
 		return
