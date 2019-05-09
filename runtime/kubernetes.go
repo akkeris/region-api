@@ -207,8 +207,8 @@ func deploymentToDeploymentSpec(deployment *structs.Deployment) (dp Deploymentsp
 
 	krc.Metadata.Name = deployment.App
 	krc.Metadata.Namespace = deployment.Space
+	krc.Metadata.Labels = deployment.Labels
 	krc.Spec.Replicas = deployment.Amount
-
 	krc.Spec.RevisionHistoryLimit = deployment.RevisionHistoryLimit
 	krc.Spec.Selector.MatchLabels.Name = deployment.App
 	krc.Spec.Template.Metadata.Name = deployment.App
@@ -527,14 +527,18 @@ func (rt Kubernetes) DeletePods(space string, label string) (e error) {
 	return e
 }
 
-func (rt Kubernetes) CreateSpace(name string, compliance string) (e error) {
+func (rt Kubernetes) CreateSpace(name string, internal bool, compliance string) (e error) {
 	if name == "" {
 		return errors.New("FATAL ERROR: Unable to create space, space is blank.")
 	}
 	var namespace Namespacespec
 	namespace.Metadata.Name = name
 	if len(compliance) > 0 {
-		namespace.Metadata.Labels.ComplianceTags = compliance
+		namespace.Metadata.Annotations.ComplianceTags = compliance
+	}
+	namespace.Metadata.Labels.Internal = "false"
+	if internal {
+		namespace.Metadata.Labels.Internal = "true"
 	}
 	resp, e := rt.k8sRequest("post", "/api/"+rt.defaultApiServerVersion+"/namespaces", namespace)
 
@@ -567,7 +571,7 @@ func (rt Kubernetes) UpdateSpaceTags(space string, compliance string) (e error) 
 	}
 	var namespace Namespacespec
 	namespace.Metadata.Name = space
-	namespace.Metadata.Labels.ComplianceTags = compliance
+	namespace.Metadata.Annotations.ComplianceTags = compliance
 	_, e = rt.k8sRequest("patch", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+space, namespace)
 	return e
 }
@@ -776,7 +780,7 @@ func (rt Kubernetes) GetService(space string, app string) (KubeService, error) {
 	return response, nil
 }
 
-func (rt Kubernetes) CreateService(space string, app string, port int) (c *Createspec, e error) {
+func (rt Kubernetes) CreateService(space string, app string, port int, labels map[string]string) (c *Createspec, e error) {
 	if space == "" {
 		return nil, errors.New("FATAL ERROR: Unable to create service, space is blank.")
 	}
@@ -791,8 +795,9 @@ func (rt Kubernetes) CreateService(space string, app string, port int) (c *Creat
 	service.Kind = "Service"
 	service.Metadata.Annotations.ServiceBetaKubernetesIoAwsLoadBalancerInternal = "0.0.0.0/0"
 	service.Metadata.Name = app
-	service.Metadata.Labels.App = app
-	service.Metadata.Labels.Name = app
+	labels["app"] = app
+	labels["name"] = app
+	service.Metadata.Labels = labels
 	service.Spec.Selector.Name = app
 
 	var portitem PortItem
@@ -818,7 +823,7 @@ func (rt Kubernetes) CreateService(space string, app string, port int) (c *Creat
 	return &response, nil
 }
 
-func (rt Kubernetes) UpdateService(space string, app string, port int) (c *Createspec, e error) {
+func (rt Kubernetes) UpdateService(space string, app string, port int, labels map[string]string) (c *Createspec, e error) {
 	if space == "" {
 		return nil, errors.New("Unable to update service, space is blank.")
 	}
@@ -833,6 +838,9 @@ func (rt Kubernetes) UpdateService(space string, app string, port int) (c *Creat
 		return nil, e
 	}
 	existingservice.Spec.Ports[0].TargetPort = port
+	for k := range labels {
+		existingservice.Metadata.Labels[k] = labels[k]
+	}
 
 	resp, e := rt.k8sRequest("put", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+space+"/services/"+app, existingservice)
 	if e != nil {

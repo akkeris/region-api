@@ -57,6 +57,7 @@ type Deployspec struct {
 	Port     int      `json:"port"`
 	Command  []string `json:"command"`
 	Features Features `json:"features,omitempty"`
+	Labels   map[string]string `json:"labels,omitempty"`
 }
 
 type Features struct {
@@ -245,6 +246,7 @@ type Deployment struct {
 	ConfigVars           []EnvVar
 	Schedule             string
 	Features             Features
+	Labels				 map[string]string
 }
 
 //Deployresponse deploy response

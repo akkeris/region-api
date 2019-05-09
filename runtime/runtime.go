@@ -55,8 +55,11 @@ type Namespacespec struct {
 	Metadata struct {
 		Name   string `json:"name"`
 		Labels struct {
-			ComplianceTags string `json:"compliancetags,omitempty"`
+			Internal string `json:"akkeris.io/internal,omitempty"`
 		} `json:"labels,omitempty"`
+		Annotations struct {
+			ComplianceTags string `json:"akkeris.io/compliancetags,omitempty"`
+		}
 	} `json:"metadata"`
 }
 
@@ -116,10 +119,7 @@ type Service struct {
 		} `json:"annotations"`
 		Name      string `json:"name"`
 		Namespace string `json:"namespace"`
-		Labels    struct {
-			App  string `json:"app"`
-			Name string `json:"name"`
-		} `json:"labels"`
+		Labels    map[string]string `json:"labels"`
 	} `json:"metadata"`
 	Spec struct {
 		Selector struct {
@@ -140,10 +140,7 @@ type KubeService struct {
 		UID               string    `json:"uid"`
 		ResourceVersion   string    `json:"resourceVersion"`
 		CreationTimestamp time.Time `json:"creationTimestamp"`
-		Labels            struct {
-			App  string `json:"app"`
-			Name string `json:"name"`
-		} `json:"labels"`
+		Labels    map[string]string `json:"labels"`
 		Annotations struct {
 			ServiceBetaKubernetesIoAwsLoadBalancerInternal string `json:"service.beta.kubernetes.io/aws-load-balancer-internal"`
 		} `json:"annotations"`
@@ -173,6 +170,7 @@ type Deploymentspec struct {
 	Metadata struct {
 		Name      string `json:"name"`
 		Namespace string `json:"namespace"`
+		Labels map[string]string `json:"labels,omitempty"`
 	} `json:"metadata"`
 	Spec struct {
 		RevisionHistoryLimit int `json:"revisionHistoryLimit"`
@@ -512,8 +510,8 @@ type Runtime interface {
 	GenericRequest(method string, path string, payload interface{}) ([]byte, int, error)
 	Scale(space string, app string, amount int) (e error)
 	GetService(space string, app string) (service KubeService, e error)
-	CreateService(space string, app string, port int) (c *Createspec, e error)
-	UpdateService(space string, app string, port int) (c *Createspec, e error)
+	CreateService(space string, app string, port int, labels map[string]string) (c *Createspec, e error)
+	UpdateService(space string, app string, port int, labels map[string]string) (c *Createspec, e error)
 	DeleteService(space string, app string) (e error)
 	GetServices() (*ServiceCollectionspec, error)
 	CreateDeployment(deployment *structs.Deployment) (err error)
@@ -528,7 +526,7 @@ type Runtime interface {
 	DeletePod(space string, pod string) (e error)
 	DeletePods(space string, label string) (e error)
 	GetPods(space string, app string) (rs []string, e error)
-	CreateSpace(name string, compliance string) (e error)
+	CreateSpace(name string, internal bool, compliance string) (e error)
 	DeleteSpace(name string) (e error)
 	CreateSecret(space string, name string, data string, mimetype string) (s *Secretspec, e error)
 	AddImagePullSecretToSpace(space string) (e error)

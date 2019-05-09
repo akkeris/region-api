@@ -20,6 +20,17 @@ import (
 	"time"
 )
 
+type HeaderOperationsspec struct {
+	Set    map[string]string `json:"set,omitempty"`
+	Add    map[string]string `json:"add,omitempty"`
+	Remove []string          `json:"remove,omitempty"`
+}
+
+type Headersspec struct {
+	Request  HeaderOperationsspec `json:"request,omitempty"`
+	Response HeaderOperationsspec `json:"response,omitempty"`
+}
+
 type Matchspec struct {
 	URI struct {
 		Prefix string `json:"prefix"`
@@ -43,6 +54,7 @@ type HTTPSpec struct {
 	Match   []Matchspec `json:"match"`
 	Route   []Routespec `json:"route"`
 	Rewrite Rewritespec `json:"rewrite"`
+	Headers Headersspec `json:"headers,omitempty"`
 }
 
 type VirtualService struct {
@@ -147,7 +159,14 @@ var vstemplate = `{
                             }
                         }
                     }
-                ]
+                ],
+		        "headers": {
+		        	"response": {
+		        		"set": {
+		        			"Strict-Transport-Security":"max-age=31536000; includeSubDomains"
+		        		}
+		        	}
+		        }
             }
             {{ if eq (removeslashslash $value.Path) (removeslash $value.Path) }},
             {
@@ -170,7 +189,14 @@ var vstemplate = `{
                             }
                         }
                     }
-                ]
+                ],
+		        "headers": {
+		        	"response": {
+		        		"set": {
+		        			"Strict-Transport-Security":"max-age=31536000; includeSubDomains"
+		        		}
+		        	}
+		        }
             }{{end}}
 {{end}}
         ]
@@ -354,6 +380,15 @@ func (ingress *IstioIngress) UpdateAppVirtualService(vs *VirtualService, space s
 
 func (ingress *IstioIngress) InstallOrUpdateVirtualService(router structs.Routerspec, sitevs *VirtualService, exists bool) error {
 	var err error = nil
+
+	// Force good security practices
+	for i, _ := range sitevs.Spec.HTTP {
+		if sitevs.Spec.HTTP[i].Headers.Response.Set == nil {
+			sitevs.Spec.HTTP[i].Headers.Response.Set = make(map[string]string)
+		}
+		sitevs.Spec.HTTP[i].Headers.Response.Set["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+	}
+
 	if !exists {
 		body, code, err := ingress.runtime.GenericRequest("post", "/apis/networking.istio.io/v1alpha3/namespaces/sites-system/virtualservices", sitevs)
 		if err != nil {
@@ -446,7 +481,7 @@ func RemoveHostsAndServers(domain string, certificate string, gateway *Gateway) 
 			if dirty {
 				out.Spec.Servers[i].Hosts = newHosts
 			} else {
-				return fmt.Errorf("WARNING: We were instructed to remove host (%s) but it was not found on server %#+v\n", removeHostRecord, server), false, nil
+				return fmt.Errorf("Error: were instructed to remove host (%s) but it was not found on server %#+v\n", removeHostRecord, server), false, nil
 			}
 		}
 	}

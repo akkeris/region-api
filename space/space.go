@@ -79,7 +79,7 @@ func Createspace(db *sql.DB, space structs.Spacespec, berr binding.Errors, r ren
 		return
 	}
 
-	if err = rt.CreateSpace(space.Name, space.ComplianceTags); err != nil {
+	if err = rt.CreateSpace(space.Name, space.Internal, space.ComplianceTags); err != nil {
 		utils.ReportError(err, r)
 		return
 	}
