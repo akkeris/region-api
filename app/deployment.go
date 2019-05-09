@@ -11,6 +11,7 @@ import (
 	runtime "region-api/runtime"
 	service "region-api/service"
 	structs "region-api/structs"
+	spacepkg "region-api/space"
 	utils "region-api/utils"
 	"strconv"
 	"strings"
@@ -178,6 +179,22 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 		return
 	}
 
+	internal, err := spacepkg.IsInternalSpace(db, space)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+
+	if deploy1.Labels == nil {
+		deploy1.Labels = make(map[string]string)
+	}
+
+	if internal {
+		deploy1.Labels["akkeris.io/internal"] = "true"
+	} else {
+		deploy1.Labels["akkeris.io/internal"] = "false"
+	}
+
 	// Via heuristics and rules, determine and/or override ports and configvars
 	var finalport int
 	finalport = appport
@@ -225,6 +242,7 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 
 	// Create deployment
 	var deployment structs.Deployment
+	deployment.Labels = deploy1.Labels
 	deployment.Space = space
 	deployment.App = appname
 	deployment.Port = finalport
@@ -264,12 +282,12 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 	// Create/update service
 	if finalport != -1 {
 		if !deploymentExists {
-			if _, err := rt.CreateService(space, appname, finalport); err != nil {
+			if _, err := rt.CreateService(space, appname, finalport, deploy1.Labels); err != nil {
 				utils.ReportError(err, r)
 				return
 			}
 		} else {
-			if _, err := rt.UpdateService(space, appname, finalport); err != nil {
+			if _, err := rt.UpdateService(space, appname, finalport, deploy1.Labels); err != nil {
 				utils.ReportError(err, r)
 				return
 			}
