@@ -63,6 +63,7 @@ type Deployspec struct {
 type Features struct {
 	ServiceMesh bool `json:"serviceMesh,omitempty"`
 	IstioInject bool `json:"istioInject,omitempty"`
+	Http2Service bool `json:"http2,omitempty"`
 }
 
 //Setspec setspec

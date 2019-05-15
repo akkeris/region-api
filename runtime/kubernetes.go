@@ -216,7 +216,7 @@ func deploymentToDeploymentSpec(deployment *structs.Deployment) (dp Deploymentsp
 	krc.Spec.Template.Metadata.Labels.App = deployment.App
 	krc.Spec.Template.Metadata.Labels.Version = "v1"
 
-	if os.Getenv("FF_ISTIOINJECT") == "true" || deployment.Features.IstioInject {
+	if os.Getenv("FF_ISTIOINJECT") == "true" || deployment.Features.IstioInject || deployment.Features.ServiceMesh {
 		krc.Spec.Template.Metadata.Annotations.SidecarIstioIoInject = "true"
 	}
 
@@ -780,7 +780,7 @@ func (rt Kubernetes) GetService(space string, app string) (KubeService, error) {
 	return response, nil
 }
 
-func (rt Kubernetes) CreateService(space string, app string, port int, labels map[string]string) (c *Createspec, e error) {
+func (rt Kubernetes) CreateService(space string, app string, port int, labels map[string]string, features structs.Features) (c *Createspec, e error) {
 	if space == "" {
 		return nil, errors.New("FATAL ERROR: Unable to create service, space is blank.")
 	}
@@ -804,8 +804,11 @@ func (rt Kubernetes) CreateService(space string, app string, port int, labels ma
 	portitem.Protocol = "TCP"
 	portitem.Port = 80
 	portitem.TargetPort = port
-	portitem.Name = "http"
-
+	if features.Http2Service {
+		portitem.Name = "http2"
+	} else {
+		portitem.Name = "http"
+	}
 	portlist := []PortItem{}
 	portlist = append(portlist, portitem)
 	service.Spec.Ports = portlist
@@ -823,7 +826,7 @@ func (rt Kubernetes) CreateService(space string, app string, port int, labels ma
 	return &response, nil
 }
 
-func (rt Kubernetes) UpdateService(space string, app string, port int, labels map[string]string) (c *Createspec, e error) {
+func (rt Kubernetes) UpdateService(space string, app string, port int, labels map[string]string, features structs.Features) (c *Createspec, e error) {
 	if space == "" {
 		return nil, errors.New("Unable to update service, space is blank.")
 	}
@@ -836,6 +839,11 @@ func (rt Kubernetes) UpdateService(space string, app string, port int, labels ma
 	existingservice, e := rt.GetService(space, app)
 	if e != nil {
 		return nil, e
+	}
+	if features.Http2Service {
+		existingservice.Spec.Ports[0].Name = "http2"
+	} else {
+		existingservice.Spec.Ports[0].Name = "http"
 	}
 	existingservice.Spec.Ports[0].TargetPort = port
 	for k := range labels {
