@@ -9,11 +9,8 @@ import (
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
-	//      "strconv"
-	//        "strings"
 	"bytes"
 	"encoding/json"
-	"io/ioutil"
 	"net/http"
 )
 
@@ -33,8 +30,7 @@ func DeleteCallback(db *sql.DB, params martini.Params, r render.Render) {
 		utils.ReportError(err, r)
 		return
 	}
-	x, err := res.RowsAffected()
-	fmt.Println(x)
+	_, err = res.RowsAffected()
 	if err != nil {
 		utils.ReportError(err, r)
 		return
@@ -51,16 +47,12 @@ func CreateCallback(db *sql.DB, spec structs.Callbackspec, berr binding.Errors, 
 		return
 	}
 
-	fmt.Println("got callback")
-	fmt.Println(spec)
-	str, err := json.Marshal(spec)
+	_, err := json.Marshal(spec)
 	if err != nil {
 		fmt.Println("Error preparing request")
 		utils.ReportError(err, r)
 		return
 	}
-	jsonStr := []byte(string(str))
-	fmt.Println(string(jsonStr[:]))
 	var appname string
 	inserterr := db.QueryRow("INSERT INTO callbacks (space,appname,tag,method,url) VALUES($1,$2,$3,$4,$5) returning appname;", spec.Space, spec.Appname, spec.Tag, spec.Method, spec.Url).Scan(&appname)
 	if inserterr != nil {
@@ -79,8 +71,6 @@ func Callback(db *sql.DB, spec structs.NagiosAlert, berr binding.Errors, r rende
 		return
 	}
 
-	fmt.Println("got callback")
-	fmt.Println(spec)
 	str, err := json.Marshal(spec)
 	if err != nil {
 		fmt.Println("Error preparing request")
@@ -106,8 +96,6 @@ func Callback(db *sql.DB, spec structs.NagiosAlert, berr binding.Errors, r rende
 		}
 		defer resp.Body.Close()
 
-		bb, _ := ioutil.ReadAll(resp.Body)
-		fmt.Println(string(bb[:]))
 	}
 	var msg structs.Messagespec
 	msg.Status = 200

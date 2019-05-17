@@ -29,8 +29,6 @@ func GetOpsgenieOption(db *sql.DB, params martini.Params, r render.Render) {
 }
 
 func getOpsgenieOption(db *sql.DB, app string, space string) (o bool, e error) {
-	fmt.Println("space " + space)
-	fmt.Println("app " + app)
 	stmt, err := db.Prepare("select optionvalue as toreturn from appfeature where space=$1 and app=$2 and optionkey=$3")
 	if err != nil {
 		var msg structs.Messagespec
@@ -46,9 +44,7 @@ func getOpsgenieOption(db *sql.DB, app string, space string) (o bool, e error) {
 	feature_default_opsgenie, _ := strconv.ParseBool(os.Getenv("FEATURE_DEFAULT_OPSGENIE"))
 	toreturn = feature_default_opsgenie
 	for rows.Next() {
-		fmt.Println("LOOOOOOOOOP")
 		err := rows.Scan(&toreturn)
-		fmt.Println(toreturn)
 		if err != nil {
 			fmt.Println(err)
 			return false, err
@@ -85,9 +81,6 @@ func UpdateOpsgenieOption(db *sql.DB, params martini.Params, r render.Render) {
 func updateOpsgenieOption(db *sql.DB, app string, space string, optionvalue bool) (m structs.Messagespec, e error) {
 	var msg structs.Messagespec
 
-	fmt.Println(app)
-	fmt.Println(space)
-	fmt.Println(optionvalue)
 
 	err := db.QueryRow("INSERT into appfeature (space,app,optionkey,optionvalue) values ($1,$2,$3,$4)  ON CONFLICT ON CONSTRAINT appfeature_pkey DO UPDATE set optionvalue=$4 returning optionvalue;", space, app, "opsgenie", optionvalue).Scan(&optionvalue)
 	if err != nil {
