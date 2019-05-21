@@ -173,7 +173,7 @@ func (issuer *CertManagerIssuer) CreateOrder(domain string, sans []string, comme
 	var cert certManagerACMECertificate
 	cert.APIVersion = "certmanager.k8s.io/v1alpha1"
 	cert.Kind = "Certificate"
-	cert.Metadata.Name = domain
+	cert.Metadata.Name = strings.Replace(domain, "*", "star", -1)
 	cert.Metadata.Namespace = issuer.certificateNamespace
 	cert.Metadata.Annotations.Comments = comment
 	cert.Metadata.Annotations.Requestor = requestor
@@ -189,7 +189,7 @@ func (issuer *CertManagerIssuer) CreateOrder(domain string, sans []string, comme
 	cert.Spec.DNSNames = append(cert.Spec.DNSNames, sans...)
 	cert.Spec.IssuerRef.Kind = "ClusterIssuer"
 	cert.Spec.IssuerRef.Name = issuer.issuerName
-	cert.Spec.SecretName = strings.Replace(domain, ".", "-", -1) + "-tls"
+	cert.Spec.SecretName = strings.Replace(strings.Replace(domain, "*", "star", -1), ".", "-", -1) + "-tls"
 	body, code, err := issuer.runtime.GenericRequest("post", "/apis/certmanager.k8s.io/v1alpha1/namespaces/"+issuer.certificateNamespace+"/certificates", cert)
 	if err != nil {
 		return cert.Metadata.Labels.Id, err
