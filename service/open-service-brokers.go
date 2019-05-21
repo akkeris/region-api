@@ -214,18 +214,14 @@ func (cserv *OSBClientServices) GetProviderByID(serviceId string) (*providerInfo
 	if err != nil {
 		return nil, err
 	}
-	var provider *providerInfo = nil
 	for _, s := range providers {
 		for _, si := range s.services {
 			if si.ID == serviceId {
-				provider = &s
+				return &s, nil
 			}
 		}
 	}
-	if provider == nil {
-		return nil, errors.New("Unable to find service")
-	}
-	return provider, nil
+	return nil, errors.New("Unable to find service")
 }
 
 func (cserv *OSBClientServices) GetProviderByName(serviceName string) (*providerInfo, error) {
@@ -285,6 +281,7 @@ func (cserv *OSBClientServices) Provision(instanceId string, service *osb.Servic
 
 	resp, err := svc.client.ProvisionInstance(request)
 	if err != nil {
+		log.Printf("open-service-broker.go: error provisioning instance: %s\n", err.Error())
 		return nil, err
 	}
 	if resp.Async {
