@@ -229,18 +229,14 @@ func (cserv *OSBClientServices) GetProviderByName(serviceName string) (*provider
 	if err != nil {
 		return nil, err
 	}
-	var provider *providerInfo = nil
 	for _, s := range providers {
 		for _, si := range s.services {
 			if si.Name == serviceName {
-				provider = &s
+				return &s, nil
 			}
 		}
 	}
-	if provider == nil {
-		return nil, errors.New("Unable to find service")
-	}
-	return provider, nil
+	return nil, errors.New("Unable to find service")
 }
 
 func (cserv *OSBClientServices) GetInstanceInfoByID(instanceId string) (serviceId string, planId string, operationKey *string, status string, err error) {
