@@ -71,7 +71,7 @@ type certManagerCertificateStatus struct {
 		SecretName string `json:"secretName"`
 	} `json:"spec"`
 	Status struct {
-		NotAfter   string `json:"creationTimestamp,omitempty"`
+		NotAfter   string `json:"notAfter,omitempty"`
 		Conditions []struct {
 			Message string `json:"message"`
 			Reason  string `json:"reason"`

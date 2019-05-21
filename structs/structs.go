@@ -14,7 +14,7 @@ type CertificateOrder struct {
 	Comment                 string   `json:"comment,omitempty"`
 	Requestor               string   `json:"requestor,omitempty"`
 	Issued                  string   `json:"issued,omitempty"`
-	Expires                 string   `json:"issued,omitempty"`
+	Expires                 string   `json:"expires,omitempty"`
 }
 
 type Certificate struct {

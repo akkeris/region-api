@@ -854,21 +854,6 @@ func (ingress *IstioIngress) GetInstalledCertificates(site string) ([]Certificat
 	if err != nil {
 		return nil, err
 	}
-
-	exists, err := ingress.GatewayExists(site)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return []Certificate{}, nil
-	}
-	exists, _, err = ingress.VirtualServiceExists(site)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return []Certificate{}, nil
-	}
 	var certType string = "normal"
 	var altNames []string = strings.Split(t.Metadata.Annotations.AltNames, ",")
 	if len(altNames) > 1 {
