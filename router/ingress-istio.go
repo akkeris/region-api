@@ -226,6 +226,12 @@ type kubernetesSecretTLS struct {
 	Type string `json:"type"`
 }
 
+
+
+type kubernetesSecretTLSList struct {
+	Items []kubernetesSecretTLS `json:"items"`
+}
+
 var tlsSecretTemplate = `
 {
     "apiVersion": "v1",
@@ -297,12 +303,19 @@ type IstioIngress struct {
 }
 
 func GetIstioIngress(db *sql.DB, config *IngressConfig) (*IstioIngress, error) {
+	if config.Device != "istio" {
+		return nil, errors.New("Unable to initialize the istio ingress, the config is not for Istio: " + config.Device)
+	}
 	runtime, err := runtime.GetRuntimeStack(db, os.Getenv("DEFAULT_STACK"))
 	// TODO: This is obvious we don't yet support multi-cluster regions.
 	//       and this is an artifact of that, we shouldn't have a 'stack' our
 	//       certificates or ingress are issued from.
 	if err != nil {
 		return nil, err
+	}
+
+	if os.Getenv("INGRESS_DEBUG") == "true" {
+		fmt.Printf("[ingress] Istio initialized with %s for namespace %s and gateway %s\n", config.Address, config.Environment, config.Name)
 	}
 	return &IstioIngress{
 		runtime: runtime,
@@ -830,49 +843,77 @@ func (ingress *IstioIngress) GetInstalledCertificates(site string) ([]Certificat
 		certificateNamespace = "istio-system"
 	}
 
-	main_server_name := strings.Replace(site, "*.", "star.", -1)
-	main_certs_name := strings.Replace(main_server_name, ".", "-", -1) + "-tls"
-	body, code, err := ingress.runtime.GenericRequest("get", "/api/v1/namespaces/"+certificateNamespace+"/secrets/"+main_certs_name, nil)
+	var certList kubernetesSecretTLSList
 
-	if err != nil {
-		return nil, err
-	}
-	if code == http.StatusNotFound {
-		return []Certificate{}, nil
-	} else if code != http.StatusOK {
-		return nil, errors.New("Failure to lookup certificate: " + string(body))
-	}
-	var t kubernetesSecretTLS
-	if err = json.Unmarshal(body, &t); err != nil {
-		return nil, err
-	}
-	pem_certs, err := base64.StdEncoding.DecodeString(t.Data.TlsCrt)
-	if err != nil {
-		return nil, err
-	}
-	x509_decoded_cert, _, _, err := DecodeCertificateBundle(site, pem_certs)
-	if err != nil {
-		return nil, err
-	}
-	var certType string = "normal"
-	var altNames []string = strings.Split(t.Metadata.Annotations.AltNames, ",")
-	if len(altNames) > 1 {
-		certType = "sans"
-	}
-	for _, n := range altNames {
-		if strings.Contains(n, "*") {
-			certType = "wildcard"
+	if site != "*" {
+		main_server_name := strings.Replace(site, "*.", "star.", -1)
+		main_certs_name := strings.Replace(main_server_name, ".", "-", -1) + "-tls"
+		body, code, err := ingress.runtime.GenericRequest("get", "/api/v1/namespaces/"+certificateNamespace+"/secrets/"+main_certs_name, nil)
+
+		if err != nil {
+			return nil, err
+		}
+		if code == http.StatusNotFound {
+			return []Certificate{}, nil
+		} else if code != http.StatusOK {
+			return nil, errors.New("Failure to lookup certificate: " + string(body))
+		}
+		var t kubernetesSecretTLS
+		if err = json.Unmarshal(body, &t); err != nil {
+			return nil, err
+		}
+		certList.Items = make([]kubernetesSecretTLS, 0)
+		certList.Items = append(certList.Items, t)
+	} else {
+		body, code, err := ingress.runtime.GenericRequest("get", "/api/v1/namespaces/"+certificateNamespace+"/secrets?fieldSelector=type%3Dkubernetes.io%2Ftls", nil)
+		if err != nil {
+			return nil, err
+		}
+		if code == http.StatusNotFound {
+			return []Certificate{}, nil
+		} else if code != http.StatusOK {
+			return nil, errors.New("Failure to lookup certificate: " + string(body))
+		}
+		if err = json.Unmarshal(body, &certList); err != nil {
+			return nil, err
 		}
 	}
 
-	return []Certificate{Certificate{
-		Type:         certType,
-		Name:         main_certs_name,
-		Expires:      x509_decoded_cert.NotAfter.Unix(),
-		Alternatives: altNames,
-		Expired:      !x509_decoded_cert.NotAfter.Before(time.Now()),
-		Address:      ingress.config.Address,
-	}}, nil
+	certificates := make([]Certificate, 0)
+	for _, t := range certList.Items {
+		pem_certs, err := base64.StdEncoding.DecodeString(t.Data.TlsCrt)
+		if err != nil {
+			return nil, err
+		}
+		x509_decoded_cert, _, _, err := DecodeCertificateBundle(site, pem_certs)
+		if err != nil {
+			return nil, err
+		}
+		
+		main_server_name := strings.Replace(x509_decoded_cert.Subject.CommonName, "*.", "star.", -1)
+		main_certs_name := strings.Replace(main_server_name, ".", "-", -1) + "-tls"
+
+		var certType string = "normal"
+		if len(x509_decoded_cert.DNSNames) > 1 {
+			certType = "sans"
+		}
+		for _, n := range x509_decoded_cert.DNSNames {
+			if strings.Contains(n, "*") {
+				certType = "wildcard"
+			}
+		}
+
+		certificates = append(certificates, Certificate{
+			Type:         certType,
+			Name:         main_certs_name,
+			Expires:      x509_decoded_cert.NotAfter.Unix(),
+			Alternatives: x509_decoded_cert.DNSNames,
+			Expired:      x509_decoded_cert.NotAfter.Before(time.Now()),
+			Address:      ingress.config.Address,
+		})
+	}
+
+	return certificates, nil
 }
 
 func (ingress *IstioIngress) Config() *IngressConfig {

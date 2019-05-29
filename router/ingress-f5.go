@@ -793,10 +793,24 @@ type F5Ingress struct {
 	db     *sql.DB
 }
 
+
+/*
+Device      string `json:"device"`
+	Address     string `json:"address"`
+	Environment string `json:"environment"`
+	Name        string `json:name`
+	*/
+
 func GetF5Ingress(db *sql.DB, config *IngressConfig) (*F5Ingress, error) {
+	if config.Device != "f5" {
+		return nil, errors.New("Unable to initialize the F5 ingress, the config is not for an F5: " + config.Device)
+	}
 	client, err := GetClient()
 	if err != nil {
 		return nil, err
+	}
+	if os.Getenv("INGRESS_DEBUG") == "true" {
+		fmt.Printf("[ingress] F5 initialized with %s for partition %s and vip %s\n", config.Address, config.Environment, config.Name)
 	}
 	return &F5Ingress{
 		client: client,
@@ -806,28 +820,18 @@ func GetF5Ingress(db *sql.DB, config *IngressConfig) (*F5Ingress, error) {
 }
 
 func (ingress *F5Ingress) CreateOrUpdateRouter(router structs.Routerspec) error {
-	config, err := GetSitesIngressPublicExternal()
-	if err != nil {
-		return err
-	}
-	if router.Internal {
-		config, err = GetSitesIngressPrivateInternal()
-		if err != nil {
-			return err
-		}
-	}
-	rule, err := ingress.client.BuildRule(ingress.db, router, config.Environment, config.Name)
+	rule, err := ingress.client.BuildRule(ingress.db, router, ingress.config.Environment, ingress.config.Name)
 	if err != nil {
 		log.Printf("Unable to update F5 router (buildRule failed): %s\n", err.Error())
 		return err
 	}
-	exists, err := ingress.client.RuleExists(config.Environment, config.Name, router.Domain+"-rule")
+	exists, err := ingress.client.RuleExists(ingress.config.Environment, ingress.config.Name, router.Domain+"-rule")
 	if err != nil {
 		log.Printf("Unable to update F5 router (ruleExists failed): %s\n", err.Error())
 		return err
 	}
 	if exists {
-		if err = ingress.client.UpdateRule(config.Environment, router.Domain+"-rule", rule); err != nil {
+		if err = ingress.client.UpdateRule(ingress.config.Environment, router.Domain+"-rule", rule); err != nil {
 			log.Printf("Unable to update F5 router (updateRule failed): %s\n", err.Error())
 			return err
 		}
@@ -837,13 +841,13 @@ func (ingress *F5Ingress) CreateOrUpdateRouter(router structs.Routerspec) error 
 			return err
 		}
 	}
-	attached, err := ingress.client.IsRuleAttached(router, config.Environment, config.Name)
+	attached, err := ingress.client.IsRuleAttached(router, ingress.config.Environment, ingress.config.Name)
 	if err != nil {
 		log.Printf("Unable to update F5 router (ruleAttached failed): %s\n", err.Error())
 		return err
 	}
 	if !attached {
-		if err = ingress.client.AttachRule(rule, config.Environment, config.Name); err != nil {
+		if err = ingress.client.AttachRule(rule, ingress.config.Environment, ingress.config.Name); err != nil {
 			log.Printf("Unable to update F5 router (attachRule failed): %s\n", err.Error())
 			return err
 		}
@@ -852,34 +856,24 @@ func (ingress *F5Ingress) CreateOrUpdateRouter(router structs.Routerspec) error 
 }
 
 func (ingress *F5Ingress) DeleteRouter(router structs.Routerspec) error {
-	config, err := GetSitesIngressPublicExternal()
-	if err != nil {
-		return err
-	}
-	if router.Internal {
-		config, err = GetSitesIngressPrivateInternal()
-		if err != nil {
-			return err
-		}
-	}
-	rule, err := ingress.client.BuildRule(ingress.db, router, config.Environment, config.Name)
+	rule, err := ingress.client.BuildRule(ingress.db, router, ingress.config.Environment, ingress.config.Name)
 	ruleName := router.Domain + "-rule"
 	if err != nil {
 		log.Printf("Unable to delete F5 router (buildRule failed): %s\n", err.Error())
 		return err
 	}
-	err = ingress.client.DetachRule(rule.Name, config.Environment, config.Name)
+	err = ingress.client.DetachRule(rule.Name, ingress.config.Environment, ingress.config.Name)
 	if err != nil {
 		log.Printf("Unable to delete F5 router (detachRule failed): %s\n", err.Error())
 		return err
 	}
-	exists, err := ingress.client.RuleExists(config.Environment, config.Name, ruleName)
+	exists, err := ingress.client.RuleExists(ingress.config.Environment, ingress.config.Name, ruleName)
 	if err != nil {
 		log.Printf("Unable to delete F5 router (ruleExists failed): %s\n", err.Error())
 		return err
 	}
 	if exists {
-		err = ingress.client.DeleteRule(ruleName, config.Environment, config.Name)
+		err = ingress.client.DeleteRule(ruleName, ingress.config.Environment, ingress.config.Name)
 		if err != nil {
 			log.Printf("Unable to delete F5 router (deleteRule failed): %s\n", err.Error())
 			return err
@@ -980,45 +974,50 @@ func (ingress *F5Ingress) GetInstalledCertificates(site string) ([]Certificate, 
 
 	var certs []Certificate = make([]Certificate, 0)
 	for _, cert := range ssl_certs {
-		var matchedSiteDomain = false
-		var onCorrectPartition = false
-		var isAttachedToVip = false
-		var notExpired = false
-		sans := strings.Split(strings.Replace(cert.SubjectAlternativeName, "DNS:", "", -1), ",")
-		var certType string = "normal"
-		if len(sans) > 1 {
-			certType = "sans"
-		}
-		destsans := make([]string, 0)
-		for _, san := range sans {
-			san = strings.Replace(san, " ", "", -1)
-			destsans = append(destsans, san)
-			if strings.Contains(san, "*") {
-				certType = "wildcard"
+		// We do not want to examine chains that are for intermediate or root certificates,
+		// therefore we kind of have to "hack" it as the F5 does not clearly deliniate the
+		// way its using installed certificates as it may be different from vip to vip.
+		if !strings.HasPrefix(cert.Subject, "CN=Let's Encrypt") && !strings.HasPrefix(cert.Subject, "CN=DigiCert") && cert.IsBundle == "false" {
+			var matchedSiteDomain = false
+			var onCorrectPartition = false
+			var isAttachedToVip = false
+			var notExpired = false
+			sans := strings.Split(strings.Replace(cert.SubjectAlternativeName, "DNS:", "", -1), ",")
+			var certType string = "normal"
+			if len(sans) > 1 {
+				certType = "sans"
 			}
-			if !matchedSiteDomain {
-				matchedSiteDomain = WildCardMatch(san, site)
+			destsans := make([]string, 0)
+			for _, san := range sans {
+				san = strings.Replace(san, " ", "", -1)
+				destsans = append(destsans, san)
+				if strings.Contains(san, "*") {
+					certType = "wildcard"
+				}
+				if !matchedSiteDomain {
+					matchedSiteDomain = WildCardMatch(san, site)
+				}
 			}
-		}
-		notExpired = int64(cert.Expiration) > time.Now().Unix()
-		onCorrectPartition = cert.Partition == ingress.config.Environment
-		// Dont bother unless we match
-		if matchedSiteDomain && onCorrectPartition {
-			isAttachedToVip, err = ingress.client.IsCertificateAttachedToVip(strings.Replace(cert.Name, ".crt", "", -1), ingress.config.Environment, ingress.config.Name)
-			if err != nil {
-				isAttachedToVip = false
-				fmt.Printf("An error occured querying if the certifiate was attached: %s %s\n", cert.Name, err.Error())
+			notExpired = int64(cert.Expiration) > time.Now().Unix()
+			onCorrectPartition = cert.Partition == ingress.config.Environment
+			// Dont bother unless we match
+			if matchedSiteDomain && onCorrectPartition {
+				isAttachedToVip, err = ingress.client.IsCertificateAttachedToVip(strings.Replace(cert.Name, ".crt", "", -1), ingress.config.Environment, ingress.config.Name)
+				if err != nil {
+					isAttachedToVip = false
+					fmt.Printf("An error occured querying if the certifiate was attached: %s %s\n", cert.Name, err.Error())
+				}
 			}
-		}
-		if matchedSiteDomain && onCorrectPartition && isAttachedToVip {
-			certs = append(certs, Certificate{
-				Type:         certType,
-				Name:         cert.Name,
-				Expires:      int64(cert.Expiration),
-				Alternatives: destsans,
-				Expired:      !notExpired,
-				Address:      ingress.config.Address,
-			})
+			if matchedSiteDomain && onCorrectPartition && isAttachedToVip {
+				certs = append(certs, Certificate{
+					Type:         certType,
+					Name:         cert.Name,
+					Expires:      int64(cert.Expiration),
+					Alternatives: destsans,
+					Expired:      !notExpired,
+					Address:      ingress.config.Address,
+				})
+			}
 		}
 	}
 	return certs, nil
