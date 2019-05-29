@@ -2,7 +2,6 @@ package router
 
 import (
 	"database/sql"
-	"errors"
 	"fmt"
 	"github.com/go-martini/martini"
 	_ "github.com/lib/pq" //driver
@@ -11,7 +10,6 @@ import (
 	"github.com/nu7hatch/gouuid"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	runtime "region-api/runtime"
 	spacepackage "region-api/space"
@@ -20,102 +18,6 @@ import (
 	"strconv"
 	"strings"
 )
-
-type IngressesConfig struct {
-	AppsPublicInternal   *IngressConfig `json:"apps_public_internal"`
-	AppsPublicExternal   *IngressConfig `json:"apps_public_external"`
-	AppsPrivateInternal  *IngressConfig `json:"apps_private_interal"`
-	SitesPublicInternal  *IngressConfig `json:"sites_public_internal"`
-	SitesPublicExternal  *IngressConfig `json:"sites_public_external"`
-	SitesPrivateInternal *IngressConfig `json:"sites_private_interal"`
-}
-
-type IngressConfig struct {
-	Device      string `json:"device"`
-	Address     string `json:"address"`
-	Environment string `json:"environment"`
-	Name        string `json:name`
-}
-
-func urlToIngressConfig(uri string) (*IngressConfig, error) {
-	u, err := url.Parse(uri)
-	if err != nil {
-		return nil, err
-	}
-	components := strings.Split(u.Path, "/")
-	if len(components) != 3 {
-		return nil, errors.New("The ingress configuration provided " + uri + " was invalid.")
-	}
-	if components[0] != "" {
-		return nil, errors.New("The ingress config provided " + uri + " was invalid.")
-	}
-	if strings.ToLower(u.Scheme) != "f5" && strings.ToLower(u.Scheme) != "istio" {
-		return nil, errors.New("The ingress " + uri + " contains an invalid ingress type, must be f5 or istio.")
-	}
-	if u.Host == "" {
-		return nil, errors.New("The ingress " + uri + " contains an invalid address for the ingress.")
-	}
-	return &IngressConfig{
-		Device:      strings.ToLower(u.Scheme),
-		Address:     strings.ToLower(u.Host),
-		Environment: components[1],
-		Name:        components[2],
-	}, nil
-}
-
-func GetAppsIngressPublicInternal() (*IngressConfig, error) {
-	return urlToIngressConfig(os.Getenv("APPS_PUBLIC_INTERNAL"))
-}
-func GetAppsIngressPublicExternal() (*IngressConfig, error) {
-	return urlToIngressConfig(os.Getenv("APPS_PUBLIC_EXTERNAL"))
-}
-func GetAppsIngressPrivateInternal() (*IngressConfig, error) {
-	return urlToIngressConfig(os.Getenv("APPS_PRIVATE_INTERNAL"))
-}
-func GetSitesIngressPublicInternal() (*IngressConfig, error) {
-	return urlToIngressConfig(os.Getenv("SITES_PUBLIC_INTERNAL"))
-}
-func GetSitesIngressPublicExternal() (*IngressConfig, error) {
-	return urlToIngressConfig(os.Getenv("SITES_PUBLIC_EXTERNAL"))
-}
-func GetSitesIngressPrivateInternal() (*IngressConfig, error) {
-	return urlToIngressConfig(os.Getenv("SITES_PRIVATE_INTERNAL"))
-}
-
-func GetIngressConfig() (*IngressesConfig, error) {
-	api, err := GetAppsIngressPublicInternal()
-	if err != nil {
-		return nil, err
-	}
-	ape, err := GetAppsIngressPublicExternal()
-	if err != nil {
-		return nil, err
-	}
-	apri, err := GetAppsIngressPrivateInternal()
-	if err != nil {
-		return nil, err
-	}
-	spi, err := GetSitesIngressPublicInternal()
-	if err != nil {
-		return nil, err
-	}
-	spe, err := GetSitesIngressPublicExternal()
-	if err != nil {
-		return nil, err
-	}
-	spri, err := GetSitesIngressPrivateInternal()
-	if err != nil {
-		return nil, err
-	}
-	return &IngressesConfig{
-		AppsPublicInternal:   api,
-		AppsPublicExternal:   ape,
-		AppsPrivateInternal:  apri,
-		SitesPublicInternal:  spi,
-		SitesPublicExternal:  spe,
-		SitesPrivateInternal: spri,
-	}, nil
-}
 
 func Octhc(db *sql.DB, params martini.Params, r render.Render) {
 	if _, err := GetAppIngress(db, false); err != nil {
@@ -295,23 +197,25 @@ func createRouter(spec structs.Routerspec, db *sql.DB) (structs.Messagespec, err
 	if err != nil {
 		return structs.Messagespec{Status: http.StatusInternalServerError, Message: "Error while adding router: " + err.Error()}, err
 	}
-	config, err := GetIngressConfig()
+	
+	config, err := GetDefaultIngressSiteAddresses()
 	if err != nil {
-		return structs.Messagespec{Status: http.StatusInternalServerError, Message: "Error while adding router: " + err.Error()}, err
+		return structs.Messagespec{Status: http.StatusInternalServerError, Message: "Error while adding router (getting site addresses): " + err.Error()}, err
 	}
+
 	for _, domain := range domains {
 		if domain.Public && !spec.Internal {
-			if err := dns.CreateDomainRecord(domain, GetDNSRecordType(config.SitesPublicExternal.Address), spec.Domain, []string{config.SitesPublicExternal.Address}); err != nil {
+			if err := dns.CreateDomainRecord(domain, GetDNSRecordType(config.PublicExternal.Address), spec.Domain, []string{config.PublicExternal.Address}); err != nil {
 				fmt.Printf("Error: Failed to create public (external) dns: %s\n", err.Error())
 			}
 		}
 		if !domain.Public && !spec.Internal {
-			if err := dns.CreateDomainRecord(domain, GetDNSRecordType(config.SitesPublicInternal.Address), spec.Domain, []string{config.SitesPublicInternal.Address}); err != nil {
+			if err := dns.CreateDomainRecord(domain, GetDNSRecordType(config.PublicInternal.Address), spec.Domain, []string{config.PublicInternal.Address}); err != nil {
 				fmt.Printf("Error: Failed to create private (external) dns: %s\n", err.Error())
 			}
 		}
 		if !domain.Public && spec.Internal {
-			if err := dns.CreateDomainRecord(domain, GetDNSRecordType(config.SitesPrivateInternal.Address), spec.Domain, []string{config.SitesPrivateInternal.Address}); err != nil {
+			if err := dns.CreateDomainRecord(domain, GetDNSRecordType(config.PrivateInternal.Address), spec.Domain, []string{config.PrivateInternal.Address}); err != nil {
 				fmt.Printf("Error: Failed to create private (internal) dns: %s\n", err.Error())
 			}
 		}
@@ -435,24 +339,24 @@ func DeleteRouter(db *sql.DB, params martini.Params, r render.Render) {
 	if err != nil {
 		fmt.Println("Error trying to fetch domain(s) for " + router.Domain + ": " + err.Error())
 	} else {
-		config, err := GetIngressConfig()
+		config, err := GetDefaultIngressSiteAddresses()
 		if err != nil {
 			utils.ReportError(err, r)
 			return
 		}
 		for _, domain := range domains {
 			if domain.Public && !router.Internal {
-				if err := dns.RemoveDomainRecord(domain, GetDNSRecordType(config.SitesPublicExternal.Address), router.Domain, []string{config.SitesPublicExternal.Address}); err != nil {
+				if err := dns.RemoveDomainRecord(domain, GetDNSRecordType(config.PublicExternal.Address), router.Domain, []string{config.PublicExternal.Address}); err != nil {
 					fmt.Printf("Error: Failed to remove public (external) dns: %s\n", err.Error())
 				}
 			}
 			if !domain.Public && !router.Internal {
-				if err := dns.RemoveDomainRecord(domain, GetDNSRecordType(config.SitesPublicInternal.Address), router.Domain, []string{config.SitesPublicInternal.Address}); err != nil {
+				if err := dns.RemoveDomainRecord(domain, GetDNSRecordType(config.PublicInternal.Address), router.Domain, []string{config.PublicInternal.Address}); err != nil {
 					fmt.Printf("Error: Failed to remove private (external) dns: %s\n", err.Error())
 				}
 			}
 			if !domain.Public && router.Internal {
-				if err := dns.RemoveDomainRecord(domain, GetDNSRecordType(config.SitesPrivateInternal.Address), router.Domain, []string{config.SitesPrivateInternal.Address}); err != nil {
+				if err := dns.RemoveDomainRecord(domain, GetDNSRecordType(config.PrivateInternal.Address), router.Domain, []string{config.PrivateInternal.Address}); err != nil {
 					fmt.Printf("Error: Failed to remove private (internal) dns: %s\n", err.Error())
 				}
 			}

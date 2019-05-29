@@ -77,6 +77,8 @@ func DecodeCertificateBundle(server_name string, pem_certs []byte) (x509_decoded
 	for _, cert := range x509_decoded_certs {
 		if cert.Subject.CommonName == server_name {
 			x509_decoded_cert = cert
+		} else if cert.BasicConstraintsValid == true && cert.IsCA == false {
+			x509_decoded_cert = cert
 		} else {
 			data := pem.EncodeToMemory(&pem.Block{
 				Type:    "CERTIFICATE",
@@ -98,7 +100,7 @@ func DecodeCertificateBundle(server_name string, pem_certs []byte) (x509_decoded
 }
 
 func WildCardMatch(wildcard string, domain string) bool {
-	if wildcard == "*" {
+	if wildcard == "*" || domain == "*" {
 		return true
 	} else if strings.Contains(wildcard, "*") {
 		var d = strings.Split(domain, ".")
