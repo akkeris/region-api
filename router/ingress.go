@@ -268,7 +268,7 @@ func GetSiteIngress(db *sql.DB, internal bool) (Ingress, error) {
 		if internalSiteIngress != nil {
 			return *internalSiteIngress, nil
 		}
-		configs, err := getAppsIngressPrivateInternal()
+		configs, err := getSitesIngressPrivateInternal()
 		if err != nil {
 			return nil, err
 		}

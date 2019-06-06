@@ -72,10 +72,10 @@ type F5Client struct {
 type LBClientSsl struct {
 	Name         string           `json:"name"`
 	Partition    string           `json:"partition"`
-	Ciphers      string           `json:"ciphers"`
+	Ciphers      string           `json:"ciphers,omitempty"`
 	DefaultsFrom string           `json:"defaultsFrom"`
 	Mode         string           `json:"mode"`
-	SniDefault   string           `json:"sniDefault"`
+	SniDefault   string           `json:"sniDefault,omitempty"`
 	ServerName   string           `json:"serverName"`
 	CertKeyChain []LBCertKeyChain `json:"certKeyChain"`
 }
