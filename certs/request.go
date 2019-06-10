@@ -103,7 +103,7 @@ func InstallCertificate(db *sql.DB, params martini.Params, r render.Render) {
 			return
 		}
 	}
-	auto, err = issuer.IsOrderAutoInstalled(private)
+	auto, err = issuer.IsOrderAutoInstalled(public)
 	if err != nil {
 		utils.ReportError(err, r)
 		return

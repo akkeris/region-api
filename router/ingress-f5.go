@@ -72,10 +72,10 @@ type F5Client struct {
 type LBClientSsl struct {
 	Name         string           `json:"name"`
 	Partition    string           `json:"partition"`
-	Ciphers      string           `json:"ciphers"`
+	Ciphers      string           `json:"ciphers,omitempty"`
 	DefaultsFrom string           `json:"defaultsFrom"`
 	Mode         string           `json:"mode"`
-	SniDefault   string           `json:"sniDefault"`
+	SniDefault   string           `json:"sniDefault,omitempty"`
 	ServerName   string           `json:"serverName"`
 	CertKeyChain []LBCertKeyChain `json:"certKeyChain"`
 }
@@ -592,21 +592,43 @@ func (f5 *F5Client) InstallCertificate(partition string, vip string, server_name
 		}
 
 		// Install the SSL/TLS Profile
-		profile := LBClientSsl{
-			Name:       profile_name,
-			Partition:  partition,
-			Ciphers:    f5_cipher_list, // MUST BE THIS LIST!
-			SniDefault: "false",
-			ServerName: server_name,
-			Mode:       "enabled",
-			CertKeyChain: []LBCertKeyChain{
-				LBCertKeyChain{
-					Name:  profile_name,
-					Cert:  "/" + partition + "/" + main_certs_name + ".crt",
-					Chain: "/" + partition + "/" + main_certs_name + "_chain.crt",
-					Key:   "/" + partition + "/" + main_certs_name + ".key",
+		var profile LBClientSsl
+		if os.Getenv("SSLPROFILEPARENT") == "default" {
+			profile = LBClientSsl{
+				Name:       profile_name,
+				Partition:  partition,
+				Ciphers:    f5_cipher_list, // MUST BE THIS LIST!
+				SniDefault: "false",
+				ServerName: server_name,
+				Mode:       "enabled",
+				CertKeyChain: []LBCertKeyChain{
+					LBCertKeyChain{
+						Name:  profile_name,
+						Cert:  "/" + partition + "/" + main_certs_name + ".crt",
+						Chain: "/" + partition + "/" + main_certs_name + "_chain.crt",
+						Key:   "/" + partition + "/" + main_certs_name + ".key",
+					},
 				},
-			},
+			}
+		}
+
+		if os.Getenv("SSLPROFILEPARENT") != "default" {
+			profile = LBClientSsl{
+				Name:         profile_name,
+				Partition:    partition,
+				DefaultsFrom: os.Getenv("SSLPROFILEPARENT"),
+				SniDefault:   "false",
+				ServerName:   server_name,
+				Mode:         "enabled",
+				CertKeyChain: []LBCertKeyChain{
+					LBCertKeyChain{
+						Name:  profile_name,
+						Cert:  "/" + partition + "/" + main_certs_name + ".crt",
+						Chain: "/" + partition + "/" + main_certs_name + "_chain.crt",
+						Key:   "/" + partition + "/" + main_certs_name + ".key",
+					},
+				},
+			}
 		}
 		b, err := json.Marshal(profile)
 		if err != nil {
@@ -624,13 +646,14 @@ func (f5 *F5Client) InstallCertificate(partition string, vip string, server_name
 			return err
 		}
 		// Attach the client ssl profile to the virtual server
+
 		vprofile := f5client.LBVirtualProfile{
 			Name:      "/" + partition + "/" + profile_name,
 			Partition: partition,
 			FullPath:  "/" + partition + "/" + profile_name,
 			Context:   "clientside",
 		}
-
+                 
 		err, _ = f5.device.AddVirtualProfile(vserver, &vprofile)
 
 		if err != nil {
@@ -638,6 +661,7 @@ func (f5 *F5Client) InstallCertificate(partition string, vip string, server_name
 			fmt.Println(err)
 			return err
 		}
+
 	}
 	return nil
 }
@@ -793,13 +817,12 @@ type F5Ingress struct {
 	db     *sql.DB
 }
 
-
 /*
 Device      string `json:"device"`
 	Address     string `json:"address"`
 	Environment string `json:"environment"`
 	Name        string `json:name`
-	*/
+*/
 
 func GetF5Ingress(db *sql.DB, config *IngressConfig) (*F5Ingress, error) {
 	if config.Device != "f5" {
