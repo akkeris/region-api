@@ -23,7 +23,6 @@ func GetSubscribers(params martini.Params, r render.Render) {
 	if space == "default" {
 		servicegroup = "alamo-" + app + "-services"
 	}
-	fmt.Println(servicegroup)
 	subscribers, err := getSubscribers(servicegroup)
 	if err != nil {
 		utils.ReportError(err, r)
@@ -36,7 +35,6 @@ func GetSubscribersDB(db *sql.DB, params martini.Params, r render.Render) {
 	app := params["app"]
 	space := params["space"]
 	subscribers, err := getSubscribersDB(db, space, app)
-	fmt.Println(subscribers)
 	if err != nil {
 		utils.ReportError(err, r)
 		return
@@ -62,7 +60,6 @@ func RemoveSubscriber(spec structs.Subscriberspec, berr binding.Errors, r render
 	if space == "default" {
 		servicegroup = "alamo-" + app + "-services"
 	}
-	fmt.Println(servicegroup)
 	msg, err := removeSubscriber(servicegroup, email)
 	if err != nil {
 		fmt.Println(err)
@@ -121,7 +118,6 @@ func AddSubscriber(spec structs.Subscriberspec, berr binding.Errors, r render.Re
 	if space == "default" {
 		servicegroup = "alamo-" + app + "-services"
 	}
-	fmt.Println(servicegroup)
 	msg, err := addSubscriber(servicegroup, email)
 	if err != nil {
 		fmt.Println(err)
@@ -149,7 +145,6 @@ func removeSubscriber(servicegroup string, email string) (msg structs.Messagespe
 		return toreturn, err
 	}
 
-	fmt.Println("Removed :" + strconv.Itoa(changeinfo.Removed))
 	toreturn.Status = 200
 	toreturn.Message = "Removed :" + strconv.Itoa(changeinfo.Removed)
 	return toreturn, nil
@@ -184,7 +179,6 @@ func addSubscriber(servicegroup string, email string) (msg structs.Messagespec, 
 	var toreturn structs.Messagespec
 
 	exists := subscriberExists(servicegroup, email)
-	fmt.Println(exists)
 	if !exists {
 
 		var c *mgo.Collection
@@ -290,6 +284,5 @@ func getSubscribersDB(db *sql.DB, space string, app string) (subs []structs.Subs
 		fmt.Println(err)
 		return result, err
 	}
-	fmt.Println(result)
 	return result, nil
 }

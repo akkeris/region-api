@@ -42,7 +42,6 @@ func Spaceappstatus(params martini.Params, r render.Render) {
 	if err != nil {
 		utils.ReportError(err, r)
 	}
-	//fmt.Println(string(result))
 	resulta = strings.Split(string(result), "\n")
 	var resultso structs.SpaceAppStatus
 	for _, element := range resulta {
