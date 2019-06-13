@@ -209,9 +209,9 @@ func (ingress *TransitionIngress) GetInstalledCertificates(site string) ([]Certi
 func (ingress *TransitionIngress) Config() *IngressConfig {
 	// Generally used to determine DNS for new sites, we'll use f5
 	if os.Getenv("DEFAULT_TRANSITION_INGRESS") == "istio" {
-		return ingress.f5.Config()
+		return ingress.istio.Config()
 	}
-	return ingress.istio.Config()
+	return ingress.f5.Config()
 }
 
 func (ingress *TransitionIngress) Name() string {
