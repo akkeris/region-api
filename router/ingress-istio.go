@@ -306,13 +306,17 @@ func GetIstioIngress(db *sql.DB, config *IngressConfig) (*IstioIngress, error) {
 	if config.Device != "istio" {
 		return nil, errors.New("Unable to initialize the istio ingress, the config is not for Istio: " + config.Device)
 	}
-	runtime, err := runtime.GetRuntimeStack(db, os.Getenv("DEFAULT_STACK"))
+	runtimes, err := runtime.GetAllRuntimes(db)
 	// TODO: This is obvious we don't yet support multi-cluster regions.
 	//       and this is an artifact of that, we shouldn't have a 'stack' our
 	//       certificates or ingress are issued from.
 	if err != nil {
 		return nil, err
 	}
+	if len(runtimes) == 0 {
+		return nil, errors.New("No runtime was found wilhe trying to init istio ingress.")
+	}
+	runtime := runtimes[0]
 
 	if os.Getenv("INGRESS_DEBUG") == "true" {
 		fmt.Printf("[ingress] Istio initialized with %s for namespace %s and gateway %s\n", config.Address, config.Environment, config.Name)
