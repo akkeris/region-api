@@ -188,6 +188,7 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 		deploy1.Labels = make(map[string]string)
 	}
 
+	deploy1.Labels["akkeris.io/plan"] = plan
 	if internal {
 		deploy1.Labels["akkeris.io/internal"] = "true"
 	} else {

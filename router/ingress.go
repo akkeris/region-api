@@ -294,3 +294,11 @@ func GetSiteIngress(db *sql.DB, internal bool) (Ingress, error) {
 		return *externalSiteIngress, nil
 	}
 }
+
+func TransitionAppToIngress(db *sql.DB, ingress string, internal bool) (error) {
+	return nil
+}
+
+func TransitionSiteToIngress(db *sql.DB, ingress string, internal bool) (error) {
+	return nil
+}

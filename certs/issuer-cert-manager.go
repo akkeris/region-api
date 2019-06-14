@@ -119,13 +119,17 @@ func GetCertManagerIssuer(db *sql.DB) (*CertManagerIssuer, error) {
 	if certificateNamespace == "" {
 		certificateNamespace = "istio-system"
 	}
-	runtime, err := runtime.GetRuntimeStack(db, os.Getenv("DEFAULT_STACK"))
+	runtimes, err := runtime.GetAllRuntimes(db)
 	// TODO: This is obvious we don't yet support multi-cluster regions.
 	//       and this is an artifact of that, we shouldn't have a 'stack' our
 	//       certificates or ingress are issued from.
 	if err != nil {
 		return nil, err
 	}
+	if len(runtimes) == 0 {
+		return nil, errors.New("No runtime was found wilhe trying to init istio ingress.")
+	}
+	runtime := runtimes[0]
 	return &CertManagerIssuer{
 		issuerName:           issuerName,
 		runtime:              runtime,
