@@ -741,8 +741,14 @@ func (ingress *IstioIngress) SetMaintenancePage(app string, space string, value 
 	if len(virtualService.Spec.HTTP) == 0 || len(virtualService.Spec.HTTP[0].Route) == 0 {
 		return errors.New("The specified maintenance page could not be found or did not have a routable virtual service.")
 	}
+	
+	downpage := "akkeris404.akkeris-system.svc.cluster.local"
+	if os.Getenv("ISTIO_DOWNPAGE") != "" {
+		downpage = os.Getenv("ISTIO_DOWNPAGE")
+	}
+
 	if value {
-		virtualService.Spec.HTTP[0].Route[0].Destination.Host = "akkeris-404-page.default.svc.cluster.local"
+		virtualService.Spec.HTTP[0].Route[0].Destination.Host = downpage
 	} else {
 		virtualService.Spec.HTTP[0].Route[0].Destination.Host = app + "." + space + ".svc.cluster.local"
 	}
@@ -757,10 +763,16 @@ func (ingress *IstioIngress) GetMaintenancePageStatus(app string, space string) 
 	if err != nil {
 		return false, err
 	}
+	
+	downpage := "akkeris404.akkeris-system.svc.cluster.local"
+	if os.Getenv("ISTIO_DOWNPAGE") != "" {
+		downpage = os.Getenv("ISTIO_DOWNPAGE")
+	}
+
 	if len(virtualService.Spec.HTTP) == 0 || len(virtualService.Spec.HTTP[0].Route) == 0 {
 		return false, errors.New("The specified maintenance page could not be found or did not have a routable virtual service.")
 	}
-	if virtualService.Spec.HTTP[0].Route[0].Destination.Host == "akkeris-404-page.default.svc.cluster.local" {
+	if virtualService.Spec.HTTP[0].Route[0].Destination.Host == downpage {
 		return true, nil
 	} else {
 		return false, nil

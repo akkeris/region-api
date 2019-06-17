@@ -46,6 +46,7 @@ Set the following environment variables, if this is first time running it see th
 * F5_URL - The https URL of the F5 
 * F5_UNIPOOL - When using the F5 in an ingress instruct it to use a single pool. See F5 Setup below for more information.
 * F5_CIPHER_LIST - The cipher list to use when creating TLS (SSL) client profiles, defaults to `!SSLv2:!SSLv3:!MD5:!EXPORT:!RSA+3DES:!RSA+RC4:!ECDHE+RC4:!ECDHE+3DES:ECDHE+AES:RSA+AES`
+* ISTIO_DOWNPAGE - The maintenance page to use, this should be the service host for an app in akkeris. Defaults to `akkeris404.akkeris-system.svc.cluster.local`.
 
 If the apps or sites ingres uses an F5, the `F5_SECRET` and `F5_URL` should be set.  If using istio these may be left blank.
 
