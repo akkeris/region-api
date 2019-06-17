@@ -22,6 +22,7 @@ vendor/
 !.vscode/extensions.json
 
 *.env
+manifests/
 
 
 # End of https://www.gitignore.io/api/go,visualstudiocode

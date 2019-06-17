@@ -1,0 +1,112 @@
+# Default values for chart.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+image:
+  repository: akkeris/region-api
+  tag: release-27
+  pullPolicy: IfNotPresent
+
+nameOverride: "region-api"
+fullnameOverride: "region-api"
+
+service:
+  type: NodePort
+  port: 80
+  targetPort: 3600
+
+ingress:
+  enabled: true
+  annotations: {
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  }
+  hosts:
+    - region-api.example
+
+  # tls: 
+  # - secretName: region-api-certificate
+  #   hosts:
+  #     - region-api.example
+  paths: 
+   - /
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #  cpu: 100m
+  #  memory: 128Mi
+  # requests:
+  #  cpu: 100m
+  #  memory: 128Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+configmap:
+  data:
+    ALAMO_API_AUTH_SECRET: 
+    ALAMO_INTERNAL_URL_TEMPLATE: 
+    ALAMO_URL_TEMPLATE: 
+    APPS_PRIVATE_INTERNAL: 
+    APPS_PUBLIC_EXTERNAL: 
+    APPS_PUBLIC_INTERNAL: 
+    CASSANDRA_BROKER_URL: 
+    CERT_COUNTRY: 
+    CERT_EMAIL: 
+    CERT_LOCALITY: 
+    CERT_ORG: 
+    CERT_ORG_UNIT: 
+    CERT_PROVINCE: 
+    CERT_VALIDITY_YEARS: 
+    DEFAULT_TRANSITION_INGRESS: 
+    DIGICERT_REQUEST_URL: 
+    DIGICERT_SECRET: 
+    DIGICERT_URL: 
+    DOMAIN_NAME: 
+    ENABLE_AUTH: "false"
+    ES_BROKER_URL: 
+    EXTERNAL_DOMAIN: 
+    F5_SECRET: 
+    F5_UNIPOOL: 
+    F5_URL: 1
+    FEATURE_DEFAULT_OCTHC: 
+    FEATURE_DEFAULT_OPSGENIE: 
+    IMAGE_PULL_SECRET: 
+    INFLUXDB_BROKER_URL: 
+    INFLUXDB_URL: 
+    INGRESS_DEBUG: "true"
+    INTERNAL_DOMAIN:
+    KAFKA_BROKER_URL:
+    KAFKA_BROKERS: 
+    LOGSHUTTLE_APP: logshuttle
+    LOGSHUTTLE_RESTART: "false"
+    LOGSHUTTLE_SPACE: default
+    MARTINI_ENV: Prod
+    MEMCACHED_BROKER_URL: 
+    MONGODB_BROKER_URL:
+    NAGIOS_ADDRESS: 
+    NEPTUNE_BROKER_URL: 
+    PITDB: 
+    PORT: "3600"
+    PROMETHEUS_URL: http://prometheus-server.prometheus
+    RABBITMQ_BROKER_URL: 
+    REDIS_BROKER_URL: 
+    REVISION_HISTORY_LIMIT: "10"
+    S3_BROKER_URL: 
+    SECRETS: 
+    SERVICES: 
+    SITES_PRIVATE_INTERNAL: 
+    SITES_PUBLIC_EXTERNAL: 
+    SITES_PUBLIC_INTERNAL: 
+    SSLPROFILEPARENT: 
+    SUBSCRIPTION_URL: 
+    VAULT_CERT_STORAGE: 
+    VAULT_PREFIX: 

@@ -19,6 +19,17 @@ Ensure you've set the environment variables in the running section below.
 
 ## Running
 
+### Kubernetes Install
+
+Helm charts are available under the *kubernetes* folder.  To install:
+
+* Copy the example *values* file from *kubernetes/chart/values* to a seperate folder ex. *kubernetes/manifests*
+* Add the relevant values from the next section.
+* Generate templates with `helm template --values ./kubernetes/chart/values.yaml --output-dir ./kubernetes/manifests ./kubernetes/chart`
+* Apply to cluster with `kubectl apply -f ./kubernetes/manifests/`
+
+``
+
 ### Environment
 
 Set the following environment variables, if this is first time running it see the Setup section.
