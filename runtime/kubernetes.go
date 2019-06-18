@@ -804,7 +804,7 @@ func (rt Kubernetes) CreateService(space string, app string, port int, labels ma
 	portitem.Protocol = "TCP"
 	portitem.Port = 80
 	portitem.TargetPort = port
-	if features.Http2Service {
+	if features.Http2EndToEndService {
 		portitem.Name = "http2"
 	} else {
 		portitem.Name = "http"
@@ -840,7 +840,7 @@ func (rt Kubernetes) UpdateService(space string, app string, port int, labels ma
 	if e != nil {
 		return nil, e
 	}
-	if features.Http2Service {
+	if features.Http2EndToEndService {
 		existingservice.Spec.Ports[0].Name = "http2"
 	} else {
 		existingservice.Spec.Ports[0].Name = "http"

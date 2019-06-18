@@ -107,6 +107,7 @@ This uses jetstack's cert-manager (if installed) to issue certificates. Note abo
 * SUBSCRIPTION_URL
 * FEATURE_DEFAULT_OCTHC - a true or false value to enable octhc feature
 * FEATURE_DEFAULT_OPSGENIE - a true or false value to enable opsgenie feature
+* PUBLIC_DNS_RESOLVER - Used to see if DNS records are already set, this is used incase region api is in a VPN/VPC network. Defaults to 8.8.8.8
 
 **Debugging Environment Variables:**
 
