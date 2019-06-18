@@ -748,9 +748,15 @@ func (rt Kubernetes) GetPodDetails(space string, app string) []structs.Instance 
 	return instances
 }
 
-func (rt Kubernetes) GetPodLogs(space string, app string, pod string) (log string, err error) {
+func (rt Kubernetes) GetPodLogs(space string, app string, pod string, timestamps bool) (log string, err error) {
 	limitBytes := "1000000" //100kb
-	resp, e := rt.k8sRequest("get", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+space+"/pods/"+pod+"/log?limitBytes="+limitBytes+"&container="+app, nil)
+        var requeststring string
+        if timestamps {
+            requeststring = "/api/"+rt.defaultApiServerVersion+"/namespaces/"+space+"/pods/"+pod+"/log?timestamps=true&limitBytes="+limitBytes+"&container="+app
+        }else{
+            requeststring = "/api/"+rt.defaultApiServerVersion+"/namespaces/"+space+"/pods/"+pod+"/log?limitBytes="+limitBytes+"&container="+app
+        }
+	resp, e := rt.k8sRequest("get", requeststring, nil)
 	if e != nil {
 		return "", e
 	}

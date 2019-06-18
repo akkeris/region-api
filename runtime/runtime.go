@@ -534,7 +534,7 @@ type Runtime interface {
 	RestartDeployment(space string, app string) (e error)
 	GetCurrentImage(space string, app string) (i string, e error)
 	GetPodDetails(space string, app string) []structs.Instance
-	GetPodLogs(app string, space string, pod string) (log string, err error)
+	GetPodLogs(app string, space string, pod string, timestamps bool) (log string, err error)
 	OneOffExists(space string, name string) bool
 	GetDeploymentHistory(space string, app string) (dslist []structs.DeploymentsSpec, err error)
 	RollbackDeployment(space string, app string, revision int) (e error)

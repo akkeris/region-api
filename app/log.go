@@ -11,18 +11,27 @@ import (
 )
 
 // GetAppLogs gets 100kb dump of pod logs from the top
-func GetAppLogs(db *sql.DB, params martini.Params, r render.Render) {
+
+func GetAppLogs(req *http.Request, db *sql.DB, params martini.Params, r render.Render) {
 	app := params["appname"]
 	space := params["space"]
+        
 	instance := params["instanceid"]
+        timestampsparam := req.URL.Query().Get("timestamps")
+        var timestamps bool
+        if timestampsparam == "true" {
+           timestamps = true
+        }else{
+           timestamps = false
+        }       
 
 	rt, err := runtime.GetRuntimeFor(db, space)
 	if err != nil {
 		utils.ReportError(err, r)
 		return
 	}
-
-	re, err := rt.GetPodLogs(space, app, instance)
+ 
+	re, err := rt.GetPodLogs(space, app, instance, timestamps)
 	if err != nil {
 		utils.ReportError(err, r)
 		return
@@ -33,3 +42,4 @@ func GetAppLogs(db *sql.DB, params martini.Params, r render.Render) {
 	log.Logs = re
 	r.JSON(http.StatusOK, log)
 }
+
