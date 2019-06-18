@@ -2,6 +2,7 @@ package router
 
 import (
 	"fmt"
+	"errors"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/route53"
@@ -39,6 +40,7 @@ type DNSProvider interface {
 	Type() string
 	Domains() ([]Domain, error)
 	Domain(domain string) ([]Domain, error)
+	DomainRecord(domain Domain, recordType string, name string) (*DomainRecord, error)
 	DomainRecords(domain Domain) ([]DomainRecord, error)
 	CreateDomainRecord(domain Domain, recordType string, name string, values []string) error
 	RemoveDomainRecord(domain Domain, recordType string, name string, values []string) error
@@ -431,6 +433,29 @@ func (dnsProvider *AwsDNSProvider) Domain(domain string) ([]Domain, error) {
 		}
 	}
 	return domains, nil
+}
+
+func (dnsProvider *AwsDNSProvider) DomainRecord(domain Domain, recordType string, name string) (*DomainRecord, error) {
+	dnsProvider.mutex.Lock()
+	defer dnsProvider.mutex.Unlock()
+	t := time.NewTicker(time.Millisecond * 500)
+	<-t.C // in order to not exceed our throttle rate
+	result, err := dnsProvider.client.ListResourceRecordSets(&route53.ListResourceRecordSetsInput{
+		MaxItems:              aws.String("1"),
+		HostedZoneId:          aws.String(domain.ProviderId),
+		StartRecordName:       aws.String(name),
+		StartRecordType:       aws.String(recordType),
+		StartRecordIdentifier: nil,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(result.ResourceRecordSets) == 0 {
+		return nil, errors.New("Record not found")
+	}
+
+	records := MapAwsResourceRecordsToDomainRecords(domain, result.ResourceRecordSets)
+	return &records[0], nil
 }
 
 func (dnsProvider *AwsDNSProvider) DomainRecords(domain Domain) ([]DomainRecord, error) {

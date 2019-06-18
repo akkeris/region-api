@@ -11,9 +11,11 @@ import (
 	runtime "region-api/runtime"
 	service "region-api/service"
 	structs "region-api/structs"
+	ingress "region-api/router"
 	utils "region-api/utils"
 	"strconv"
 	"strings"
+	"fmt"
 )
 
 func AddAlamoConfigVars(appname string, space string) []structs.EnvVar {
@@ -195,6 +197,12 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 		deploy1.Labels["akkeris.io/internal"] = "false"
 	}
 
+	if deploy1.Features.Http2EndToEndService {
+		deploy1.Labels["akkeris.io/http2"] = "true"
+	} else {
+		deploy1.Labels["akkeris.io/http2"] = "false"
+	}
+
 	// Via heuristics and rules, determine and/or override ports and configvars
 	var finalport int
 	finalport = appport
@@ -276,6 +284,34 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 		if err = rt.UpdateDeployment(&deployment); err != nil {
 			utils.ReportError(err, r)
 			return
+		}
+	}
+
+	// Any deployment features requiring istio transitioned ingresses should
+	// be marked here. Only apply this to the web dyno types.
+	webDyno := !strings.Contains(appname, "--")
+	appFQDN := appname + "." + space
+	if space == "default" {
+		appFQDN = appname
+	}
+	if internal {
+		appFQDN = appFQDN + "." + os.Getenv("INTERNAL_DOMAIN")
+	} else {
+		appFQDN = appFQDN + "." + os.Getenv("EXTERNAL_DOMAIN")
+	}
+	if (deploy1.Features.IstioInject || deploy1.Features.Http2Service || deploy1.Features.Http2EndToEndService) && webDyno {
+		if os.Getenv("INGRESS_DEBUG") == "true" {
+			fmt.Printf("[ingress] Moving app to istio ingress: %s\n", appFQDN)
+		}
+		if err := ingress.TransitionAppToIngress(db, "istio", internal, appFQDN); err != nil {
+			fmt.Printf("WARNING: Transition to istio ingress failed: %s\n", err.Error())
+		}
+	} else {
+		if os.Getenv("INGRESS_DEBUG") == "true" {
+			fmt.Printf("[ingress] Moving app to f5 ingress: %s\n", appFQDN)
+		}
+		if err := ingress.TransitionAppToIngress(db, "f5", internal, appFQDN); err != nil {
+			fmt.Printf("WARNING: Transition to f5 ingress failed: %s\n", err.Error())
 		}
 	}
 

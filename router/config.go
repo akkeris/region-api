@@ -3,6 +3,7 @@ package router
 import (
 	"database/sql"
 	"fmt"
+	"context"
 	"github.com/go-martini/martini"
 	_ "github.com/lib/pq" //driver
 	"github.com/martini-contrib/binding"
@@ -191,36 +192,116 @@ func GetDNSRecordType(address string) string {
 	return recType
 }
 
-func createRouter(spec structs.Routerspec, db *sql.DB) (structs.Messagespec, error) {
-	dns := GetDnsProvider()
-	domains, err := dns.Domain(spec.Domain)
-	if err != nil {
-		return structs.Messagespec{Status: http.StatusInternalServerError, Message: "Error while adding router: " + err.Error()}, err
+func ResolveDNS(address string, private bool) ([]string, error) {
+	resolver := net.DefaultResolver
+	if !private {
+		resolver = &net.Resolver{
+			PreferGo:true,
+			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+	            d := net.Dialer{}
+	            nameserver := "8.8.8.8"
+	            if os.Getenv("PUBLIC_DNS_RESOLVER") != "" {
+	            	nameserver = os.Getenv("PUBLIC_DNS_RESOLVER")
+	            }
+	            return d.DialContext(ctx, "udp", net.JoinHostPort(nameserver, "53"))
+	        },
+		}
 	}
-	
+	result, err := resolver.LookupHost(context.Background(), address)
+	if err != nil {
+		r, err := resolver.LookupCNAME(context.Background(), address)
+		if err != nil {
+			return nil, err
+		}
+		result = []string{r}
+	}
+	return result, nil
+}
+
+func SetDomainName(config *FullIngressConfig, fqdn string, internal bool) (error) {
+	dns := GetDnsProvider()
+	domains, err := dns.Domain(fqdn)
+	if err != nil {
+		return err
+	}
+
+	// Set the DNS 
+	for _, domain := range domains {
+		if domain.Public && !internal {
+			record, err := ResolveDNS(fqdn, false)
+			if err == nil && record[0] == config.PublicExternal.Address {
+				if os.Getenv("INGRESS_DEBUG") == "true" {
+					fmt.Printf("[ingress] Setting public external address was unnecessary, it already is set: %s == %s\n", fqdn, config.PublicExternal.Address)
+				}
+				continue;
+			} else {
+				if os.Getenv("INGRESS_DEBUG") == "true" {
+					fmt.Printf("[ingress] Setting public external address to: %s = %s\n", fqdn, config.PublicExternal.Address)
+					if err != nil {
+						fmt.Printf("[ingress]  - Because: %s\n", err.Error())
+					} else {
+						fmt.Printf("[ingress]  - Due to %#+v != %s\n", record, config.PublicExternal.Address)
+					}
+				}
+			}
+			if err := dns.CreateDomainRecord(domain, GetDNSRecordType(config.PublicExternal.Address), fqdn, []string{config.PublicExternal.Address}); err != nil {
+				return fmt.Errorf("Error: Failed to create public (external) dns: %s", err.Error())
+			}
+		}
+		if !domain.Public && !internal {
+			record, err := ResolveDNS(fqdn, true)
+			if err == nil && record[0] == config.PublicInternal.Address {
+				if os.Getenv("INGRESS_DEBUG") == "true" {
+					fmt.Printf("[ingress] Setting public internal address was unnecessary, it already is set: %s == %s\n", fqdn, config.PublicInternal.Address)
+				}
+				continue;
+			} else {
+				if os.Getenv("INGRESS_DEBUG") == "true" {
+					fmt.Printf("[ingress] Setting public internal address to: %s = %s\n", fqdn, config.PublicInternal.Address)
+					if err != nil {
+						fmt.Printf("[ingress]  - Because: %s\n", err.Error())
+					} else {
+						fmt.Printf("[ingress]  - Due to %#+v != %s\n", record, config.PublicInternal.Address)
+					}
+				}
+			}
+			if err := dns.CreateDomainRecord(domain, GetDNSRecordType(config.PublicInternal.Address), fqdn, []string{config.PublicInternal.Address}); err != nil {
+				return fmt.Errorf("Error: Failed to create private (external) dns: %s", err.Error())
+			}
+		}
+		if !domain.Public && internal {
+			record, err := ResolveDNS(fqdn, true)
+			if err == nil && record[0] == config.PrivateInternal.Address {
+				if os.Getenv("INGRESS_DEBUG") == "true" {
+					fmt.Printf("[ingress] Setting private internal address was unnecessary, it already is set: %s == %s\n", fqdn, config.PrivateInternal.Address)
+				}
+				continue;
+			} else {
+				if os.Getenv("INGRESS_DEBUG") == "true" {
+					fmt.Printf("[ingress] Setting private internal address to: %s = %s\n", fqdn, config.PrivateInternal.Address)
+					if err != nil {
+						fmt.Printf("[ingress]  - Because: %s\n", err.Error())
+					} else {
+						fmt.Printf("[ingress]  - Due to %#+v != %s\n", record, config.PrivateInternal.Address)
+					}
+				}
+			}
+			if err := dns.CreateDomainRecord(domain, GetDNSRecordType(config.PrivateInternal.Address), fqdn, []string{config.PrivateInternal.Address}); err != nil {
+				return fmt.Errorf("Error: Failed to create private (internal) dns: %s", err.Error())
+			}
+		}
+	}
+	return nil
+}
+
+func createRouter(spec structs.Routerspec, db *sql.DB) (structs.Messagespec, error) {
 	config, err := GetDefaultIngressSiteAddresses()
 	if err != nil {
 		return structs.Messagespec{Status: http.StatusInternalServerError, Message: "Error while adding router (getting site addresses): " + err.Error()}, err
 	}
-
-	for _, domain := range domains {
-		if domain.Public && !spec.Internal {
-			if err := dns.CreateDomainRecord(domain, GetDNSRecordType(config.PublicExternal.Address), spec.Domain, []string{config.PublicExternal.Address}); err != nil {
-				fmt.Printf("Error: Failed to create public (external) dns: %s\n", err.Error())
-			}
-		}
-		if !domain.Public && !spec.Internal {
-			if err := dns.CreateDomainRecord(domain, GetDNSRecordType(config.PublicInternal.Address), spec.Domain, []string{config.PublicInternal.Address}); err != nil {
-				fmt.Printf("Error: Failed to create private (external) dns: %s\n", err.Error())
-			}
-		}
-		if !domain.Public && spec.Internal {
-			if err := dns.CreateDomainRecord(domain, GetDNSRecordType(config.PrivateInternal.Address), spec.Domain, []string{config.PrivateInternal.Address}); err != nil {
-				fmt.Printf("Error: Failed to create private (internal) dns: %s\n", err.Error())
-			}
-		}
+	if err := SetDomainName(config, spec.Domain, spec.Internal); err != nil {
+		fmt.Printf("WARNING: %s\n", err.Error())
 	}
-
 	var routerid string
 	newrouteriduuid, _ := uuid.NewV4()
 	newrouterid := newrouteriduuid.String()

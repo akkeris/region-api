@@ -93,14 +93,14 @@ func getSitesIngressPrivateInternal() ([]*IngressConfig, error) {
 	return urlToIngressConfig(os.Getenv("SITES_PRIVATE_INTERNAL"))
 }
 
-type SiteIngressConfig struct {
+type FullIngressConfig struct {
 	PublicInternal IngressConfig
 	PublicExternal IngressConfig
 	PrivateInternal IngressConfig
 }
 
-func GetDefaultIngressSiteAddresses() (*SiteIngressConfig, error) {
-	var config SiteIngressConfig 
+func GetDefaultIngressSiteAddresses() (*FullIngressConfig, error) {
+	var config FullIngressConfig 
 	spi, err := getSitesIngressPublicInternal()
 	if err != nil {
 		return nil, err
@@ -295,10 +295,89 @@ func GetSiteIngress(db *sql.DB, internal bool) (Ingress, error) {
 	}
 }
 
-func TransitionAppToIngress(db *sql.DB, ingress string, internal bool) (error) {
+
+func getIngressType(configs []*IngressConfig, ingress string) (*IngressConfig, error) {
+	if configs[0].Device == ingress {
+		return configs[0], nil
+	} else if configs[1].Device == ingress {
+		return configs[1], nil
+	} else {
+		return nil, errors.New("Cannot find ingress " + ingress +" within transition config")
+	}
+}
+
+func TransitionAppToIngress(db *sql.DB, ingress string, internal bool, appFQDN string) (error) {
+	publicInternals, err := getAppsIngressPublicInternal()
+	if err != nil {
+		return err
+	}
+	publicExternals, err := getAppsIngressPublicExternal()
+	if err != nil {
+		return err
+	}
+	privateInternals, err := getAppsIngressPrivateInternal()
+	if err != nil {
+		return err
+	}
+	publicInternal, err := getIngressType(publicInternals, ingress)
+	if err != nil {
+		return err
+	}
+	publicExternal, err := getIngressType(publicExternals, ingress)
+	if err != nil {
+		return err
+	}
+	privateInternal, err := getIngressType(privateInternals, ingress)
+	if err != nil {
+		return err
+	}
+
+	configs := FullIngressConfig{
+		PublicInternal: *publicInternal,
+		PublicExternal: *publicExternal,
+		PrivateInternal: *privateInternal,
+	}
+
+	if err := SetDomainName(&configs, appFQDN, internal); err != nil {
+		return err
+	}
 	return nil
 }
 
-func TransitionSiteToIngress(db *sql.DB, ingress string, internal bool) (error) {
+func TransitionSiteToIngress(db *sql.DB, ingress string, internal bool, siteFQDN string) (error) {
+	publicInternals, err := getSitesIngressPublicInternal()
+	if err != nil {
+		return err
+	}
+	publicExternals, err := getSitesIngressPublicExternal()
+	if err != nil {
+		return err
+	}
+	privateInternals, err := getSitesIngressPrivateInternal()
+	if err != nil {
+		return err
+	}
+	publicInternal, err := getIngressType(publicInternals, ingress)
+	if err != nil {
+		return err
+	}
+	publicExternal, err := getIngressType(publicExternals, ingress)
+	if err != nil {
+		return err
+	}
+	privateInternal, err := getIngressType(privateInternals, ingress)
+	if err != nil {
+		return err
+	}
+
+	configs := FullIngressConfig{
+		PublicInternal: *publicInternal,
+		PublicExternal: *publicExternal,
+		PrivateInternal: *privateInternal,
+	}
+
+	if err := SetDomainName(&configs, siteFQDN, internal); err != nil {
+		return err
+	}
 	return nil
 }
