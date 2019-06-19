@@ -64,7 +64,7 @@ type Features struct {
 	ServiceMesh bool `json:"serviceMesh,omitempty"`
 	IstioInject bool `json:"istioInject,omitempty"`
 	Http2Service bool `json:"http2,omitempty"`
-	Http2EndToEndService bool `json:"http2-end-to-end,omitempty`
+	Http2EndToEndService bool `json:"http2-end-to-end,omitempty"`
 }
 
 //Setspec setspec
