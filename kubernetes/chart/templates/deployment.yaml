@@ -34,6 +34,10 @@ spec:
         envFrom:
         - configMapRef:
           name: {{ .Chart.Name }}
+        {{- range .Values.secrets }}
+        - secretRef:
+          name: {{ . }}
+        {{- end }}
         ports:
         - containerPort: 3600
           protocol: TCP

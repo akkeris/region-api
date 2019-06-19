@@ -6,7 +6,7 @@ replicaCount: 1
 
 image:
   repository: akkeris/region-api
-  tag: release-27
+  tag: latest
   pullPolicy: IfNotPresent
 
 nameOverride: "region-api"
@@ -17,6 +17,9 @@ service:
   port: 80
   targetPort: 3600
 
+secrets:
+  - akkeris-system-iam
+  - akkeris-system-vault
 ingress:
   enabled: true
   annotations: {
