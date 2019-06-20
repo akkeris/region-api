@@ -10,6 +10,8 @@ import (
 )
 
 type Ingress interface {
+	InstallOrUpdateJWTAuthFilter(appname string, space string, fqdn string, port int64, issuer string, jwksUri string, audiences []string, excludes []string) (error)
+	DeleteJWTAuthFilter(appname string, space string, fqdn string, port int64) (error)
 	SetMaintenancePage(app string, space string, value bool) error
 	GetMaintenancePageStatus(app string, space string) (bool, error)
 	DeleteRouter(router structs.Routerspec) error

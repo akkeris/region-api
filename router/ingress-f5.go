@@ -955,6 +955,17 @@ func (ingress *F5Ingress) SetMaintenancePage(app string, space string, value boo
 	return nil
 }
 
+func (ingress *F5Ingress) InstallOrUpdateJWTAuthFilter(appname string, space string, fqdn string, port int64, issuer string, jwksUri string, audiences []string, excludes []string) (error) {
+	// TODO
+	return nil
+}
+
+func (ingress *F5Ingress) DeleteJWTAuthFilter(appname string, space string, fqdn string, port int64) (error) {
+	// TODO
+	return nil
+}
+
+
 func (ingress *F5Ingress) GetMaintenancePageStatus(app string, space string) (bool, error) {
 	ruleName := app + "-" + space + "-rule"
 	if space == "default" {
