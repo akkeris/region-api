@@ -49,6 +49,11 @@ type Routerspec struct {
 	Paths           []Routerpathspec `json:"paths"`
 }
 
+type HttpFilters struct {
+	Type string `json:"type"`
+	Data map[string]string `json:"data"`
+}
+
 //Deployspec deployment spec
 type Deployspec struct {
 	AppName  string   `json:"appname"`
@@ -58,6 +63,7 @@ type Deployspec struct {
 	Command  []string `json:"command"`
 	Features Features `json:"features,omitempty"`
 	Labels   map[string]string `json:"labels,omitempty"`
+	Filters  []HttpFilters `json:"filters,omitempty"`
 }
 
 type Features struct {

@@ -57,6 +57,47 @@ type HTTPSpec struct {
 	Headers Headersspec `json:"headers,omitempty"`
 }
 
+type StringMatch struct {
+	Exact string `json:"exact,omitempty"`
+	Prefix string `json:"prefix,omitempty"`
+	Suffix string `json:"suffix,omitempty"`
+	Regex string `json:"regex,omitempty"`
+}
+
+type TriggerRule struct {
+	ExcludedPaths []StringMatch `json:"excludedPaths,omitempty"`
+	IncludedPaths []StringMatch `json:"includedPaths,omitempty"`
+}
+
+type Jwt struct {
+	Issuer string `json:"issuer,omitempty"`
+	Audiences []string `json:"audiences,omitempty"`
+	JwksUri string `json:"jwksUri"`
+	TriggerRules []TriggerRule `json:"triggerRules,omitempty"` 
+}
+
+type OriginAuthenticationMethod struct {
+	Jwt Jwt `json:"jwt"`
+}
+
+type TargetSelector struct {
+	Name string `json:"name"`
+}
+
+type Policy struct {
+	APIVersion string `json:"apiVersion"`
+	Kind       string `json:"kind"`
+	Metadata   struct {
+		Name            string `json:"name"`
+		Namespace       string `json:"namespace"`
+	} `json:"metadata"`
+	Spec struct {
+		Origins []OriginAuthenticationMethod `json:"origins"`
+		PrincipalBinding string `json:"principalBinding` /* Can be USE_PEER or USE_ORIGIN, set to USE_ORIGIN */
+		Targets []TargetSelector `json:"targets"`
+	} `json:"spec"`
+}
+
 type VirtualService struct {
 	APIVersion string `json:"apiVersion"`
 	Kind       string `json:"kind"`
@@ -622,6 +663,62 @@ func (ingress *IstioIngress) DeleteUberSiteGateway(domain string, certificate st
 		return ingress.InstallOrUpdateGateway(domain, updated_gateway)
 	}
 	return nil
+}
+
+func (ingress *IstioIngress) InstallOrUpdateJWTAuthFilter(appname string, space string, fqdn string, port int64, issuer string, jwksUri string, audiences []string, excludes []string) (error) {
+	var jwtPolicy Policy
+	jwtPolicy.Kind = "Policy"
+	jwtPolicy.APIVersion = "authentication.istio.io/v1alpha1"
+	jwtPolicy.Metadata.Name = appname
+	jwtPolicy.Metadata.Namespace = space
+	jwtPolicy.Spec.Origins = []OriginAuthenticationMethod{ 
+		OriginAuthenticationMethod{
+			Jwt:Jwt{
+				Issuer: issuer,
+				JwksUri: jwksUri,
+				Audiences: audiences,
+			},
+		},
+	}
+	jwtPolicy.Spec.PrincipalBinding = "USE_ORIGIN"
+	jwtPolicy.Spec.Targets = []TargetSelector{
+		TargetSelector{
+			Name: appname,
+		},
+	}
+
+	if len(excludes) > 0 {
+		jwtPolicy.Spec.Origins[0].Jwt.TriggerRules = make([]TriggerRule, 1)
+		jwtPolicy.Spec.Origins[0].Jwt.TriggerRules[0].ExcludedPaths = make([]StringMatch, 0)
+		for _, exclude := range excludes {
+			jwtPolicy.Spec.Origins[0].Jwt.TriggerRules[0].ExcludedPaths = append(jwtPolicy.Spec.Origins[0].Jwt.TriggerRules[0].ExcludedPaths, StringMatch{Prefix:exclude})
+		}
+	}
+
+	body, code, err := ingress.runtime.GenericRequest("post", "/apis/" + jwtPolicy.APIVersion +  "/namespaces/" + space + "/policies", jwtPolicy)
+	if err != nil {
+		body, code, err = ingress.runtime.GenericRequest("put", "/apis/" + jwtPolicy.APIVersion +  "/namespaces/" + space + "/policies/" + appname, jwtPolicy)
+	}
+	if err != nil {
+		return err
+	}
+	if code == http.StatusOK || code == http.StatusCreated {
+		return nil
+	} else {
+		return errors.New("The response for creating/updating JWT auth policy failed: " + strconv.Itoa(code) + " " + string(body))
+	}
+}
+
+func (ingress *IstioIngress) DeleteJWTAuthFilter(appname string, space string, fqdn string, port int64) (error) {
+	body, code, err := ingress.runtime.GenericRequest("delete", "/apis/authentication.istio.io/v1alpha1/namespaces/" + space + "/policies/" + appname, nil)
+	if err != nil {
+		return err
+	}
+	if code == http.StatusOK {
+		return nil
+	} else {
+		return errors.New("The response for deleting a JWT auth policy failed: " + strconv.Itoa(code) + " " + string(body))
+	}
 }
 
 func (ingress *IstioIngress) InstallOrUpdateUberSiteGateway(domain string, certificate string, internal bool) error {

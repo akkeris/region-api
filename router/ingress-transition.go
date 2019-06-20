@@ -184,6 +184,20 @@ func (ingress *TransitionIngress) InstallCertificate(server_name string, pem_cer
 	return err
 }
 
+func (ingress *TransitionIngress) InstallOrUpdateJWTAuthFilter(appname string, space string, fqdn string, port int64, issuer string, jwksUri string, audiences []string, excludes []string) (error) {
+	if err := ingress.f5.InstallOrUpdateJWTAuthFilter(appname, space, fqdn, port, issuer, jwksUri, audiences, excludes); err != nil {
+		return err
+	}
+	return ingress.istio.InstallOrUpdateJWTAuthFilter(appname, space, fqdn, port, issuer, jwksUri, audiences, excludes)
+}
+
+func (ingress *TransitionIngress) DeleteJWTAuthFilter(appname string, space string, fqdn string, port int64) (error) {
+	if err := ingress.f5.DeleteJWTAuthFilter(appname, space, fqdn, port); err != nil {
+		return err
+	}
+	return ingress.istio.DeleteJWTAuthFilter(appname, space, fqdn, port)
+}
+
 func (ingress *TransitionIngress) GetInstalledCertificates(site string) ([]Certificate, error) {
 	certs, err := ingress.f5.GetInstalledCertificates(site)
 	if err != nil {

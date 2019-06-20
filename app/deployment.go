@@ -248,6 +248,12 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 		}
 	}
 
+	appIngress, err := ingress.GetAppIngress(db, internal)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+
 	// Create deployment
 	var deployment structs.Deployment
 	deployment.Labels = deploy1.Labels
@@ -266,7 +272,10 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 		deployment.Command = deploy1.Command
 
 	}
-	// Service Mesh Feature Flag
+	if len(deploy1.Filters) > 0 {
+		// Inject istio sidecar for http filters
+		deployment.Features.IstioInject = true
+	}
 	if (structs.Features{}) != deploy1.Features {
 		deployment.Features = deploy1.Features
 	}
@@ -299,21 +308,6 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 	} else {
 		appFQDN = appFQDN + "." + os.Getenv("EXTERNAL_DOMAIN")
 	}
-	if (deploy1.Features.IstioInject || deploy1.Features.Http2Service || deploy1.Features.Http2EndToEndService) && webDyno {
-		if os.Getenv("INGRESS_DEBUG") == "true" {
-			fmt.Printf("[ingress] Moving app to istio ingress: %s\n", appFQDN)
-		}
-		if err := ingress.TransitionAppToIngress(db, "istio", internal, appFQDN); err != nil {
-			fmt.Printf("WARNING: Transition to istio ingress failed: %s\n", err.Error())
-		}
-	} else {
-		if os.Getenv("INGRESS_DEBUG") == "true" {
-			fmt.Printf("[ingress] Moving app to f5 ingress: %s\n", appFQDN)
-		}
-		if err := ingress.TransitionAppToIngress(db, "f5", internal, appFQDN); err != nil {
-			fmt.Printf("WARNING: Transition to f5 ingress failed: %s\n", err.Error())
-		}
-	}
 
 	// Create/update service
 	if finalport != -1 {
@@ -326,6 +320,62 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 			if _, err := rt.UpdateService(space, appname, finalport, deploy1.Labels, deploy1.Features); err != nil {
 				utils.ReportError(err, r)
 				return
+			}
+		}
+
+		// Apply the HTTP filters
+		foundJwtFilter := false
+		for _, filter := range deploy1.Filters {
+			if filter.Type == "jwt" {
+				issuer := ""
+				jwksUri := ""
+				audiences := make([]string, 0)
+				exclude := make([]string, 0)
+				if val, ok := filter.Data["issuer"]; ok {
+					issuer = val
+				}
+				if val, ok := filter.Data["jwks_uri"]; ok {
+					jwksUri = val
+				}
+				if val, ok := filter.Data["audiences"]; ok {
+					audiences = strings.Split(val, ",")
+				}
+				if val, ok := filter.Data["excludes"]; ok {
+					exclude = strings.Split(val, ",")
+				}
+				if jwksUri == "" {
+					fmt.Printf("WARNING: Invalid jwt configuration, uri was not valid: %s\n", jwksUri)
+				} else {
+					foundJwtFilter = true
+					if err := appIngress.InstallOrUpdateJWTAuthFilter(appname, space, appFQDN, int64(finalport), issuer, jwksUri, audiences, exclude); err != nil {
+						fmt.Printf("WARNING: There was an error installing or updating JWT Auth filter: %s\n", err.Error())
+					}
+				}
+			} else {
+				fmt.Printf("WARNING: Unknown filter type: %s\n", filter.Type)
+			}
+		}
+		if !foundJwtFilter {
+			if err := appIngress.DeleteJWTAuthFilter(appname, space, appFQDN, int64(finalport)); err != nil {
+				fmt.Printf("WARNING: There was an error removing the JWT auth filter: %s\n", err.Error())
+			}
+		}
+	}
+
+	if appIngress.Name() == "transition" {
+		if (deploy1.Features.IstioInject || deploy1.Features.Http2Service || deploy1.Features.Http2EndToEndService) && webDyno {
+			if os.Getenv("INGRESS_DEBUG") == "true" {
+				fmt.Printf("[ingress] Moving app to istio ingress: %s\n", appFQDN)
+			}
+			if err := ingress.TransitionAppToIngress(db, "istio", internal, appFQDN); err != nil {
+				fmt.Printf("WARNING: Transition to istio ingress failed: %s\n", err.Error())
+			}
+		} else {
+			if os.Getenv("INGRESS_DEBUG") == "true" {
+				fmt.Printf("[ingress] Moving app to f5 ingress: %s\n", appFQDN)
+			}
+			if err := ingress.TransitionAppToIngress(db, "f5", internal, appFQDN); err != nil {
+				fmt.Printf("WARNING: Transition to f5 ingress failed: %s\n", err.Error())
 			}
 		}
 	}
