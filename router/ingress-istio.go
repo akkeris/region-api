@@ -400,18 +400,24 @@ func (ingress *IstioIngress) GatewayExists(domain string) (bool, error) {
 }
 
 func (ingress *IstioIngress) DeleteVirtualService(domain string) error {
-	_, _, err := ingress.runtime.GenericRequest("delete", "/apis/networking.istio.io/v1alpha3/namespaces/sites-system/virtualservices/"+domain, nil)
+	body, code, err := ingress.runtime.GenericRequest("delete", "/apis/networking.istio.io/v1alpha3/namespaces/sites-system/virtualservices/"+domain, nil)
 	if err != nil {
 		return err
+	}
+	if code != http.StatusOK && code != http.StatusCreated {
+		return errors.New("Unable to delete virtual service: " + string(body))
 	}
 	return nil
 }
 
 func (ingress *IstioIngress) DeleteGateway(domain string) error {
 	newdomain := strings.Replace(domain, ".", "-", -1) + "-gateway"
-	_, _, err := ingress.runtime.GenericRequest("delete", "/apis/networking.istio.io/v1alpha3/namespaces/sites-system/gateways/"+newdomain, nil)
+	body, code, err := ingress.runtime.GenericRequest("delete", "/apis/networking.istio.io/v1alpha3/namespaces/sites-system/gateways/"+newdomain, nil)
 	if err != nil {
 		return err
+	}
+	if code != http.StatusOK && code != http.StatusCreated {
+		return errors.New("Unable to delete gateway: " + string(body))
 	}
 	return nil
 }
@@ -429,9 +435,12 @@ func (ingress *IstioIngress) AppVirtualService(space string, app string) (*Virtu
 }
 
 func (ingress *IstioIngress) UpdateAppVirtualService(vs *VirtualService, space string, app string) error {
-	_, _, err := ingress.runtime.GenericRequest("put", "/apis/networking.istio.io/v1alpha3/namespaces/sites-system/virtualservices/"+app+"-"+space, vs)
+	body, code, err := ingress.runtime.GenericRequest("put", "/apis/networking.istio.io/v1alpha3/namespaces/sites-system/virtualservices/"+app+"-"+space, vs)
 	if err != nil {
 		return err
+	}
+	if code != http.StatusOK && code != http.StatusCreated {
+		return errors.New("Unable to update virtual service: " + string(body))
 	}
 	return nil
 }
