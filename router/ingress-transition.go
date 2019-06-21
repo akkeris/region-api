@@ -115,15 +115,15 @@ func GetTransitionIngress(db *sql.DB, istio *IstioIngress, f5 *F5Ingress)  (*Tra
 }
 
 func (ingress *TransitionIngress) SetMaintenancePage(app string, space string, value bool) error {
-	err := ingress.f5.SetMaintenancePage(app, space, value)
-	if err != nil {
+	if err := ingress.f5.SetMaintenancePage(app, space, value); err != nil {
 		fmt.Printf("Error in f5 trying to apply SetMaintenancePage to: %s %s %v: %s\n", app, space, value, err.Error())
+		return err
 	}
 	if err := ingress.istio.SetMaintenancePage(app, space, value); err != nil {
 		fmt.Printf("Error in istio trying to apply SetMaintenancePage to %s %s %v: %s\n", app, space, value, err.Error())
 		return err
 	}
-	return err
+	return nil
 }
 
 func (ingress *TransitionIngress) GetMaintenancePageStatus(app string, space string) (bool, error) {
