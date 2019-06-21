@@ -38,7 +38,7 @@ type Matchspec struct {
 }
 
 type Rewritespec struct {
-	URI string `json:"uri"`
+	URI string `json:"uri,omitempty"`
 }
 
 type Routespec struct {
@@ -53,8 +53,8 @@ type Routespec struct {
 type HTTPSpec struct {
 	Match   []Matchspec `json:"match"`
 	Route   []Routespec `json:"route"`
-	Rewrite Rewritespec `json:"rewrite"`
-	Headers Headersspec `json:"headers,omitempty"`
+	Rewrite *Rewritespec `json:"rewrite,omitempty"`
+	Headers *Headersspec `json:"headers,omitempty"`
 }
 
 type StringMatch struct {
@@ -424,9 +424,12 @@ func (ingress *IstioIngress) DeleteGateway(domain string) error {
 
 func (ingress *IstioIngress) AppVirtualService(space string, app string) (*VirtualService, error) {
 	var vs *VirtualService
-	body, _, err := ingress.runtime.GenericRequest("get", "/apis/networking.istio.io/v1alpha3/namespaces/sites-system/virtualservices/"+app+"-"+space, nil)
+	body, code, err := ingress.runtime.GenericRequest("get", "/apis/networking.istio.io/v1alpha3/namespaces/sites-system/virtualservices/"+app+"-"+space, nil)
 	if err != nil {
 		return vs, err
+	}
+	if code == http.StatusNotFound {
+		return vs, errors.New("virtual service was not found")
 	}
 	if err = json.Unmarshal(body, &vs); err != nil {
 		return vs, err
@@ -842,6 +845,10 @@ func (ingress *IstioIngress) CreateOrUpdateRouter(router structs.Routerspec) err
 func (ingress *IstioIngress) SetMaintenancePage(app string, space string, value bool) error {
 	virtualService, err := ingress.AppVirtualService(space, app)
 	if err != nil {
+		if err.Error() == "virtual service was not found" {
+			// Go ahead and ignore setting the maintenace page.  We can't as there's no deployment yet.
+			return nil
+		}
 		return err
 	}
 	if len(virtualService.Spec.HTTP) == 0 || len(virtualService.Spec.HTTP[0].Route) == 0 {
@@ -867,6 +874,10 @@ func (ingress *IstioIngress) SetMaintenancePage(app string, space string, value 
 func (ingress *IstioIngress) GetMaintenancePageStatus(app string, space string) (bool, error) {
 	virtualService, err := ingress.AppVirtualService(space, app)
 	if err != nil {
+		if err.Error() == "virtual service was not found" {
+			// Go ahead and ignore setting the maintenace page.  We can't as there's no deployment yet.
+			return false, nil
+		}
 		return false, err
 	}
 	

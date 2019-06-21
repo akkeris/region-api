@@ -115,15 +115,23 @@ func GetTransitionIngress(db *sql.DB, istio *IstioIngress, f5 *F5Ingress)  (*Tra
 }
 
 func (ingress *TransitionIngress) SetMaintenancePage(app string, space string, value bool) error {
-	if err := ingress.f5.SetMaintenancePage(app, space, value); err != nil {
-		fmt.Printf("Error in f5 trying to apply SetMaintenancePage to: %s %s %v: %s\n", app, space, value, err.Error())
-		return err
+	errF5 := ingress.f5.SetMaintenancePage(app, space, value)
+	if errF5 != nil {
+		fmt.Printf("Error in f5 trying to apply SetMaintenancePage to: %s %s %v: %s\n", app, space, value, errF5.Error())
 	}
-	if err := ingress.istio.SetMaintenancePage(app, space, value); err != nil {
-		fmt.Printf("Error in istio trying to apply SetMaintenancePage to %s %s %v: %s\n", app, space, value, err.Error())
-		return err
+	errIstio := ingress.istio.SetMaintenancePage(app, space, value)
+	if errIstio != nil {
+		fmt.Printf("Error in istio trying to apply SetMaintenancePage to %s %s %v: %s\n", app, space, value, errIstio.Error())
 	}
-	return nil
+	if errF5 == nil && errIstio != nil {
+		return errIstio
+	} else if errF5 != nil && errIstio == nil {
+		return errF5
+	} else if errF5 != nil && errIstio != nil {
+		return fmt.Errorf("Error in both istio and F5 trying to set maintenace page to %s %s %v: istio[%s] f5[%s]\n", app, space, value, errIstio.Error(), errF5.Error())
+	} else {
+		return nil
+	}
 }
 
 func (ingress *TransitionIngress) GetMaintenancePageStatus(app string, space string) (bool, error) {
