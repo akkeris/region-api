@@ -405,7 +405,7 @@ func (ingress *IstioIngress) DeleteVirtualService(domain string) error {
 		return err
 	}
 	if code == http.StatusNotFound {
-		return vs, errors.New("virtual service was not found")
+		return errors.New("virtual service was not found")
 	}
 	if code != http.StatusOK && code != http.StatusCreated {
 		return errors.New("Unable to delete virtual service: " + string(body))
