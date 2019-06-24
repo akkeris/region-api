@@ -404,6 +404,9 @@ func (ingress *IstioIngress) DeleteVirtualService(domain string) error {
 	if err != nil {
 		return err
 	}
+	if code == http.StatusNotFound {
+		return vs, errors.New("virtual service was not found")
+	}
 	if code != http.StatusOK && code != http.StatusCreated {
 		return errors.New("Unable to delete virtual service: " + string(body))
 	}
@@ -898,6 +901,11 @@ func (ingress *IstioIngress) GetMaintenancePageStatus(app string, space string) 
 
 func (ingress *IstioIngress) DeleteRouter(router structs.Routerspec) error {
 	if err := ingress.DeleteVirtualService(router.Domain); err != nil {
+		if err.Error() == "virtual service was not found" {
+			// if we do not have a virtual service bail out without
+			// attempting to remove the gateway.
+			return nil
+		}
 		return err
 	}
 	return ingress.DeleteUberSiteGateway(router.Domain, ingress.GetCertificateFromDomain(router.Domain), router.Internal)
