@@ -299,7 +299,7 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 	// Any deployment features requiring istio transitioned ingresses should
 	// be marked here. Only apply this to the web dyno types.
 	webDyno := !strings.Contains(appname, "--")
-	appFQDN := appname + "." + space
+	appFQDN := appname + "-" + space
 	if space == "default" {
 		appFQDN = appname
 	}
