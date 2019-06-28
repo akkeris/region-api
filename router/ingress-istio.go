@@ -93,7 +93,7 @@ type Policy struct {
 	} `json:"metadata"`
 	Spec struct {
 		Origins []OriginAuthenticationMethod `json:"origins"`
-		PrincipalBinding string `json:"principalBinding` /* Can be USE_PEER or USE_ORIGIN, set to USE_ORIGIN */
+		PrincipalBinding string `json:"principalBinding"` /* Can be USE_PEER or USE_ORIGIN, set to USE_ORIGIN */
 		Targets []TargetSelector `json:"targets"`
 	} `json:"spec"`
 }
