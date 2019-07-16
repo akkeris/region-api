@@ -31,7 +31,7 @@ func DeleteInstance(db *sql.DB, params martini.Params, r render.Render) {
 		return
 	}
 
-	err = rt.DeletePods(space, instanceid)
+	err = rt.DeletePod(space, instanceid)
 	if err != nil {
 		utils.ReportError(err, r)
 		return
