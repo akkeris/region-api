@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"fmt"
 	"os"
 	"reflect"
 	structs "region-api/structs"
@@ -512,7 +513,12 @@ func (rt Kubernetes) DeletePod(space string, pod string) (e error) {
 	if pod == "" {
 		return errors.New("Unable to delete pod is blank.")
 	}
-	_, e = rt.k8sRequest("delete", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+space+"/pods/"+pod, nil)
+	resp, e := rt.k8sRequest("delete", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+space+"/pods/"+pod, nil)
+	if resp.StatusCode > 199 && resp.StatusCode < 300 || resp.StatusCode == 404 {
+		return nil
+	} else {
+		return fmt.Errorf("Invalid response from kubernetes: %d Status Code %s", resp.StatusCode, resp.Body)
+	}
 	return e
 }
 
@@ -523,8 +529,15 @@ func (rt Kubernetes) DeletePods(space string, label string) (e error) {
 	if label == "" {
 		return errors.New("Unable to delete pods, the label is blank.")
 	}
-	_, e = rt.k8sRequest("delete", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+space+"/pods?labelSelector=name="+label, nil)
-	return e
+	resp, e := rt.k8sRequest("delete", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+space+"/pods?labelSelector=name="+label, nil)
+	if e != nil {
+		return e
+	}
+	if resp.StatusCode > 199 && resp.StatusCode < 300 || resp.StatusCode == 404 {
+		return nil
+	} else {
+		return fmt.Errorf("Invalid response from kubernetes: %d Status Code %s", resp.StatusCode, resp.Body)
+	}
 }
 
 func (rt Kubernetes) CreateSpace(name string, internal bool, compliance string) (e error) {
