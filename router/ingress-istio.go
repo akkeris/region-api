@@ -858,7 +858,7 @@ func (ingress *IstioIngress) SetMaintenancePage(app string, space string, value 
 		return errors.New("The specified maintenance page could not be found or did not have a routable virtual service.")
 	}
 	
-	downpage := "akkeris404.akkeris-system.svc.cluster.local"
+	downpage := "downpage.akkeris-system.svc.cluster.local"
 	if os.Getenv("ISTIO_DOWNPAGE") != "" {
 		downpage = os.Getenv("ISTIO_DOWNPAGE")
 	}
@@ -884,7 +884,7 @@ func (ingress *IstioIngress) GetMaintenancePageStatus(app string, space string) 
 		return false, err
 	}
 	
-	downpage := "akkeris404.akkeris-system.svc.cluster.local"
+	downpage := "downpage.akkeris-system.svc.cluster.local"
 	if os.Getenv("ISTIO_DOWNPAGE") != "" {
 		downpage = os.Getenv("ISTIO_DOWNPAGE")
 	}
