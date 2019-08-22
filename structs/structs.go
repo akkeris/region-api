@@ -158,40 +158,11 @@ type Planspec struct {
 	Description string `json:"description"`
 }
 
-//Redisspec Redis spec
-type Redisspec struct {
-	RedisUrl string `json:"REDIS_URL"`
-	Spec     string `json:"spec"`
-}
-
-//Memcachedspec Redis spec
-type Memcachedspec struct {
-	MemcachedUrl string `json:"MEMCACHED_URL"`
-	Spec         string `json:"spec"`
-}
-
-//ESspec spec
-type Esspec struct {
-	EsUrl     string `json:"ES_URL"`
-	KibanaUrl string `json:"KIBANA_URL"`
-	Spec      string `json:"spec"`
-}
-
 //Rabbitmqspec  spec
 type Rabbitmqspec struct {
 	RabbitmqUrl   string `json:"RABBITMQ_URL"`
 	RabbitmqUiUrl string `json:"RABBITMQUI_URL"`
 	Spec          string `json:"spec"`
-}
-
-//S3spec  spec
-type S3spec struct {
-	S3location  string `json:"S3_LOCATION"`
-	S3bucket    string `json:"S3_BUCKET"`
-	S3accesskey string `json:"S3_ACCESS_KEY"`
-	S3secretkey string `json:"S3_SECRET_KEY"`
-	S3region    string `json:"S3_REGION"`
-	Spec        string `json:"spec"`
 }
 
 //Postgresspec Postgres spec
