@@ -14,40 +14,8 @@ func GetServiceConfigVars(db *sql.DB, appname string, space string, appbindings 
 		servicename := element.Bindname
 		servicevars := []structs.EnvVar{}
 
-		if servicetype == "redis" {
-			err, vars := Getredisvars(servicename)
-			if err != nil {
-				return err, elist
-			}
-			for key, value := range vars {
-				servicevars = append(servicevars, structs.EnvVar{Name: key, Value: value.(string)})
-			}
-		} else if servicetype == "memcached" {
-			err, vars := Getmemcachedvars(servicename)
-			if err != nil {
-				return err, elist
-			}
-			for key, value := range vars {
-				servicevars = append(servicevars, structs.EnvVar{Name: key, Value: value.(string)})
-			}
-		} else if servicetype == "rabbitmq" {
+		if servicetype == "rabbitmq" {
 			err, vars := Getrabbitmqvars(servicename)
-			if err != nil {
-				return err, elist
-			}
-			for key, value := range vars {
-				servicevars = append(servicevars, structs.EnvVar{Name: key, Value: value.(string)})
-			}
-		} else if servicetype == "s3" {
-			err, vars := Gets3vars(servicename)
-			if err != nil {
-				return err, elist
-			}
-			for key, value := range vars {
-				servicevars = append(servicevars, structs.EnvVar{Name: key, Value: value.(string)})
-			}
-		} else if servicetype == "es" {
-			err, vars := Getesvars(servicename)
 			if err != nil {
 				return err, elist
 			}

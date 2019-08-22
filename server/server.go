@@ -139,26 +139,6 @@ func InitOldServiceEndpoints(m *martini.ClassicMartini) {
 	m.Get("/v1/service/kafka/cluster/:cluster/consumer-groups/:consumerGroupName/members", service.GetConsumerGroupMembersV1)
 	m.Post("/v1/service/kafka/cluster/:cluster/consumer-groups/:consumerGroupName/seek", binding.Json(structs.KafkaConsumerGroupSeekRequest{}), service.SeekConsumerGroupV1)
 
-	m.Get("/v1/service/redis/plans", service.Getredisplans)
-	m.Get("/v1/service/redis/url/:servicename", service.Getredisurl)
-	m.Post("/v1/service/redis/instance", binding.Json(structs.Provisionspec{}), service.Provisionredis)
-	m.Delete("/v1/service/redis/instance/:servicename", service.Deleteredis)
-	m.Post("/v1/service/redis/instance/tag", binding.Json(structs.Tagspec{}), service.Tagredis)
-
-	m.Get("/v1/service/es/plans", service.Getesplans)
-	m.Get("/v1/service/es/url/:servicename", service.Getesurl)
-	m.Get("/v1/service/es/instance/:servicename/status", service.Getesstatus)
-	m.Post("/v1/service/es/instance", binding.Json(structs.Provisionspec{}), service.Provisiones)
-	m.Delete("/v1/service/es/instance/:servicename", service.Deletees)
-	m.Post("/v1/service/es/instance/tag", binding.Json(structs.Tagspec{}), service.Tages)
-
-	m.Get("/v1/service/memcached/plans", service.Getmemcachedplans)
-	m.Get("/v1/service/memcached/url/:servicename", service.Getmemcachedurl)
-	m.Post("/v1/service/memcached/instance", binding.Json(structs.Provisionspec{}), service.Provisionmemcached)
-	m.Delete("/v1/service/memcached/instance/:servicename", service.Deletememcached)
-	m.Post("/v1/service/memcached/instance/tag", binding.Json(structs.Tagspec{}), service.Tagmemcached)
-	m.Get("/v1/service/memcached/operations/stats/:name", service.GetMemcachedStats)
-	m.Delete("/v1/service/memcached/operations/cache/:name", service.FlushMemcached)
 
 	m.Get("/v1/service/influxdb/plans", service.GetInfluxdbPlans)
 	m.Get("/v1/service/influxdb/url/:servicename", service.GetInfluxdbURL)
@@ -181,12 +161,6 @@ func InitOldServiceEndpoints(m *martini.ClassicMartini) {
 	m.Get("/v1/service/rabbitmq/url/:servicename", service.Getrabbitmqurl)
 	m.Delete("/v1/service/rabbitmq/instance/:servicename", service.Deleterabbitmq)
 	m.Post("/v1/service/rabbitmq/instance/tag", binding.Json(structs.Tagspec{}), service.Tagrabbitmq)
-
-	m.Get("/v1/service/s3/plans", service.Gets3plans)
-	m.Post("/v1/service/s3/instance", binding.Json(structs.Provisionspec{}), service.Provisions3)
-	m.Get("/v1/service/s3/url/:servicename", service.Gets3url)
-	m.Delete("/v1/service/s3/instance/:servicename", service.Deletes3)
-	m.Post("/v1/service/s3/instance/tag", binding.Json(structs.Tagspec{}), service.Tags3)
 
 	m.Get("/v1/service/mongodb/plans", service.GetmongodbplansV1)
 	m.Post("/v1/service/mongodb/instance", binding.Json(structs.Provisionspec{}), service.ProvisionmongodbV1)
@@ -335,9 +309,6 @@ func Server(db *sql.DB) *martini.ClassicMartini {
 
 	m.Get("/v1/octhc/router", router.Octhc)
 	m.Get("/v1/octhc/kube", utils.Octhc)
-	m.Get("/v1/octhc/service/redis", service.Getredisplans)
-	m.Get("/v1/octhc/service/memcached", service.Getmemcachedplans)
-	m.Get("/v1/octhc/service/s3", service.Gets3plans)
 	m.Get("/v1/octhc/service/vault", vault.GetVaultList)
 	m.Get("/v1/octhc/service/rabbitmq", service.Getrabbitmqplans)
 	m.Get("/v1/octhc/kubesystem", utils.GetKubeSystemPods)

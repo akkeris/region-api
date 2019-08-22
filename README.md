@@ -53,12 +53,8 @@ If the apps or sites ingres uses an F5, the `F5_SECRET` and `F5_URL` should be s
 **Broker Settings**
 
 * SERVICES - A comma delimited list of urls for open service brokers to use e.g., (https://user:pass@hostname/,https://:token@hostname/)
-* REDIS_BROKER_URL - todo, get brokers to register with alamo-api, otherwise this is the host of the broker
-* MEMCACHED_BROKER_URL - todo, get brokers to register with alamo-api, otherwise this is the host of the broker
 * RABBITMQ_BROKER_URL - todo, get brokers to register with alamo-api, otherwise this is the host of the broker
 * MONGODB_BROKER_URL - todo, get brokers to register with alamo-api, otherwise this is the host of the broker
-* S3_BROKER_URL - todo, get brokers to register with alamo-api, otherwise this is the host of the broker
-* ES_BROKER_URL - todo, get brokers to register with alamo-api, otherwise this is the host of the broker
 * INFLUXDB_URL - The influx DB url to retrieve http metrics and other custom app data
 * PROMETHEUS_URL - The prometheus DB url to retrieve metrics pod data for apps
 * NEPTUNE_BROKER_URL - todo, get brokers to register with alamo-api, otherwise this is the host of the broker
