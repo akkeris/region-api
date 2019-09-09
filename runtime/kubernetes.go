@@ -213,9 +213,15 @@ func deploymentToDeploymentSpec(deployment *structs.Deployment) (dp Deploymentsp
 	krc.Spec.RevisionHistoryLimit = deployment.RevisionHistoryLimit
 	krc.Spec.Selector.MatchLabels.Name = deployment.App
 	krc.Spec.Template.Metadata.Name = deployment.App
-	krc.Spec.Template.Metadata.Labels.Name = deployment.App
-	krc.Spec.Template.Metadata.Labels.App = deployment.App
-	krc.Spec.Template.Metadata.Labels.Version = "v1"
+
+	// copy labels to pod spec, add name app and version as well.
+	krc.Spec.Template.Metadata.Labels = make(map[string]string)
+	for key, val := range deployment.Labels {
+		krc.Spec.Template.Metadata.Labels[key] = val
+	}
+	krc.Spec.Template.Metadata.Labels["name"] = deployment.App	// unsure what this is used for.
+	krc.Spec.Template.Metadata.Labels["app"] = deployment.App	// unsure what this is used for.
+	krc.Spec.Template.Metadata.Labels["version"] = "v1"	// unsure what this is used for.
 
 	if os.Getenv("FF_ISTIOINJECT") == "true" || deployment.Features.IstioInject || deployment.Features.ServiceMesh {
 		krc.Spec.Template.Metadata.Annotations.SidecarIstioIoInject = "true"

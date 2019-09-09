@@ -197,11 +197,7 @@ type Deploymentspec struct {
 		Template struct {
 			Metadata struct {
 				Name   string `json:"name"`
-				Labels struct {
-					Name    string `json:"name"`
-					App     string `json:"app,omitempty"`
-					Version string `json:"version,omitempty"`
-				} `json:"labels"`
+				Labels map[string]string `json:"labels,omitempty"`
 				Annotations struct {
 					SidecarIstioIoInject string `json:"sidecar.istio.io/inject"`
 				} `json:"annotations,omitempty"`
