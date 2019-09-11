@@ -32,5 +32,5 @@ require (
 	github.com/stackimpact/stackimpact-go v2.3.10+incompatible
 	gopkg.in/guregu/null.v3 v3.4.0
 	gopkg.in/inf.v0 v0.9.1
-	gopkg.in/mgo.v2 v2.0.0-20180705113604-9856a29383ce
+	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22
 )
