@@ -496,6 +496,8 @@ func (dnsProvider *AwsDNSProvider) DomainRecords(domain Domain) ([]DomainRecord,
 
 func (dnsProvider *AwsDNSProvider) CreateDomainRecord(domain Domain, recordType string, name string, values []string) error {
 	name = strings.ToLower(name)
+	t := time.NewTicker(time.Millisecond * 500)
+	<-t.C // in order to not exceed our throttle rate
 	_, err := dnsProvider.client.ChangeResourceRecordSets(&route53.ChangeResourceRecordSetsInput{
 		HostedZoneId: aws.String(domain.ProviderId),
 		ChangeBatch: &route53.ChangeBatch{
@@ -542,6 +544,8 @@ func (dnsProvider *AwsDNSProvider) CreateDomainRecord(domain Domain, recordType 
 
 func (dnsProvider *AwsDNSProvider) RemoveDomainRecord(domain Domain, recordType string, name string, values []string) error {
 	name = strings.ToLower(name)
+	t := time.NewTicker(time.Millisecond * 500)
+	<-t.C // in order to not exceed our throttle rate
 	_, err := dnsProvider.client.ChangeResourceRecordSets(&route53.ChangeResourceRecordSetsInput{
 		HostedZoneId: aws.String(domain.ProviderId),
 		ChangeBatch: &route53.ChangeBatch{
