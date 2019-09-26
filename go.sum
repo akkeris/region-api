@@ -28,6 +28,8 @@ github.com/jtolds/gls v4.20.0+incompatible h1:xdiiI2gbIgH/gLH7ADydsJ1uDOEzR8yvV7
 github.com/jtolds/gls v4.20.0+incompatible/go.mod h1:QJZ7F/aHp+rZTRtaJ1ow/lLfFfVYBRgL+9YlvaHOwJU=
 github.com/lib/pq v1.0.0 h1:X5PMW56eZitiTeO7tKzZxFCSpbFZJtkMMooicw2us9A=
 github.com/lib/pq v1.0.0/go.mod h1:5WUZQaWbwv1U+lTReE5YruASi9Al49XbQIvNi/34Woo=
+github.com/lib/pq v1.2.0 h1:LXpIM/LZ5xGFhOpXAQUIMM1HdyqzVYM13zNdjCEEcA0=
+github.com/lib/pq v1.2.0/go.mod h1:5WUZQaWbwv1U+lTReE5YruASi9Al49XbQIvNi/34Woo=
 github.com/martini-contrib/auth v0.0.0-20150219114609-fa62c19b7ae8 h1:1ded5x5QpCLsyTH5ct62Rh1RXPFnn0/dubCqAeh+stU=
 github.com/martini-contrib/auth v0.0.0-20150219114609-fa62c19b7ae8/go.mod h1:ahTFgV/NtzY/CALneRrC67m1dis5arHTQDfyIhKk69E=
 github.com/martini-contrib/binding v0.0.0-20160701174519-05d3e151b6cf h1:6YSkbjZVghliN7zwJC/U3QQG+OVXOrij3qQ8sxfPIMg=
