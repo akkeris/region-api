@@ -26,7 +26,7 @@ require (
 	github.com/octanner/f5er v0.0.0-20190122181703-99e01a9fd236
 	github.com/oxtoacart/bpool v0.0.0-20150712133111-4e1c5567d7c2
 	github.com/pmorie/go-open-service-broker-client v0.0.0-20180912182616-9cc214e88d00
-	github.com/robfig/cron v1.1.0
+	github.com/robfig/cron v1.2.0
 	github.com/smartystreets/assertions v0.0.0-20180301161246-7678a5452ebe
 	github.com/smartystreets/goconvey v0.0.0-20170602164621-9e8dc3f972df
 	github.com/stackimpact/stackimpact-go v2.3.10+incompatible
