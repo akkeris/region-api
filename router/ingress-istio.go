@@ -189,7 +189,7 @@ var vstemplate = `{
                     }
                 ],
                 "rewrite": {
-                    "uri": "{{ slashIt $value.ReplacePath}}"
+                    "uri": "{{ slashit $value.ReplacePath}}"
                 },
                 "route": [
                     {
@@ -831,6 +831,7 @@ func (ingress *IstioIngress) CreateOrUpdateRouter(router structs.Routerspec) err
 		"newhosttoservice": newHostToService,
 		"removeslashslash": removeSlashSlash,
 		"removeslash":      removeSlash,
+		"slashit":			slashIt,
 	}
 	if exists {
 		router.ResourceVersion = version
