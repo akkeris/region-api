@@ -323,7 +323,7 @@ func newHostToService(input string) string {
 }
 
 func slashIt(input string) string {
-	if input[len(input) - 1] == "/" {
+	if input[len(input) - 1] == '/' {
 		return input
 	}
 	return input + "/"
