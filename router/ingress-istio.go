@@ -189,7 +189,7 @@ var vstemplate = `{
                     }
                 ],
                 "rewrite": {
-                    "uri": "{{$value.ReplacePath}}"
+                    "uri": "{{ slashIt $value.ReplacePath}}"
                 },
                 "route": [
                     {
@@ -320,6 +320,13 @@ func newHostToService(input string) string {
 	app := strings.Join(hostnamea[:len(hostnamea)-1], "-")
 	space := hostnamea[len(hostnamea)-1]
 	return app + "." + space + ".svc.cluster.local"
+}
+
+func slashIt(input string) string {
+	if input[len(input) - 1] == "/" {
+		return input
+	}
+	return input + "/"
 }
 
 func removeSlashSlash(input string) string {

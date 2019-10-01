@@ -86,7 +86,7 @@ func OneOffDeployment(db *sql.DB, oneoff1 structs.OneOffSpec, berr binding.Error
 	}
 
 	// Assembly config
-	elist := AddAlamoConfigVars(appname, space)
+	elist := AddAkkerisConfigVars(appname, space)
 	// add user specific vars
 	for n, v := range configvars {
 		elist = append(elist, structs.EnvVar{Name: n, Value: v})
