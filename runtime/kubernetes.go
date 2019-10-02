@@ -156,7 +156,7 @@ func (rt Kubernetes) Scale(space string, app string, amount int) (e error) {
 	if amount < 0 {
 		return errors.New("FATAL ERROR: Unable to scale app, amount is not a whole positive number.")
 	}
-	_, err := rt.k8sRequest("put", "/apis/extensions/v1beta1/namespaces/"+space+"/deployments/"+app+"/scale",
+	_, err := rt.k8sRequest("put", "/apis/apps/v1/namespaces/"+space+"/deployments/"+app+"/scale",
 		Scalespec{Metadata: Metadataspec{Name: app, Namespace: space}, Spec: Specspec{Replicas: amount}})
 	if err != nil {
 		return err
@@ -249,7 +249,7 @@ func (rt Kubernetes) UpdateDeployment(deployment *structs.Deployment) (err error
 		deployment.Secrets = append(deployment.Secrets, structs.Namespec{Name: rt.imagePullSecret})
 	}
 
-	resp, err := rt.k8sRequest("PUT", "/apis/extensions/v1beta1/namespaces/"+deployment.Space+"/deployments/"+deployment.App,
+	resp, err := rt.k8sRequest("PUT", "/apis/apps/v1/namespaces/"+deployment.Space+"/deployments/"+deployment.App,
 		deploymentToDeploymentSpec(deployment))
 	if err != nil {
 		return err
@@ -266,7 +266,7 @@ func (rt Kubernetes) CreateDeployment(deployment *structs.Deployment) (err error
 	if os.Getenv("FF_QUAY") == "true" || os.Getenv("IMAGE_PULL_SECRET") != "" {
 		deployment.Secrets = append(deployment.Secrets, structs.Namespec{Name: rt.imagePullSecret})
 	}
-	resp, err := rt.k8sRequest("POST", "/apis/extensions/v1beta1/namespaces/"+deployment.Space+"/deployments", deploymentToDeploymentSpec(deployment))
+	resp, err := rt.k8sRequest("POST", "/apis/apps/v1/namespaces/"+deployment.Space+"/deployments", deploymentToDeploymentSpec(deployment))
 	if err != nil {
 		return err
 	}
@@ -283,7 +283,7 @@ func (rt Kubernetes) GetDeployment(space string, app string) (*Deploymentspec, e
 	if app == "" {
 		return nil, errors.New("FATAL ERROR: Unable to get deployment, the app is blank.")
 	}
-	resp, e := rt.k8sRequest("get", "/apis/extensions/v1beta1/namespaces/"+space+"/deployments/"+app, nil)
+	resp, e := rt.k8sRequest("get", "/apis/apps/v1/namespaces/"+space+"/deployments/"+app, nil)
 	if e != nil {
 		return nil, e
 	}
@@ -305,7 +305,7 @@ func (rt Kubernetes) DeploymentExists(space string, app string) (bool, error) {
 	if app == "" {
 		return false, errors.New("The app name was blank.")
 	}
-	resp, e := rt.k8sRequest("get", "/apis/extensions/v1beta1/namespaces/"+space+"/deployments/"+app, nil)
+	resp, e := rt.k8sRequest("get", "/apis/apps/v1/namespaces/"+space+"/deployments/"+app, nil)
 	if e != nil {
 		return false, e
 	}
@@ -328,7 +328,7 @@ func (rt Kubernetes) DeleteDeployment(space string, app string) (e error) {
 	if app == "" {
 		return errors.New("FATAL ERROR: Unable to remove deployment, the app is blank.")
 	}
-	_, e = rt.k8sRequest("delete", "/apis/extensions/v1beta1/namespaces/"+space+"/deployments/"+app, nil)
+	_, e = rt.k8sRequest("delete", "/apis/apps/v1/namespaces/"+space+"/deployments/"+app, nil)
 	return e
 }
 
@@ -352,12 +352,12 @@ func (rt Kubernetes) RestartDeployment(space string, app string) (e error) {
 	}
 	deployment.Spec.Template.Spec.Containers[0].Env = newenvs
 
-	_, e = rt.k8sRequest("put", "/apis/extensions/v1beta1/namespaces/"+space+"/deployments/"+app, deployment)
+	_, e = rt.k8sRequest("put", "/apis/apps/v1/namespaces/"+space+"/deployments/"+app, deployment)
 	return e
 }
 
 func (rt Kubernetes) GetDeployments() (*DeploymentCollectionspec, error) {
-	resp, e := rt.k8sRequest("get", "/apis/extensions/v1beta1/deployments", nil)
+	resp, e := rt.k8sRequest("get", "/apis/apps/v1/deployments", nil)
 	if e != nil {
 		return nil, e
 	}
@@ -370,7 +370,7 @@ func (rt Kubernetes) GetDeployments() (*DeploymentCollectionspec, error) {
 }
 
 func (rt Kubernetes) GetDeploymentHistory(space string, app string) (dslist []structs.DeploymentsSpec, e error) {
-	resp, err := rt.k8sRequest("get", "/apis/extensions/v1beta1/namespaces/"+space+"/replicasets?labelSelector=name="+app, nil)
+	resp, err := rt.k8sRequest("get", "/apis/apps/v1/namespaces/"+space+"/replicasets?labelSelector=name="+app, nil)
 	if err != nil {
 		log.Println(err)
 	}
@@ -392,9 +392,9 @@ func (rt Kubernetes) GetDeploymentHistory(space string, app string) (dslist []st
 }
 
 func (rt Kubernetes) RollbackDeployment(space string, app string, revision int) (e error) {
-	var rollbackspec Rollbackspec = Rollbackspec{ApiVersion: "extensions/v1beta1", Name: app, RollbackTo: Revisionspec{Revision: revision}}
+	var rollbackspec Rollbackspec = Rollbackspec{ApiVersion: "apps/v1", Name: app, RollbackTo: Revisionspec{Revision: revision}}
 	rollbackspec.RollbackTo.Revision = revision
-	_, e = rt.k8sRequest("post", "/apis/extensions/v1beta1/namespaces/"+space+"/deployments/"+app+"/rollback", rollbackspec)
+	_, e = rt.k8sRequest("post", "/apis/apps/v1/namespaces/"+space+"/deployments/"+app+"/rollback", rollbackspec)
 	if e != nil {
 		return e
 	}
@@ -402,7 +402,7 @@ func (rt Kubernetes) RollbackDeployment(space string, app string, revision int) 
 }
 
 func (rt Kubernetes) GetReplicas(space string, app string) (rs []string, e error) {
-	resp, err := rt.k8sRequest("get", "/apis/extensions/v1beta1/namespaces/"+space+"/replicasets?labelSelector=name="+app, nil)
+	resp, err := rt.k8sRequest("get", "/apis/apps/v1/namespaces/"+space+"/replicasets?labelSelector=name="+app, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -424,7 +424,7 @@ func (rt Kubernetes) DeleteReplica(space string, app string, replica string) (e 
 	if replica == "" {
 		return errors.New("Unable to delete replica, the replica is blank.")
 	}
-	_, e = rt.k8sRequest("delete", "/apis/extensions/v1beta1/namespaces/"+space+"/replicasets/"+replica, nil)
+	_, e = rt.k8sRequest("delete", "/apis/apps/v1/namespaces/"+space+"/replicasets/"+replica, nil)
 	return e
 }
 

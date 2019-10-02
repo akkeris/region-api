@@ -295,7 +295,7 @@ func DeployCronJob(db *sql.DB, params martini.Params, req structs.JobDeploy, ber
 		return
 	}
 
-	elist := app.AddAlamoConfigVars(jobName, space)
+	elist := app.AddAkkerisConfigVars(jobName, space)
 	for n, v := range configvars {
 		elist = append(elist, structs.EnvVar{Name: n, Value: v})
 	}

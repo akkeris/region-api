@@ -18,20 +18,32 @@ import (
 	"fmt"
 )
 
-func AddAlamoConfigVars(appname string, space string) []structs.EnvVar {
-	var elist []structs.EnvVar
-	var spaceconfigvar structs.EnvVar
-	var appconfigvar structs.EnvVar
-	var fullappname structs.EnvVar
-	spaceconfigvar.Name = "ALAMO_SPACE"
-	spaceconfigvar.Value = space
-	elist = append(elist, spaceconfigvar)
-	appconfigvar.Name = "ALAMO_DEPLOYMENT"
-	appconfigvar.Value = appname
-	elist = append(elist, appconfigvar)
-	fullappname.Name = "ALAMO_APPLICATION"
-	fullappname.Value = appname + "-" + space
-	elist = append(elist, fullappname)
+func AddAkkerisConfigVars(appname string, space string) []structs.EnvVar {
+	elist := make([]structs.EnvVar, 0)
+	elist = append(elist, structs.EnvVar{
+		Name:"ALAMO_SPACE",
+		Value:space,
+	})
+	elist = append(elist, structs.EnvVar{
+		Name:"AKKERIS_SPACE",
+		Value:space,
+	})
+	elist = append(elist, structs.EnvVar{
+		Name:"ALAMO_DEPLOYMENT",
+		Value:appname,
+	})
+	elist = append(elist, structs.EnvVar{
+		Name:"AKKERIS_DEPLOYMENT",
+		Value:appname,
+	})
+	elist = append(elist, structs.EnvVar{
+		Name:"ALAMO_APPLICATION",
+		Value:appname + "-" + space,
+	})
+	elist = append(elist, structs.EnvVar{
+		Name:"AKKERIS_APPLICATION",
+		Value:appname + "-" + space,
+	})
 	return elist
 }
 
@@ -88,8 +100,8 @@ func GetAllConfigVars(db *sql.DB, params martini.Params, r render.Render) {
 		utils.ReportError(err, r)
 		return
 	}
-	// Assemble config -- alamo "built in config", "user defined config vars", "service configvars"
-	elist := AddAlamoConfigVars(appname, space)
+	// Assemble config -- akkeris "built in config", "user defined config vars", "service configvars"
+	elist := AddAkkerisConfigVars(appname, space)
 	for n, v := range configvars {
 		elist = append(elist, structs.EnvVar{Name: n, Value: v})
 	}
@@ -220,8 +232,8 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 		configvars["PORT"] = "4747"
 	}
 
-	// Assemble config -- alamo "built in config", "user defined config vars", "service configvars"
-	elist := AddAlamoConfigVars(appname, space)
+	// Assemble config -- akkeris "built in config", "user defined config vars", "service configvars"
+	elist := AddAkkerisConfigVars(appname, space)
 	for n, v := range configvars {
 		elist = append(elist, structs.EnvVar{Name: n, Value: v})
 	}
