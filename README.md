@@ -2,6 +2,8 @@
 
 HTTP API for regional akkeris actions, it integrates with kubernetes, and service brokers in addition to the ingress.
 
+[![CircleCI](https://circleci.com/gh/akkeris/region-api.svg?style=svg)](https://circleci.com/gh/akkeris/region-api)
+
 ## Installation
 
 ### Setup
