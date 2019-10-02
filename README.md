@@ -6,6 +6,7 @@ HTTP API for regional akkeris actions, it integrates with kubernetes, and servic
 
 ### Setup
 
+
 When you first run alamo-api on a brand new database it will create the necessary infrastructure, you should first set the following environment variables, they only need to be set when first ran on an empty database.  Note that these only need to be set on first launch, afterwards they can be removed safely, they will have no affect if ran on a database that's already been populated:
 
 * KUBERNETES_API_SERVER - the hostname of the kubernetes server
