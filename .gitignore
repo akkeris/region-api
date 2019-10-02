@@ -7,6 +7,8 @@ vendor/
 *.dll
 *.so
 *.dylib
+.env*
+region-api
 
 # Test binary, build with `go test -c`
 *.test
