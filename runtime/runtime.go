@@ -117,8 +117,8 @@ type Service struct {
 		Annotations struct {
 			ServiceBetaKubernetesIoAwsLoadBalancerInternal string `json:"service.beta.kubernetes.io/aws-load-balancer-internal"`
 		} `json:"annotations"`
-		Name      string `json:"name"`
-		Namespace string `json:"namespace"`
+		Name      string            `json:"name"`
+		Namespace string            `json:"namespace"`
 		Labels    map[string]string `json:"labels"`
 	} `json:"metadata"`
 	Spec struct {
@@ -134,14 +134,14 @@ type KubeService struct {
 	Kind       string `json:"kind"`
 	APIVersion string `json:"apiVersion"`
 	Metadata   struct {
-		Name              string    `json:"name"`
-		Namespace         string    `json:"namespace"`
-		SelfLink          string    `json:"selfLink"`
-		UID               string    `json:"uid"`
-		ResourceVersion   string    `json:"resourceVersion"`
-		CreationTimestamp time.Time `json:"creationTimestamp"`
-		Labels    map[string]string `json:"labels"`
-		Annotations struct {
+		Name              string            `json:"name"`
+		Namespace         string            `json:"namespace"`
+		SelfLink          string            `json:"selfLink"`
+		UID               string            `json:"uid"`
+		ResourceVersion   string            `json:"resourceVersion"`
+		CreationTimestamp time.Time         `json:"creationTimestamp"`
+		Labels            map[string]string `json:"labels"`
+		Annotations       struct {
 			ServiceBetaKubernetesIoAwsLoadBalancerInternal string `json:"service.beta.kubernetes.io/aws-load-balancer-internal"`
 		} `json:"annotations"`
 	} `json:"metadata"`
@@ -168,9 +168,9 @@ type ServiceCollectionspec struct {
 
 type Deploymentspec struct {
 	Metadata struct {
-		Name      string `json:"name"`
-		Namespace string `json:"namespace"`
-		Labels map[string]string `json:"labels,omitempty"`
+		Name      string            `json:"name"`
+		Namespace string            `json:"namespace"`
+		Labels    map[string]string `json:"labels,omitempty"`
 	} `json:"metadata"`
 	Spec struct {
 		RevisionHistoryLimit int `json:"revisionHistoryLimit"`
@@ -196,10 +196,11 @@ type Deploymentspec struct {
 		} `json:"selector"`
 		Template struct {
 			Metadata struct {
-				Name   string `json:"name"`
-				Labels map[string]string `json:"labels,omitempty"`
+				Name        string            `json:"name"`
+				Labels      map[string]string `json:"labels,omitempty"`
 				Annotations struct {
 					SidecarIstioIoInject string `json:"sidecar.istio.io/inject"`
+					AkkerisIORestartTime string `json:"akkeris.io/restartTime,omitempty"`
 				} `json:"annotations,omitempty"`
 			} `json:"metadata"`
 			Spec struct {
