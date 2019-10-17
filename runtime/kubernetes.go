@@ -6,11 +6,10 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"errors"
-	vault "github.com/akkeris/vault-client"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
-	"fmt"
 	"os"
 	"reflect"
 	structs "region-api/structs"
@@ -18,6 +17,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	vault "github.com/akkeris/vault-client"
 )
 
 type KubeRequest struct {
@@ -219,9 +220,9 @@ func deploymentToDeploymentSpec(deployment *structs.Deployment) (dp Deploymentsp
 	for key, val := range deployment.Labels {
 		krc.Spec.Template.Metadata.Labels[key] = val
 	}
-	krc.Spec.Template.Metadata.Labels["name"] = deployment.App	// unsure what this is used for.
-	krc.Spec.Template.Metadata.Labels["app"] = deployment.App	// unsure what this is used for.
-	krc.Spec.Template.Metadata.Labels["version"] = "v1"	// unsure what this is used for.
+	krc.Spec.Template.Metadata.Labels["name"] = deployment.App // unsure what this is used for.
+	krc.Spec.Template.Metadata.Labels["app"] = deployment.App  // unsure what this is used for.
+	krc.Spec.Template.Metadata.Labels["version"] = "v1"        // unsure what this is used for.
 
 	if os.Getenv("FF_ISTIOINJECT") == "true" || deployment.Features.IstioInject || deployment.Features.ServiceMesh {
 		krc.Spec.Template.Metadata.Annotations.SidecarIstioIoInject = "true"
@@ -342,15 +343,9 @@ func (rt Kubernetes) RestartDeployment(space string, app string) (e error) {
 		}
 		return e
 	}
-	oldenvs := deployment.Spec.Template.Spec.Containers[0].Env
-	var newenvs []structs.EnvVar
-	newenvs = append(newenvs, structs.EnvVar{Name: "RESTART", Value: time.Now().Format(time.RFC850)})
-	for _, element := range oldenvs {
-		if element.Name != "RESTART" {
-			newenvs = append(newenvs, element)
-		}
-	}
-	deployment.Spec.Template.Spec.Containers[0].Env = newenvs
+
+	currentTime := strconv.FormatInt(time.Now().UTC().Unix(), 10)
+	deployment.Spec.Template.Metadata.Annotations.AkkerisIORestartTime = currentTime
 
 	_, e = rt.k8sRequest("put", "/apis/apps/v1/namespaces/"+space+"/deployments/"+app, deployment)
 	return e
