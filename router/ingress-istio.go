@@ -201,19 +201,23 @@ var vstemplate = `{
                         }
                     }
                 ],
-		        "headers": {
-		        	"response": {
-		        		"set": {
-		        			"Strict-Transport-Security":"max-age=31536000; includeSubDomains",
-		        			"X-Forwarded-Path":"{{ removeslash $value.Path }}/",
-		        			"X-Orig-Path":"{{ removeslash $value.Path }}/",
-		        			"X-Orig-Host":"{{.Domain}}",
-		        			"X-Orig-Port":"443",
-		        			"X-Orig-Proto":"https",
-		        			"X-Request-Start": "t=%START_TIME(%s.%3f)%"
-		        		}
-		        	}
-		        }
+				"headers": {
+					"response": {
+						"set": {
+							"Strict-Transport-Security":"max-age=31536000; includeSubDomains",
+						}
+					},
+					"request": {
+						"set": {
+							"X-Forwarded-Path":"{{ removeslash $value.Path }}/",
+							"X-Orig-Path":"{{ removeslash $value.Path }}/",
+							"X-Orig-Host":"{{.Domain}}",
+							"X-Orig-Port":"443",
+							"X-Orig-Proto":"https",
+							"X-Request-Start": "t=%START_TIME(%s.%3f)%"
+						}
+					}
+				}
             }
             {{ if eq (removeslashslash $value.Path) (removeslash $value.Path) }},
             {
@@ -237,18 +241,22 @@ var vstemplate = `{
                         }
                     }
                 ],
-		        "headers": {
-		        	"response": {
-		        		"set": {
-		        			"Strict-Transport-Security":"max-age=31536000; includeSubDomains"
-		        			"X-Forwarded-Path":"{{ removeslashslash $value.Path}}",
-		        			"X-Orig-Path":"{{ removeslashslash $value.Path}}",
-		        			"X-Orig-Host":"{{.Domain}}",
-		        			"X-Orig-Port":"443",
-		        			"X-Orig-Proto":"https",
-		        			"X-Request-Start": "t=%START_TIME(%s.%3f)%"
-		        		}
-		        	}
+				"headers": {
+					"response": {
+						"set": {
+							"Strict-Transport-Security":"max-age=31536000; includeSubDomains"
+						}
+					},
+					"request": {
+						"set": {
+							"X-Forwarded-Path":"{{ removeslashslash $value.Path }}/",
+							"X-Orig-Path":"{{ removeslashslash $value.Path }}/",
+							"X-Orig-Host":"{{.Domain}}",
+							"X-Orig-Port":"443",
+							"X-Orig-Proto":"https",
+							"X-Request-Start": "t=%START_TIME(%s.%3f)%"
+						}
+					}
 		        }
             }{{end}}
 {{end}}

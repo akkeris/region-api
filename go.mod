@@ -16,7 +16,7 @@ require (
 	github.com/gopherjs/gopherjs v0.0.0-20181004151105-1babbf986f6f
 	github.com/hailocab/go-hostpool v0.0.0-20160125115350-e80d13ce29ed
 	github.com/jmcvetta/napping v3.2.0+incompatible
-	github.com/jmespath/go-jmespath v0.0.0-20160202185014-0b12d6b521d8
+	github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af
 	github.com/jtolds/gls v4.20.0+incompatible
 	github.com/lib/pq v1.2.0
 	github.com/martini-contrib/auth v0.0.0-20150219114609-fa62c19b7ae8
