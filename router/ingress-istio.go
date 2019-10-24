@@ -210,7 +210,7 @@ var vstemplate = `{
 		        	"request": {
 		        		"set": {
 		        			"X-Forwarded-Path":"{{ removeslash $value.Path }}/",
-		        			"X-Orig-Path":"{{ removeslash $value.Path }}/",
+		        			"X-Orig-Path":"{{ removeslash $value.Path }}",
 		        			"X-Orig-Host":"{{.Domain}}",
 		        			"X-Orig-Port":"443",
 		        			"X-Orig-Proto":"https",
