@@ -284,12 +284,12 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 		deployment.Command = deploy1.Command
 
 	}
+	if (structs.Features{}) != deploy1.Features {
+		deployment.Features = deploy1.Features
+	}
 	if len(deploy1.Filters) > 0 {
 		// Inject istio sidecar for http filters
 		deployment.Features.IstioInject = true
-	}
-	if (structs.Features{}) != deploy1.Features {
-		deployment.Features = deploy1.Features
 	}
 	deploymentExists, err := rt.DeploymentExists(space, appname)
 	if err != nil {
