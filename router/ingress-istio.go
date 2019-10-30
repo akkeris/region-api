@@ -35,6 +35,7 @@ type Matchspec struct {
 	URI struct {
 		Prefix string `json:"prefix"`
 	} `json:"uri"`
+	IgnoreUriCase bool `json:"ignoreUriCase"`
 }
 
 type Rewritespec struct {
@@ -185,7 +186,8 @@ var vstemplate = `{
                     {
                         "uri": {
                             "prefix": "{{ removeslash $value.Path }}/"
-                        }
+                        },
+                        "ignoreUriCase": true
                     }
                 ],
                 "rewrite": {
@@ -225,7 +227,8 @@ var vstemplate = `{
                     {
                         "uri": {
                             "prefix": "{{ removeslashslash $value.Path}}"
-                        }
+                        },
+                        "ignoreUriCase": true
                     }
                 ],
                 "rewrite": {
