@@ -160,6 +160,8 @@ type TLSSecretData struct {
 	Space       string
 }
 
+// TODO: We should just populate the structure, otherwise
+// changes must be made twice.
 var vstemplate = `{
     "apiVersion": "networking.istio.io/v1alpha3",
     "kind": "VirtualService",
