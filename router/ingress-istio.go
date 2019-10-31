@@ -35,6 +35,7 @@ type Matchspec struct {
 	URI struct {
 		Prefix string `json:"prefix"`
 	} `json:"uri"`
+	IgnoreUriCase bool `json:"ignoreUriCase"`
 }
 
 type Rewritespec struct {
@@ -159,6 +160,8 @@ type TLSSecretData struct {
 	Space       string
 }
 
+// TODO: We should just populate the structure, otherwise
+// changes must be made twice.
 var vstemplate = `{
     "apiVersion": "networking.istio.io/v1alpha3",
     "kind": "VirtualService",
@@ -185,7 +188,8 @@ var vstemplate = `{
                     {
                         "uri": {
                             "prefix": "{{ removeslash $value.Path }}/"
-                        }
+                        },
+                        "ignoreUriCase": true
                     }
                 ],
                 "rewrite": {
@@ -225,7 +229,8 @@ var vstemplate = `{
                     {
                         "uri": {
                             "prefix": "{{ removeslashslash $value.Path}}"
-                        }
+                        },
+                        "ignoreUriCase": true
                     }
                 ],
                 "rewrite": {
