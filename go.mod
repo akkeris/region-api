@@ -8,7 +8,7 @@ require (
 	github.com/bitly/go-simplejson v0.5.0
 	github.com/codegangsta/inject v0.0.0-20140425184007-37d7f8432a3e
 	github.com/fatih/structs v1.1.0
-	github.com/go-ini/ini v1.48.0
+	github.com/go-ini/ini v1.50.0
 	github.com/go-martini/martini v0.0.0-20140519164645-49411a5b6468
 	github.com/gocql/gocql v0.0.0-20181011060509-26b68fd73104
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
