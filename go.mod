@@ -4,7 +4,7 @@ go 1.12
 
 require (
 	github.com/akkeris/vault-client v0.0.0-20180727165111-6788ec8d1925
-	github.com/aws/aws-sdk-go v1.25.2
+	github.com/aws/aws-sdk-go v1.26.5
 	github.com/bitly/go-simplejson v0.5.0
 	github.com/codegangsta/inject v0.0.0-20140425184007-37d7f8432a3e
 	github.com/fatih/structs v1.1.0
