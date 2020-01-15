@@ -4,15 +4,26 @@ import (
 	"database/sql"
 	"region-api/router"
 	"region-api/runtime"
-	"region-api/structs"
 	"errors"
 )
+
+type CertificateOrder struct {
+	Id                      string   `json:"id,omitempty"`
+	CommonName              string   `json:"common_name"`
+	SubjectAlternativeNames []string `json:"subject_alternative_names"`
+	Status                  string   `json:"status,omitempty"` // can be pending, approved, issued, rejected
+	Comment                 string   `json:"comment,omitempty"`
+	Requestor               string   `json:"requestor,omitempty"`
+	Issued                  string   `json:"issued,omitempty"`
+	Expires                 string   `json:"expires,omitempty"`
+	Issuer                  string   `json:"issuer,omitempty"`
+}
 
 type Issuer interface {
 	GetName() string
 	CreateOrder(domain string, sans []string, comment string, requestor string, issuerName string) (id string, err error)
-	GetOrderStatus(id string) (order *structs.CertificateOrder, err error)
-	GetOrders() (orders []structs.CertificateOrder, err error)
+	GetOrderStatus(id string) (order *CertificateOrder, err error)
+	GetOrders() (orders []CertificateOrder, err error)
 	IsOrderAutoInstalled(ingress router.Ingress) (bool, error)
 	IsOrderReady(id string) (bool, error)
 	GetCertificate(id string, domain string) (pem_cert []byte, pem_key []byte, err error)

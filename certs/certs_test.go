@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"region-api/structs"
 	"region-api/utils"
 	"testing"
 )
@@ -44,7 +43,7 @@ func TestHandlers(t *testing.T) {
 				issuer, _ := GetIssuer(pool, "cert-manager")
 				issuer.DeleteCertificate("apitest.example.com")
 			})
-			var request structs.CertificateOrder
+			var request CertificateOrder
 			request.CommonName = "apitest.example.com"
 			request.SubjectAlternativeNames = []string{"apitest.qa.example.com", "apitest.dev.example.com"}
 			cr := new(bytes.Buffer)
@@ -60,7 +59,7 @@ func TestHandlers(t *testing.T) {
 				w := httptest.NewRecorder()
 				m.ServeHTTP(w, r)
 				So(w.Code, ShouldEqual, http.StatusOK)
-				var certs []structs.CertificateOrder
+				var certs []CertificateOrder
 				decoder := json.NewDecoder(w.Body)
 				if err := decoder.Decode(&certs); err != nil {
 					panic(err)
@@ -77,7 +76,7 @@ func TestHandlers(t *testing.T) {
 					w := httptest.NewRecorder()
 					m.ServeHTTP(w, r)
 					So(w.Code, ShouldEqual, http.StatusOK)
-					var cert structs.CertificateOrder
+					var cert CertificateOrder
 					decoder := json.NewDecoder(w.Body)
 					if err := decoder.Decode(&cert); err != nil {
 						panic(err)

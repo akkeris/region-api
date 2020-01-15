@@ -12,7 +12,7 @@ import (
 	"os"
 )
 
-func HttpCreateCertificateOrder(db *sql.DB, request structs.CertificateOrder, berr binding.Errors, r render.Render) {
+func HttpCreateCertificateOrder(db *sql.DB, request CertificateOrder, berr binding.Errors, r render.Render) {
 	if berr != nil {
 		utils.ReportInvalidRequest(berr[0].Message, r)
 		return
@@ -125,7 +125,7 @@ func HttpInstallCertificate(db *sql.DB, params martini.Params, r render.Render) 
 }
 
 func AddToMartini(m *martini.ClassicMartini) {
-	m.Post("/v1/certs", binding.Json(structs.CertificateOrder{}), HttpCreateCertificateOrder)
+	m.Post("/v1/certs", binding.Json(CertificateOrder{}), HttpCreateCertificateOrder)
 	m.Get("/v1/certs", HttpGetCertificateOrders)
 	m.Get("/v1/certs/:id", HttpGetCertificateOrderStatus)
 	m.Post("/v1/certs/:id/install", HttpInstallCertificate)

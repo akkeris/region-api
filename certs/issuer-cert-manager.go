@@ -9,7 +9,6 @@ import (
 	"os"
 	"region-api/router"
 	"region-api/runtime"
-	"region-api/structs"
 	"strconv"
 	"strings"
 	certmanager "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1alpha2"
@@ -46,7 +45,7 @@ func GetCertManagerIssuers(runtime runtime.Runtime) ([]Issuer, error) {
 	}}, nil
 }
 
-func CertificateStatusToOrder(certificate certmanager.Certificate) (structs.CertificateOrder, error) {
+func CertificateStatusToOrder(certificate certmanager.Certificate) (CertificateOrder, error) {
 	s := "pending"
 	if len(certificate.Status.Conditions) > 0 && certificate.Status.Conditions[0].Type == "Ready" && certificate.Status.Conditions[0].Status == "True" {
 		s = "issued"
@@ -75,7 +74,7 @@ func CertificateStatusToOrder(certificate certmanager.Certificate) (structs.Cert
 	if labels != nil {
 		id = labels["akkeris-cert-id"]
 	}
-	return structs.CertificateOrder{
+	return CertificateOrder{
 		Id:                      id,
 		CommonName:              certificate.Spec.CommonName,
 		SubjectAlternativeNames: names,
@@ -87,8 +86,8 @@ func CertificateStatusToOrder(certificate certmanager.Certificate) (structs.Cert
 	}, nil
 }
 
-func CertificateStatusesToOrders(certificates []certmanager.Certificate) ([]structs.CertificateOrder, error) {
-	orders := make([]structs.CertificateOrder, 0)
+func CertificateStatusesToOrders(certificates []certmanager.Certificate) ([]CertificateOrder, error) {
+	orders := make([]CertificateOrder, 0)
 	for _, e := range certificates {
 		o, err := CertificateStatusToOrder(e)
 		if err != nil {
@@ -139,7 +138,7 @@ func (issuer *CertManagerIssuer) CreateOrder(domain string, sans []string, comme
 	return cert.GetLabels()["akkeris-cert-id"], nil
 }
 
-func (issuer *CertManagerIssuer) GetOrderStatus(id string) (*structs.CertificateOrder, error) {
+func (issuer *CertManagerIssuer) GetOrderStatus(id string) (*CertificateOrder, error) {
 	body, code, err := issuer.runtime.GenericRequest("get", "/apis/" + certmanager.SchemeGroupVersion.Group + "/" + certmanager.SchemeGroupVersion.Version + "/namespaces/" + issuer.certificateNamespace + "/certificates?labelSelector=akkeris-cert-id%3D"+id, nil)
 	if err != nil {
 		return nil, err
@@ -161,7 +160,7 @@ func (issuer *CertManagerIssuer) GetOrderStatus(id string) (*structs.Certificate
 	return &order, nil
 }
 
-func (issuer *CertManagerIssuer) GetOrders() (orders []structs.CertificateOrder, err error) {
+func (issuer *CertManagerIssuer) GetOrders() (orders []CertificateOrder, err error) {
 	body, code, err := issuer.runtime.GenericRequest("get", "/apis/" + certmanager.SchemeGroupVersion.Group + "/" + certmanager.SchemeGroupVersion.Version + "/namespaces/" + issuer.certificateNamespace + "/certificates?labelSelector=akkeris-cert-id", nil)
 	if err != nil {
 		return nil, err

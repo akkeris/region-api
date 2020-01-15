@@ -2,27 +2,8 @@ package structs
 
 import (
 	"time"
-
 	"gopkg.in/guregu/null.v3/zero"
 )
-
-type CertificateOrder struct {
-	Id                      string   `json:"id,omitempty"`
-	CommonName              string   `json:"common_name"`
-	SubjectAlternativeNames []string `json:"subject_alternative_names"`
-	Status                  string   `json:"status,omitempty"` // can be pending, approved, issued, rejected
-	Comment                 string   `json:"comment,omitempty"`
-	Requestor               string   `json:"requestor,omitempty"`
-	Issued                  string   `json:"issued,omitempty"`
-	Expires                 string   `json:"expires,omitempty"`
-	Issuer                  string   `json:"issuer,omitempty"`
-}
-
-type Certificate struct {
-	Order       string `json:"order"`
-	Key         string `json:"key"`
-	Certificate string `json:"certificate"`
-}
 
 type Namespec struct {
 	Name string `json:"name"`
