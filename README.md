@@ -88,7 +88,7 @@ This uses jetstack's cert-manager (if installed) to issue certificates. Note abo
 **Debugging Environment Variables:**
 
 * DEBUG_K8S - print out all k8s calls, set to true
-* DEBUG_F5 - print out all f5 calls, set to true
+* INGRESS_DEBUG - print out debug information on ingress, set to true
 * MARTINI_ENV
 
 Note that dependencies are managed via `dep` command line tool, run `dep ensure` before building.
