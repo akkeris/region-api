@@ -16,7 +16,7 @@ func CreateCertificateOrder(db *sql.DB, request structs.CertificateOrder, berr b
 		utils.ReportInvalidRequest(berr[0].Message, r)
 		return
 	}
-	issuer, err := GetIssuer(db)
+	issuer, err := GetIssuer(db, /* TODO: Issuer Name */ "letsencrypt")
 	if err != nil {
 		utils.ReportError(err, r)
 		return
@@ -31,7 +31,7 @@ func CreateCertificateOrder(db *sql.DB, request structs.CertificateOrder, berr b
 }
 
 func GetCertificateOrderStatus(db *sql.DB, params martini.Params, r render.Render) {
-	issuer, err := GetIssuer(db)
+	issuer, err := GetIssuer(db, /* TODO: Issuer Name */ "letsencrypt")
 	if err != nil {
 		utils.ReportError(err, r)
 		return
@@ -45,7 +45,7 @@ func GetCertificateOrderStatus(db *sql.DB, params martini.Params, r render.Rende
 }
 
 func GetCertificateOrders(db *sql.DB, params martini.Params, r render.Render) {
-	issuer, err := GetIssuer(db)
+	issuer, err := GetIssuer(db, /* TODO: Issuer Name */ "letsencrypt")
 	if err != nil {
 		utils.ReportError(err, r)
 		return
@@ -59,7 +59,7 @@ func GetCertificateOrders(db *sql.DB, params martini.Params, r render.Render) {
 }
 
 func InstallCertificate(db *sql.DB, params martini.Params, r render.Render) {
-	issuer, err := GetIssuer(db)
+	issuer, err := GetIssuer(db, /* TODO: Issuer Name */ "letsencrypt")
 	if err != nil {
 		utils.ReportError(err, r)
 		return

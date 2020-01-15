@@ -32,23 +32,6 @@ type KV struct {
 	Value string `json:"value"`
 }
 
-type Routerpathspec struct {
-	Domain      string `json:"domain"`
-	Path        string `json:"path"`
-	Space       string `json:"space"`
-	App         string `json:"app"`
-	ReplacePath string `json:"replacepath"`
-	Port        string `json:"port"`
-}
-
-type Routerspec struct {
-	Domain          string           `json:"domain"`
-	Internal        bool             `json:"internal"`
-	VSNamespace     string           `json:"vsnamespace"`
-	ResourceVersion string           `json:"resourceVersion"`
-	Paths           []Routerpathspec `json:"paths"`
-}
-
 type HttpFilters struct {
 	Type string `json:"type"`
 	Data map[string]string `json:"data"`

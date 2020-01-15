@@ -10,8 +10,8 @@ func TestIstio(t *testing.T) {
 	var ngateway *Gateway = nil
 	gateway.APIVersion = "networking.istio.io/v1alpha3"
 	gateway.Kind = "Gateway"
-	gateway.Metadata.Name = "sites-public"
-	gateway.Metadata.Namespace = "sites-system"
+	gateway.SetName("sites-public")
+	gateway.SetNamespace("sites-system")
 	gateway.Spec.Selector = make(map[string]string)
 	gateway.Spec.Selector["istio"] = "sites-public-ingressgateway"
 

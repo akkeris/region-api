@@ -110,7 +110,6 @@ func GetAllConfigVars(db *sql.DB, params martini.Params, r render.Render) {
 	if err != nil {
 		utils.ReportError(err, r)
 		return
-
 	}
 	for _, e := range servicevars {
 		elist = append(elist, e)
@@ -242,7 +241,6 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 	if err != nil {
 		utils.ReportError(err, r)
 		return
-
 	}
 	for _, e := range servicevars {
 		elist = append(elist, e)
@@ -310,7 +308,6 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 
 	// Any deployment features requiring istio transitioned ingresses should
 	// be marked here. Only apply this to the web dyno types.
-	webDyno := !strings.Contains(appname, "--")
 	appFQDN := appname + "-" + space
 	if space == "default" {
 		appFQDN = appname
@@ -342,7 +339,8 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 				issuer := ""
 				jwksUri := ""
 				audiences := make([]string, 0)
-				exclude := make([]string, 0)
+				excludes := make([]string, 0)
+				includes := make([]string, 0)
 				if val, ok := filter.Data["issuer"]; ok {
 					issuer = val
 				}
@@ -353,13 +351,16 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 					audiences = strings.Split(val, ",")
 				}
 				if val, ok := filter.Data["excludes"]; ok {
-					exclude = strings.Split(val, ",")
+					excludes = strings.Split(val, ",")
+				}
+				if val, ok := filter.Data["includes"]; ok {
+					includes = strings.Split(val, ",")
 				}
 				if jwksUri == "" {
 					fmt.Printf("WARNING: Invalid jwt configuration, uri was not valid: %s\n", jwksUri)
 				} else {
 					foundJwtFilter = true
-					if err := appIngress.InstallOrUpdateJWTAuthFilter(appname, space, appFQDN, int64(finalport), issuer, jwksUri, audiences, exclude); err != nil {
+					if err := appIngress.InstallOrUpdateJWTAuthFilter(appname, space, appFQDN, int64(finalport), issuer, jwksUri, audiences, excludes, includes); err != nil {
 						fmt.Printf("WARNING: There was an error installing or updating JWT Auth filter: %s\n", err.Error())
 					}
 				}
@@ -370,24 +371,6 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 		if !foundJwtFilter {
 			if err := appIngress.DeleteJWTAuthFilter(appname, space, appFQDN, int64(finalport)); err != nil {
 				fmt.Printf("WARNING: There was an error removing the JWT auth filter: %s\n", err.Error())
-			}
-		}
-	}
-
-	if appIngress.Name() == "transition" {
-		if (deploy1.Features.IstioInject || deploy1.Features.Http2Service || deploy1.Features.Http2EndToEndService) && webDyno {
-			if os.Getenv("INGRESS_DEBUG") == "true" {
-				fmt.Printf("[ingress] Moving app to istio ingress: %s\n", appFQDN)
-			}
-			if err := ingress.TransitionAppToIngress(db, "istio", internal, appFQDN); err != nil {
-				fmt.Printf("WARNING: Transition to istio ingress failed: %s\n", err.Error())
-			}
-		} else {
-			if os.Getenv("INGRESS_DEBUG") == "true" {
-				fmt.Printf("[ingress] Moving app to f5 ingress: %s\n", appFQDN)
-			}
-			if err := ingress.TransitionAppToIngress(db, "f5", internal, appFQDN); err != nil {
-				fmt.Printf("WARNING: Transition to f5 ingress failed: %s\n", err.Error())
 			}
 		}
 	}
