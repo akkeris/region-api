@@ -9,7 +9,6 @@ import (
 	"github.com/martini-contrib/render"
 	"github.com/nu7hatch/gouuid"
 	"net/http"
-	spacepackage "region-api/space"
 	structs "region-api/structs"
 	utils "region-api/utils"
 	"strings"
@@ -137,7 +136,7 @@ func HttpAddPath(db *sql.DB, spec Route, berr binding.Errors, r render.Render) {
 		utils.ReportInvalidRequest("Invalid Router", r)
 		return
 	}
-	internalspace, err := spacepackage.IsInternalSpace(db, spec.Space)
+	internalspace, err := utils.IsInternalSpace(db, spec.Space)
 	if err != nil {
 		utils.ReportInvalidRequest("Invalid Space", r)
 		return
