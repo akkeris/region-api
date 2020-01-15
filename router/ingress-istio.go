@@ -738,8 +738,8 @@ func PrepareVirtualServiceForCreateorUpdate(domain string, internal bool, paths 
 	return &vs, nil
 }
 
-func (ingress *IstioIngress) CertificateToSecret(server_name string, pem_cert []byte, pem_key []byte) (*string, *kube.Secret, error) {
-	block, _ := pem.Decode([]byte(pem_cert))
+func CertificateToSecret(server_name string, pem_cert []byte, pem_key []byte, namespace string) (*string, *kube.Secret, error) {
+	block, _ := pem.Decode(pem_cert)
 	if block == nil {
 		fmt.Println("failed to parse PEM block containing the public certificate")
 		return nil, nil, errors.New("Invalid certificate: Failed to decode PEM block")
@@ -755,25 +755,14 @@ func (ingress *IstioIngress) CertificateToSecret(server_name string, pem_cert []
 		fmt.Println("failed to parse PEM block containing the private key")
 		return nil, nil, errors.New("Invalid key: Failed to decode PEM block")
 	}
-	x509_decoded_key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
-	if err != nil {
-		fmt.Println("invalid key provided")
-		fmt.Println(err)
-		return nil, nil, err
-	}
-	err = x509_decoded_key.Validate()
-	if err != nil {
-		fmt.Println("x509 decoded key was invalid")
-		fmt.Println(err)
-		return nil, nil, err
-	}
-
 	main_server_name := strings.Replace(x509_decoded_cert.Subject.CommonName, "*.", "star.", -1)
 	name := strings.Replace(main_server_name, ".", "-", -1) + "-tls"
 	secret := kube.Secret{}
+	secret.Kind = "Secret"
+	secret.APIVersion = "v1"
 	secret.Type = kube.SecretTypeTLS
 	secret.SetName(name)
-	secret.SetNamespace(ingress.config.Environment)
+	secret.SetNamespace(namespace)
 	secret.SetAnnotations(map[string]string{
 		"akkeris.k8s.io/alt-names": main_server_name,
 		"akkeris.k8s.io/common-name": main_server_name,
@@ -781,6 +770,7 @@ func (ingress *IstioIngress) CertificateToSecret(server_name string, pem_cert []
 	secret.SetLabels(map[string]string{
 		"akkeris.k8s.io/certificate-name": main_server_name,
 	})
+	secret.Data = make(map[string][]byte, 0)
 	secret.Data["tls.key"] = []byte(base64.StdEncoding.EncodeToString(pem_key))
 	secret.Data["tls.crt"] = []byte(base64.StdEncoding.EncodeToString(pem_cert))
 	return &name, &secret, nil
@@ -867,7 +857,7 @@ func (ingress *IstioIngress) DeleteRouter(domain string, internal bool) error {
 }
 
 func (ingress *IstioIngress) InstallCertificate(server_name string, pem_cert []byte, pem_key []byte) error {
-	name, secret, err := ingress.CertificateToSecret(server_name, pem_cert, pem_key)
+	name, secret, err := CertificateToSecret(server_name, pem_cert, pem_key, ingress.config.Environment)
 	if err != nil {
 		return err
 	}
