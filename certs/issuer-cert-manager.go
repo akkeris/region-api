@@ -20,7 +20,6 @@ import (
 type CertManagerIssuer struct {
 	runtime              runtime.Runtime
 	certificateNamespace string
-	providerName         string
 	clusterIssuers 		 []certmanager.ClusterIssuer
 }
 
@@ -36,10 +35,6 @@ func GetCertManagerIssuers(runtime runtime.Runtime) ([]Issuer, error) {
 	if err = json.Unmarshal(body, &certManagerIssuers); err != nil {
 		return nil, err
 	}
-	var providerName = os.Getenv("CERTMANAGER_PROVIDER_NAME")
-	if providerName == "" {
-		providerName = "aws"
-	}
 	namespace := os.Getenv("CERT_NAMESPACE");
 	if namespace == "" {
 		namespace = "istio-system"
@@ -47,7 +42,6 @@ func GetCertManagerIssuers(runtime runtime.Runtime) ([]Issuer, error) {
 	return []Issuer{&CertManagerIssuer{
 		runtime:runtime,
 		certificateNamespace:namespace,
-		providerName:providerName,
 		clusterIssuers:certManagerIssuers.Items,
 	}}, nil
 }

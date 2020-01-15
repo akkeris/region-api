@@ -46,8 +46,6 @@ Set the following environment variables, if this is first time running it see th
 * SITES_PRIVATE_INTERNAL=(see ingress format)
 * ISTIO_DOWNPAGE - The maintenance page to use, this should be the service host for an app in akkeris. Defaults to `akkeris404.akkeris-system.svc.cluster.local`.
 
-If the apps or sites ingres uses an F5, the `F5_SECRET` and `F5_URL` should be set.  If using istio these may be left blank.
-
 **Broker Settings**
 
 * SERVICES - A comma delimited list of urls for open service brokers to use e.g., (https://user:pass@hostname/,https://:token@hostname/)
@@ -72,7 +70,7 @@ If the apps or sites ingres uses an F5, the `F5_SECRET` and `F5_URL` should be s
 
 This uses jetstack's cert-manager (if installed) to issue certificates. Note above, you may only have the settings for digicert or cert manager set.  For example setting `DIGICERT_SECRET` will automatically pick it as the certificate issuer and these settings will be ignored.
 
-* CERTMANAGER_PROVIDER_NAME - The provider name to use when requesting certificates, this should match at least one provider in the cluster-wide issuer.
+* DEFAULT_ISSUER - The clusterissuer to use by default when ordering a new certificate (one may be specified when ordering a cert)
 * CERT_NAMESPACE - The namespace to store certificates.  This defaults to `istio-system` to make the certificates (and their secrets) mountable by istio. This has no affect on DigiCert Certificate Issuer as it stores its certificates in vault.
 
 **Optional Environment Variables:**
