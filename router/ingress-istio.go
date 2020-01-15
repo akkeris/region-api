@@ -186,10 +186,21 @@ func addSlash(input string) string {
 	return input + "/"
 }
 
+func removeLeadingSlash(input string) string {
+	if input == "" {
+		return input
+	}
+	if input[len(input) - 1] == '/' {
+		return input[:len(input) - 1]
+	}
+	return input
+}
+
 type IstioIngress struct {
 	runtime runtime.Runtime
 	config  *IngressConfig
 	db      *sql.DB
+	certificateNamespace string
 }
 
 func GetIstioIngress(db *sql.DB, config *IngressConfig) (*IstioIngress, error) {
@@ -211,10 +222,15 @@ func GetIstioIngress(db *sql.DB, config *IngressConfig) (*IstioIngress, error) {
 	if os.Getenv("INGRESS_DEBUG") == "true" {
 		fmt.Printf("[ingress] Istio initialized with %s for namespace %s and gateway %s\n", config.Address, config.Environment, config.Name)
 	}
+	certificateNamespace := os.Getenv("CERT_NAMESPACE")
+	if certificateNamespace == "" {
+		certificateNamespace = "istio-system"
+	}
 	return &IstioIngress{
 		runtime: runtime,
 		config:  config,
 		db:      db,
+		certificateNamespace: certificateNamespace,
 	}, nil
 }
 
@@ -550,7 +566,6 @@ func (ingress *IstioIngress) InstallOrUpdateJWTAuthFilter(appname string, space 
 			Name: appname,
 		},
 	}
-
 	if len(excludes) > 0 {
 		jwtPolicy.Spec.Origins[0].Jwt.TriggerRules = make([]TriggerRule, 1)
 		jwtPolicy.Spec.Origins[0].Jwt.TriggerRules[0].ExcludedPaths = make([]StringMatch, 0)
@@ -653,7 +668,7 @@ func createHTTPSpecForVS(app string, space string, domain string, adjustedPath s
 	return HTTP{
 		Match: []Match{Match{
 			URI:StringMatch{
-				Prefix: adjustedPath,
+				Prefix: forwardedPath,
 			},
 			IgnoreUriCase: true,
 		}},
@@ -677,7 +692,7 @@ func createHTTPSpecForVS(app string, space string, domain string, adjustedPath s
 			Request: HeaderOperations{
 				Set: map[string]string{
 					"X-Forwarded-Path": forwardedPath,
-					"X-Orig-Path": adjustedPath,
+					"X-Orig-Path": removeLeadingSlash(adjustedPath),
 					"X-Orig-Host": domain,
 					"X-Orig-Port": "443",
 					"X-Orig-Proto": "https",
@@ -688,18 +703,7 @@ func createHTTPSpecForVS(app string, space string, domain string, adjustedPath s
 	}
 }
 
-// Standard Ingress Methods:
-
-/*
- * We need to replicate the behavior of the F5, when installing a new site,
- * can likely assume that a certificate is installed, we can look for a list
- * of appropriate certificates and the most specific, unexpired one wins.
- */
-func (ingress *IstioIngress) CreateOrUpdateRouter(domain string, internal bool, paths []Route) error {
-	rvExists, version, err := ingress.VirtualServiceExists(domain)
-	if err != nil {
-		return err
-	}
+func PrepareVirtualServiceForCreateorUpdate(domain string, internal bool, paths []Route) (*VirtualService, error) {
 	var defaultPort int32 = 80
 	if os.Getenv("DEFAULT_PORT") != "" {
 		port, err := strconv.ParseInt(os.Getenv("DEFAULT_PORT"), 10, 32)
@@ -714,9 +718,7 @@ func (ingress *IstioIngress) CreateOrUpdateRouter(domain string, internal bool, 
 	vs.Kind = "VirtualService"
 	vs.SetName(domain)
 	vs.SetNamespace("sites-system")
-	if(rvExists && version != "") {
-		vs.SetResourceVersion(version)
-	}
+	
 	if(internal) {
 		vs.Spec.Gateways = []string{"sites-private"}
 	} else {
@@ -725,17 +727,63 @@ func (ingress *IstioIngress) CreateOrUpdateRouter(domain string, internal bool, 
 	vs.Spec.Hosts = []string{domain}
 	vs.Spec.HTTP = make([]HTTP, 0)
 	for _, value := range paths {
+		path := removeLeadingSlash(value.Path)
 		vs.Spec.HTTP = append(vs.Spec.HTTP, 
-			createHTTPSpecForVS(value.App, value.Space, value.Domain, removeSlash(value.Path), addSlash(value.ReplacePath), removeSlash(value.Path) + "/", defaultPort))
+			createHTTPSpecForVS(value.App, value.Space, value.Domain, removeSlash(path), addSlash(value.ReplacePath), removeSlash(path) + "/", defaultPort))
 		if removeSlashSlash(value.Path) == removeSlash(value.Path) {
 			vs.Spec.HTTP = append(vs.Spec.HTTP, 
-				createHTTPSpecForVS(value.App, value.Space, value.Domain, removeSlashSlash(value.Path), value.ReplacePath, removeSlashSlash(value.Path), defaultPort))
+				createHTTPSpecForVS(value.App, value.Space, value.Domain, removeSlashSlash(value.Path), value.ReplacePath, removeSlashSlash(path), defaultPort))
 		}
 	}
-	if err = ingress.InstallOrUpdateUberSiteGateway(domain, ingress.GetCertificateFromDomain(domain), internal); err != nil {
-		return err
+	return &vs, nil
+}
+
+func (ingress *IstioIngress) CertificateToSecret(server_name string, pem_cert []byte, pem_key []byte) (*string, *kube.Secret, error) {
+	block, _ := pem.Decode([]byte(pem_cert))
+	if block == nil {
+		fmt.Println("failed to parse PEM block containing the public certificate")
+		return nil, nil, errors.New("Invalid certificate: Failed to decode PEM block")
 	}
-	return ingress.InstallOrUpdateVirtualService(domain, &vs, rvExists)
+	x509_decoded_cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		fmt.Println("invalid certificate provided")
+		fmt.Println(err)
+		return nil, nil, err
+	}
+	block, _ = pem.Decode([]byte(pem_key))
+	if block == nil {
+		fmt.Println("failed to parse PEM block containing the private key")
+		return nil, nil, errors.New("Invalid key: Failed to decode PEM block")
+	}
+	x509_decoded_key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		fmt.Println("invalid key provided")
+		fmt.Println(err)
+		return nil, nil, err
+	}
+	err = x509_decoded_key.Validate()
+	if err != nil {
+		fmt.Println("x509 decoded key was invalid")
+		fmt.Println(err)
+		return nil, nil, err
+	}
+
+	main_server_name := strings.Replace(x509_decoded_cert.Subject.CommonName, "*.", "star.", -1)
+	name := strings.Replace(main_server_name, ".", "-", -1) + "-tls"
+	secret := kube.Secret{}
+	secret.Type = kube.SecretTypeTLS
+	secret.SetName(name)
+	secret.SetNamespace(ingress.config.Environment)
+	secret.SetAnnotations(map[string]string{
+		"akkeris.k8s.io/alt-names": main_server_name,
+		"akkeris.k8s.io/common-name": main_server_name,
+	})
+	secret.SetLabels(map[string]string{
+		"akkeris.k8s.io/certificate-name": main_server_name,
+	})
+	secret.Data["tls.key"] = []byte(base64.StdEncoding.EncodeToString(pem_key))
+	secret.Data["tls.crt"] = []byte(base64.StdEncoding.EncodeToString(pem_cert))
+	return &name, &secret, nil
 }
 
 func getDownPage() string {
@@ -743,6 +791,24 @@ func getDownPage() string {
 		return os.Getenv("ISTIO_DOWNPAGE")
 	}
 	return "downpage.akkeris-system.svc.cluster.local"
+}
+
+func (ingress *IstioIngress) CreateOrUpdateRouter(domain string, internal bool, paths []Route) error {
+	exists, version, err := ingress.VirtualServiceExists(domain)
+	if err != nil {
+		return err
+	}
+	vs, err := PrepareVirtualServiceForCreateorUpdate(domain, internal, paths)
+	if err != nil {
+		return err
+	}
+	if(exists && version != "") {
+		vs.SetResourceVersion(version)
+	}
+	if err = ingress.InstallOrUpdateUberSiteGateway(domain, ingress.GetCertificateFromDomain(domain), internal); err != nil {
+		return err
+	}
+	return ingress.InstallOrUpdateVirtualService(domain, vs, exists)
 }
 
 func (ingress *IstioIngress) SetMaintenancePage(app string, space string, value bool) error {
@@ -801,82 +867,29 @@ func (ingress *IstioIngress) DeleteRouter(domain string, internal bool) error {
 }
 
 func (ingress *IstioIngress) InstallCertificate(server_name string, pem_cert []byte, pem_key []byte) error {
-	block, _ := pem.Decode([]byte(pem_cert))
-	if block == nil {
-		fmt.Println("failed to parse PEM block containing the public certificate")
-		return errors.New("Invalid certificate: Failed to decode PEM block")
-	}
-	x509_decoded_cert, err := x509.ParseCertificate(block.Bytes)
+	name, secret, err := ingress.CertificateToSecret(server_name, pem_cert, pem_key)
 	if err != nil {
-		fmt.Println("invalid certificate provided")
-		fmt.Println(err)
 		return err
 	}
-	block, _ = pem.Decode([]byte(pem_key))
-	if block == nil {
-		fmt.Println("failed to parse PEM block containing the private key")
-		return errors.New("Invalid key: Failed to decode PEM block")
-	}
-	x509_decoded_key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
-	if err != nil {
-		fmt.Println("invalid key provided")
-		fmt.Println(err)
-		return err
-	}
-	err = x509_decoded_key.Validate()
-	if err != nil {
-		fmt.Println("x509 decoded key was invalid")
-		fmt.Println(err)
-		return err
-	}
-
-	main_server_name := strings.Replace(x509_decoded_cert.Subject.CommonName, "*.", "star.", -1)
-	main_certs_name := strings.Replace(main_server_name, ".", "-", -1) + "-tls"
-
-	var secret kube.Secret
-	secret.Type = kube.SecretTypeTLS
-	secret.SetName(main_certs_name)
-	secret.SetNamespace(ingress.config.Environment)
-	secret.SetAnnotations(map[string]string{
-		"akkeris.k8s.io/alt-names": main_server_name,
-		"akkeris.k8s.io/common-name": main_server_name,
-	})
-	secret.SetLabels(map[string]string{
-		"akkeris.k8s.io/certificate-name": main_server_name,
-	})
-	secret.Data["tls.key"] = []byte(base64.StdEncoding.EncodeToString(pem_key))
-	secret.Data["tls.crt"] = []byte(base64.StdEncoding.EncodeToString(pem_cert))
-
-	certificateNamespace := os.Getenv("CERT_NAMESPACE")
-	if certificateNamespace == "" {
-		certificateNamespace = "istio-system"
-	}
-
-	_, code, err := ingress.runtime.GenericRequest("get", "/api/v1/namespaces/" + certificateNamespace + "/secrets/" + main_certs_name, nil)
+	_, code, err := ingress.runtime.GenericRequest("get", "/api/v1/namespaces/" + ingress.certificateNamespace + "/secrets/" + *name, nil)
 	if err != nil {
 		return err
 	}
 	if code == http.StatusOK {
-		_, _, err = ingress.runtime.GenericRequest("put", "/api/v1/namespaces/" + certificateNamespace + "/secrets/" + main_certs_name, secret)
+		_, _, err = ingress.runtime.GenericRequest("put", "/api/v1/namespaces/" + ingress.certificateNamespace + "/secrets/" + *name, secret)
 		return err
 	} else {
-		_, _, err = ingress.runtime.GenericRequest("post", "/api/v1/namespaces/"+certificateNamespace+"/secrets", secret)
+		_, _, err = ingress.runtime.GenericRequest("post", "/api/v1/namespaces/" + ingress.certificateNamespace + "/secrets", secret)
 		return err
 	}
 }
 
 func (ingress *IstioIngress) GetInstalledCertificates(site string) ([]Certificate, error) {
-	certificateNamespace := os.Getenv("CERT_NAMESPACE")
-	if certificateNamespace == "" {
-		certificateNamespace = "istio-system"
-	}
-
 	var certList kube.SecretList
-
 	if site != "*" {
 		main_server_name := strings.Replace(site, "*.", "star.", -1)
 		main_certs_name := strings.Replace(main_server_name, ".", "-", -1) + "-tls"
-		body, code, err := ingress.runtime.GenericRequest("get", "/api/v1/namespaces/" + certificateNamespace + "/secrets/" + main_certs_name, nil)
+		body, code, err := ingress.runtime.GenericRequest("get", "/api/v1/namespaces/" + ingress.certificateNamespace + "/secrets/" + main_certs_name, nil)
 
 		if err != nil {
 			return nil, err
@@ -893,7 +906,7 @@ func (ingress *IstioIngress) GetInstalledCertificates(site string) ([]Certificat
 		certList.Items = make([]kube.Secret, 0)
 		certList.Items = append(certList.Items, t)
 	} else {
-		body, code, err := ingress.runtime.GenericRequest("get", "/api/v1/namespaces/" + certificateNamespace + "/secrets?fieldSelector=type%3Dkubernetes.io%2Ftls", nil)
+		body, code, err := ingress.runtime.GenericRequest("get", "/api/v1/namespaces/" + ingress.certificateNamespace + "/secrets?fieldSelector=type%3Dkubernetes.io%2Ftls", nil)
 		if err != nil {
 			return nil, err
 		}

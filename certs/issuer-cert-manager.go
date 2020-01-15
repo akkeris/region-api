@@ -19,9 +19,9 @@ import (
 
 type CertManagerIssuer struct {
 	runtime              runtime.Runtime
-	issuerName           string
 	certificateNamespace string
 	providerName         string
+	clusterIssuers 		 []certmanager.ClusterIssuer
 }
 
 func GetCertManagerIssuers(runtime runtime.Runtime) ([]Issuer, error) {
@@ -44,16 +44,12 @@ func GetCertManagerIssuers(runtime runtime.Runtime) ([]Issuer, error) {
 	if namespace == "" {
 		namespace = "istio-system"
 	}
-	issuers := make([]Issuer, 0)
-	for _, certManagerIssuer := range certManagerIssuers.Items {
-		issuers = append(issuers, Issuer(&CertManagerIssuer{
-			runtime:runtime,
-			issuerName:certManagerIssuer.GetName(),
-			certificateNamespace:namespace,
-			providerName:providerName,
-		}));
-	}
-	return issuers, nil
+	return []Issuer{&CertManagerIssuer{
+		runtime:runtime,
+		certificateNamespace:namespace,
+		providerName:providerName,
+		clusterIssuers:certManagerIssuers.Items,
+	}}, nil
 }
 
 func CertificateStatusToOrder(certificate certmanager.Certificate) (structs.CertificateOrder, error) {
@@ -110,10 +106,19 @@ func CertificateStatusesToOrders(certificates []certmanager.Certificate) ([]stru
 }
 
 func (issuer *CertManagerIssuer) GetName() string {
-	return issuer.issuerName
+	return "cert-manager"
 }
 
-func (issuer *CertManagerIssuer) CreateOrder(domain string, sans []string, comment string, requestor string) (id string, err error) {
+func (issuer *CertManagerIssuer) CreateOrder(domain string, sans []string, comment string, requestor string, issuerName string) (id string, err error) {
+	var found = false
+	for _, cIssuer := range issuer.clusterIssuers {
+		if cIssuer.GetName() == issuerName {
+			found = true
+		}
+	}
+	if found == false {
+		return "", errors.New("Unable to find issuer " + issuerName)
+	}
 	var cert certmanager.Certificate
 	cert.APIVersion = certmanager.SchemeGroupVersion.Group + "/" + certmanager.SchemeGroupVersion.Version
 	cert.Kind = "Certificate"
@@ -128,7 +133,7 @@ func (issuer *CertManagerIssuer) CreateOrder(domain string, sans []string, comme
 	cert.Spec.RenewBefore = &kubemetav1.Duration{Duration:certmanager.DefaultRenewBefore}
 	cert.Spec.CommonName = domain
 	cert.Spec.IssuerRef.Kind = "ClusterIssuer"
-	cert.Spec.IssuerRef.Name = issuer.issuerName
+	cert.Spec.IssuerRef.Name = issuerName
 	cert.Spec.SecretName = strings.Replace(strings.Replace(domain, "*", "star", -1), ".", "-", -1) + "-tls"
 	body, code, err := issuer.runtime.GenericRequest("post", "/apis/" + certmanager.SchemeGroupVersion.Group + "/" + certmanager.SchemeGroupVersion.Version + "/namespaces/" + issuer.certificateNamespace + "/certificates", cert)
 	if err != nil {
@@ -245,7 +250,7 @@ func (issuer *CertManagerIssuer) GetCertificate(id string, domain string) (pem_c
 
 // Used by unit tests, shoudn't be used outside of that.
 func (issuer *CertManagerIssuer) DeleteCertificate(name string) (error) {
-	_, code, err := issuer.runtime.GenericRequest("delete", "/api/v1/namespaces/" + issuer.certificateNamespace + "/certificates/" + name, nil)
+	_, code, err := issuer.runtime.GenericRequest("delete", "/apis/" + certmanager.SchemeGroupVersion.Group + "/" + certmanager.SchemeGroupVersion.Version + "/namespaces/" + issuer.certificateNamespace + "/certificates/" + name, nil)
 	if err != nil {
 		return err
 	}

@@ -291,6 +291,7 @@ func Server(db *sql.DB) *martini.ClassicMartini {
 	m.Get("/v1/service/vault/credentials/**", vault.GetVaultVariablesMasked)
 
 	router.AddToMartini(m)
+	certs.AddToMartini(m)
 
 	m.Get("/v1/octhc/kube", utils.Octhc)
 	m.Get("/v1/octhc/service/vault", vault.GetVaultList)
@@ -325,11 +326,6 @@ func Server(db *sql.DB) *martini.ClassicMartini {
 	m.Post("/v1/space/:space/app/:app/maintenance", maintenance.EnableMaintenancePage)
 	m.Delete("/v1/space/:space/app/:app/maintenance", maintenance.DisableMaintenancePage)
 	m.Get("/v1/space/:space/app/:app/maintenance", maintenance.MaintenancePageStatus)
-
-	m.Post("/v1/certs", binding.Json(structs.CertificateOrder{}), certs.CreateCertificateOrder)
-	m.Get("/v1/certs", certs.GetCertificateOrders)
-	m.Get("/v1/certs/:id", certs.GetCertificateOrderStatus)
-	m.Post("/v1/certs/:id/install", certs.InstallCertificate)
 
 	m.Get("/v1/utils/service/space/:space/app/:app", utils.GetService)
 	m.Get("/v1/utils/nodes", utils.GetNodes)

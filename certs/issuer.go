@@ -10,7 +10,7 @@ import (
 
 type Issuer interface {
 	GetName() string
-	CreateOrder(domain string, sans []string, comment string, requestor string) (id string, err error)
+	CreateOrder(domain string, sans []string, comment string, requestor string, issuerName string) (id string, err error)
 	GetOrderStatus(id string) (order *structs.CertificateOrder, err error)
 	GetOrders() (orders []structs.CertificateOrder, err error)
 	IsOrderAutoInstalled(ingress router.Ingress) (bool, error)

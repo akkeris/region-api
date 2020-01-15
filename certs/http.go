@@ -9,19 +9,25 @@ import (
 	"region-api/router"
 	"region-api/structs"
 	"region-api/utils"
+	"os"
 )
 
-func CreateCertificateOrder(db *sql.DB, request structs.CertificateOrder, berr binding.Errors, r render.Render) {
+func HttpCreateCertificateOrder(db *sql.DB, request structs.CertificateOrder, berr binding.Errors, r render.Render) {
 	if berr != nil {
 		utils.ReportInvalidRequest(berr[0].Message, r)
 		return
 	}
-	issuer, err := GetIssuer(db, /* TODO: Issuer Name */ "letsencrypt")
+	issuer, err := GetIssuer(db, "cert-manager") // we only support cert-manager as an issuer system at the moment.
 	if err != nil {
 		utils.ReportError(err, r)
 		return
 	}
-	id, err := issuer.CreateOrder(request.CommonName, request.SubjectAlternativeNames, request.Comment, request.Requestor)
+	if request.Issuer == "" && os.Getenv("DEFAULT_ISSUER") != "" {
+		request.Issuer = os.Getenv("DEFAULT_ISSUER")
+	} else if request.Issuer == "" && os.Getenv("DEFAULT_ISSUER") == "" {
+		request.Issuer = "letsencrypt"
+	}
+	id, err := issuer.CreateOrder(request.CommonName, request.SubjectAlternativeNames, request.Comment, request.Requestor, request.Issuer)
 	if err != nil {
 		utils.ReportError(err, r)
 		return
@@ -30,8 +36,8 @@ func CreateCertificateOrder(db *sql.DB, request structs.CertificateOrder, berr b
 	r.JSON(http.StatusCreated, request)
 }
 
-func GetCertificateOrderStatus(db *sql.DB, params martini.Params, r render.Render) {
-	issuer, err := GetIssuer(db, /* TODO: Issuer Name */ "letsencrypt")
+func HttpGetCertificateOrderStatus(db *sql.DB, params martini.Params, r render.Render) {
+	issuer, err := GetIssuer(db, "cert-manager") // we only support cert-manager as an issuer system at the moment.
 	if err != nil {
 		utils.ReportError(err, r)
 		return
@@ -44,8 +50,8 @@ func GetCertificateOrderStatus(db *sql.DB, params martini.Params, r render.Rende
 	r.JSON(http.StatusOK, order)
 }
 
-func GetCertificateOrders(db *sql.DB, params martini.Params, r render.Render) {
-	issuer, err := GetIssuer(db, /* TODO: Issuer Name */ "letsencrypt")
+func HttpGetCertificateOrders(db *sql.DB, params martini.Params, r render.Render) {
+	issuer, err := GetIssuer(db, "cert-manager") // we only support cert-manager as an issuer system at the moment.
 	if err != nil {
 		utils.ReportError(err, r)
 		return
@@ -58,8 +64,8 @@ func GetCertificateOrders(db *sql.DB, params martini.Params, r render.Render) {
 	r.JSON(http.StatusOK, orders)
 }
 
-func InstallCertificate(db *sql.DB, params martini.Params, r render.Render) {
-	issuer, err := GetIssuer(db, /* TODO: Issuer Name */ "letsencrypt")
+func HttpInstallCertificate(db *sql.DB, params martini.Params, r render.Render) {
+	issuer, err := GetIssuer(db, "cert-manager") // we only support cert-manager as an issuer system at the moment.
 	if err != nil {
 		utils.ReportError(err, r)
 		return
@@ -117,3 +123,11 @@ func InstallCertificate(db *sql.DB, params martini.Params, r render.Render) {
 	}
 	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: "Certificate Installed"})
 }
+
+func AddToMartini(m *martini.ClassicMartini) {
+	m.Post("/v1/certs", binding.Json(structs.CertificateOrder{}), HttpCreateCertificateOrder)
+	m.Get("/v1/certs", HttpGetCertificateOrders)
+	m.Get("/v1/certs/:id", HttpGetCertificateOrderStatus)
+	m.Post("/v1/certs/:id/install", HttpInstallCertificate)
+}
+

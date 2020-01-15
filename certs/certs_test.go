@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"github.com/go-martini/martini"
-	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
 	. "github.com/smartystreets/goconvey/convey"
 	"net/http"
@@ -21,9 +20,7 @@ var pool *sql.DB
 func Server() *martini.ClassicMartini {
 	m := martini.Classic()
 	m.Use(render.Renderer())
-	m.Post("/v1/certs", binding.Json(structs.CertificateOrder{}), CreateCertificateOrder)
-	m.Get("/v1/certs", GetCertificateOrders)
-	m.Get("/v1/certs/:id", GetCertificateOrderStatus)
+	AddToMartini(m)
 	return m
 }
 
@@ -44,7 +41,7 @@ func TestHandlers(t *testing.T) {
 			Reset(func() {
 				stmt, _ := pool.Prepare("delete from certs where request=$1")
 				stmt.Exec("1313855")
-				issuer, _ := GetIssuer(pool, "letsencrypt")
+				issuer, _ := GetIssuer(pool, "cert-manager")
 				issuer.DeleteCertificate("apitest.example.com")
 			})
 			var request structs.CertificateOrder
@@ -90,7 +87,7 @@ func TestHandlers(t *testing.T) {
 				Reset(func() {
 					stmt, _ := pool.Prepare("delete from certs where request=$1")
 					stmt.Exec("1313855")
-					issuer, _ := GetIssuer(pool, "letsencrypt")
+					issuer, _ := GetIssuer(pool, "cert-manager")
 					issuer.DeleteCertificate("apitest.example.com")
 				})
 			})

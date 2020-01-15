@@ -15,6 +15,7 @@ type CertificateOrder struct {
 	Requestor               string   `json:"requestor,omitempty"`
 	Issued                  string   `json:"issued,omitempty"`
 	Expires                 string   `json:"expires,omitempty"`
+	Issuer                  string   `json:"issuer,omitempty"`
 }
 
 type Certificate struct {
