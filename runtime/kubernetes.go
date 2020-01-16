@@ -171,7 +171,7 @@ func deploymentToDeploymentSpec(deployment *structs.Deployment) (dp Deploymentsp
 	c1.Env = deployment.ConfigVars
 	clist := []ContainerItem{}
 
-	// assemble readiness proble
+	// assemble readiness probe
 	var probe ReadinessProbe
 	if deployment.Port != -1 {
 		var cp1 ContainerPort
@@ -181,6 +181,8 @@ func deploymentToDeploymentSpec(deployment *structs.Deployment) (dp Deploymentsp
 			probe.TCPSocket = &TcpCheck{Port: deployment.Port}
 		}
 		cp1.ContainerPort = deployment.Port
+		probe.PeriodSeconds = 20
+		probe.TimeoutSeconds = 15
 		c1.ReadinessProbe = &probe
 		cportlist := []ContainerPort{}
 		c1.Ports = append(cportlist, cp1)

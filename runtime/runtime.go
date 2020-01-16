@@ -77,8 +77,10 @@ type HttpCheck struct {
 }
 
 type ReadinessProbe struct {
-	TCPSocket *TcpCheck  `json:"tcpSocket,omitempty"`
-	HTTPGET   *HttpCheck `json:"httpGet,omitempty"`
+	TCPSocket      *TcpCheck  `json:"tcpSocket,omitempty"`
+	HTTPGET        *HttpCheck `json:"httpGet,omitempty"`
+	TimeoutSeconds int        `json:"timeoutSeconds,omitempty"`
+	PeriodSeconds  int        `json:"periodSeconds,omitEmpty"`
 }
 
 type ContainerItem struct {
