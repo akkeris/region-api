@@ -10,7 +10,6 @@ jobs:
       - run:
           name: Build application Docker image
           command: |
-            apt-get install bzr
             docker build -t region-api .
       - deploy:
           name: Push application Docker image
