@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"fmt"
+	"time"
 )
 
 func AddAkkerisConfigVars(appname string, space string) []structs.EnvVar {
@@ -110,7 +111,6 @@ func GetAllConfigVars(db *sql.DB, params martini.Params, r render.Render) {
 	if err != nil {
 		utils.ReportError(err, r)
 		return
-
 	}
 	for _, e := range servicevars {
 		elist = append(elist, e)
@@ -242,7 +242,6 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 	if err != nil {
 		utils.ReportError(err, r)
 		return
-
 	}
 	for _, e := range servicevars {
 		elist = append(elist, e)
@@ -261,6 +260,11 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 	}
 
 	appIngress, err := ingress.GetAppIngress(db, internal)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	siteIngress, err := ingress.GetSiteIngress(db, internal)
 	if err != nil {
 		utils.ReportError(err, r)
 		return
@@ -310,7 +314,6 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 
 	// Any deployment features requiring istio transitioned ingresses should
 	// be marked here. Only apply this to the web dyno types.
-	webDyno := !strings.Contains(appname, "--")
 	appFQDN := appname + "-" + space
 	if space == "default" {
 		appFQDN = appname
@@ -337,12 +340,14 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 
 		// Apply the HTTP filters
 		foundJwtFilter := false
+		foundCorsFilter := false
 		for _, filter := range deploy1.Filters {
 			if filter.Type == "jwt" {
 				issuer := ""
 				jwksUri := ""
 				audiences := make([]string, 0)
-				exclude := make([]string, 0)
+				excludes := make([]string, 0)
+				includes := make([]string, 0)
 				if val, ok := filter.Data["issuer"]; ok {
 					issuer = val
 				}
@@ -353,41 +358,93 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 					audiences = strings.Split(val, ",")
 				}
 				if val, ok := filter.Data["excludes"]; ok {
-					exclude = strings.Split(val, ",")
+					excludes = strings.Split(val, ",")
+				}
+				if val, ok := filter.Data["includes"]; ok {
+					includes = strings.Split(val, ",")
 				}
 				if jwksUri == "" {
 					fmt.Printf("WARNING: Invalid jwt configuration, uri was not valid: %s\n", jwksUri)
 				} else {
 					foundJwtFilter = true
-					if err := appIngress.InstallOrUpdateJWTAuthFilter(appname, space, appFQDN, int64(finalport), issuer, jwksUri, audiences, exclude); err != nil {
+					if err := appIngress.InstallOrUpdateJWTAuthFilter(appname, space, appFQDN, int64(finalport), issuer, jwksUri, audiences, excludes, includes); err != nil {
 						fmt.Printf("WARNING: There was an error installing or updating JWT Auth filter: %s\n", err.Error())
 					}
+				}
+			} else if filter.Type == "cors" {
+				allow_origin := make([]string, 0)
+				allow_methods := make([]string, 0)
+				allow_headers := make([]string, 0)
+				expose_headers := make([]string, 0)
+				max_age := time.Second * 86400
+				allow_credentials := false
+				if val, ok := filter.Data["allow_origin"]; ok {
+					allow_origin = strings.Split(val, ",")
+				}
+				if val, ok := filter.Data["allow_methods"]; ok {
+					allow_methods = strings.Split(val, ",")
+				}
+				if val, ok := filter.Data["allow_headers"]; ok {
+					allow_headers = strings.Split(val, ",")
+				}
+				if val, ok := filter.Data["expose_headers"]; ok {
+					expose_headers = strings.Split(val, ",");
+				}
+				if val, ok := filter.Data["max_age"]; ok {
+					age, err := strconv.ParseInt(val, 10, 32)
+					if err == nil {
+						max_age = time.Second * time.Duration(age)
+					} else {
+						fmt.Printf("WARNING: Unable to convert max_age to value %s\n", val)
+					}
+				}
+				if val, ok := filter.Data["allow_credentials"]; ok {
+					if val == "true" {
+						allow_credentials = true
+					} else {
+						allow_credentials = false
+					}
+				}
+				if err := appIngress.InstallOrUpdateCORSAuthFilter(appname + "-" + space, "/", allow_origin, allow_methods, allow_headers, expose_headers, max_age, allow_credentials); err != nil {
+					fmt.Printf("WARNING: There was an error installing or updating CORS Auth filter: %s\n", err.Error())
+				} else {
+					foundCorsFilter = true
+				}
+				routes, err := ingress.GetPathsByApp(db, appname, space)
+				if err == nil {
+					for _, route := range routes {
+						if err := siteIngress.InstallOrUpdateCORSAuthFilter(route.Domain, route.Path, allow_origin, allow_methods, allow_headers, expose_headers, max_age, allow_credentials); err != nil {
+							fmt.Printf("WARNING: There was an error installing or updating CORS Auth filter on site: %s: %s\n", route.Domain, err.Error())
+						}
+					}
+				} else {
+					fmt.Printf("WARNING: There was an error trying to pull the routes for an app to install the CORS auth filters on: %s\n", err.Error())
 				}
 			} else {
 				fmt.Printf("WARNING: Unknown filter type: %s\n", filter.Type)
 			}
 		}
+
+		// If we don't have a CORS filter remove it from the app and any sites it may be associated with.
+		// this is effectively a no-op if there is no CORS auth filter in the first place
+		if !foundCorsFilter {
+			if err := siteIngress.DeleteCORSAuthFilter(appname + "-" + space, "/"); err != nil {
+				fmt.Printf("WARNING: There was an error removing the CORS auth filter from the app: %s\n", err.Error())
+			}
+			routes, err := ingress.GetPathsByApp(db, appname, space)
+			if err == nil {
+				for _, route := range routes {
+					if err := siteIngress.DeleteCORSAuthFilter(route.Domain, route.Path); err != nil {
+						fmt.Printf("WARNING: There was an error removing CORS Auth filter on site: %s: %s\n", route.Domain, err.Error())
+					}
+				}
+			} else {
+				fmt.Printf("WARNING: There was an error trying to pull the routes for an app to install the CORS auth filters on: %s\n", err.Error())
+			}
+		}
 		if !foundJwtFilter {
 			if err := appIngress.DeleteJWTAuthFilter(appname, space, appFQDN, int64(finalport)); err != nil {
 				fmt.Printf("WARNING: There was an error removing the JWT auth filter: %s\n", err.Error())
-			}
-		}
-	}
-
-	if appIngress.Name() == "transition" {
-		if (deploy1.Features.IstioInject || deploy1.Features.Http2Service || deploy1.Features.Http2EndToEndService) && webDyno {
-			if os.Getenv("INGRESS_DEBUG") == "true" {
-				fmt.Printf("[ingress] Moving app to istio ingress: %s\n", appFQDN)
-			}
-			if err := ingress.TransitionAppToIngress(db, "istio", internal, appFQDN); err != nil {
-				fmt.Printf("WARNING: Transition to istio ingress failed: %s\n", err.Error())
-			}
-		} else {
-			if os.Getenv("INGRESS_DEBUG") == "true" {
-				fmt.Printf("[ingress] Moving app to f5 ingress: %s\n", appFQDN)
-			}
-			if err := ingress.TransitionAppToIngress(db, "f5", internal, appFQDN); err != nil {
-				fmt.Printf("WARNING: Transition to f5 ingress failed: %s\n", err.Error())
 			}
 		}
 	}

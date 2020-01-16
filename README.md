@@ -44,13 +44,7 @@ Set the following environment variables, if this is first time running it see th
 * SITES_PUBLIC_INTERNAL=(see ingress format)
 * SITES_PUBLIC_EXTERNAL=(see ingress format)
 * SITES_PRIVATE_INTERNAL=(see ingress format)
-* F5_SECRET - The path to the token or password in vault
-* F5_URL - The https URL of the F5 
-* F5_UNIPOOL - When using the F5 in an ingress instruct it to use a single pool. See F5 Setup below for more information.
-* F5_CIPHER_LIST - The cipher list to use when creating TLS (SSL) client profiles, defaults to `!SSLv2:!SSLv3:!MD5:!EXPORT:!RSA+3DES:!RSA+RC4:!ECDHE+RC4:!ECDHE+3DES:ECDHE+AES:RSA+AES`
 * ISTIO_DOWNPAGE - The maintenance page to use, this should be the service host for an app in akkeris. Defaults to `akkeris404.akkeris-system.svc.cluster.local`.
-
-If the apps or sites ingres uses an F5, the `F5_SECRET` and `F5_URL` should be set.  If using istio these may be left blank.
 
 **Broker Settings**
 
@@ -72,28 +66,12 @@ If the apps or sites ingres uses an F5, the `F5_SECRET` and `F5_URL` should be s
 * VAULT_PREFIX - The prefix to use for vault credentials injected as enviornment variables.
 * SECRETS - A comma delimited list of vault paths where shared credentials are stored
 
-**DigiCert Certificate Issuer**
-
-Note, if you're using digicert setting `DIGICERT_SECRET` will immediately pick DigiCert as the issuer type, and ignore certificate manager issuer settings.
-
-* DIGICERT_SECRET - The vault path for the digicert token/login secret
-* DIGICERT_REQUEST_URL - The digicert request url API
-* DIGICERT_URL - The digicert url https://www.digicert.com/services/v2 
-* CERT_EMAIL - DigiCert - email address used when requesting new certificates
-* CERT_COUNTRY -  DigiCert - the two letter country code used when requesting new certificates (e.g., US), all caps
-* CERT_PROVINCE -  DigiCert - the state or province used when requesting new certificates
-* CERT_LOCALITY -  DigiCert - the city or locality used when requested new certificates
-* CERT_ORG -  DigiCert - the organization or company name used when requesting new certificates
-* CERT_ORG_UNIT -  DigiCert - the organization unit or department name used when requesting new certificates
-* CERT_VALIDITY_YEARS=2 - The length of time certificates issued will last (in years).
-
 **Cert Manager Certificate Issuer**
 
-This uses jetstack's cert-manager (if installed) to issue certificates. Note above, you may only have the settings for digicert or cert manager set.  For example setting `DIGICERT_SECRET` will automatically pick it as the certificate issuer and these settings will be ignored.
+This uses jetstack's cert-manager (if installed) to issue certificates. By default this is the only issuer manager that's supported. 
 
-* CERTMANAGER_ISSUER_NAME - The cluster issuer name to use when requesting certificates. The issuer must be a cluster wide issuer.
-* CERTMANAGER_PROVIDER_NAME - The provider name to use when requesting certificates, this should match at least one provider in the cluster-wide issuer.
-* CERT_NAMESPACE - The namespace to store certificates.  This defaults to `istio-system` to make the certificates (and their secrets) mountable by istio. This has no affect on DigiCert Certificate Issuer as it stores its certificates in vault.
+* DEFAULT_ISSUER - The clusterissuer to use by default when ordering a new certificate (one may be specified when ordering a cert)
+* CERT_NAMESPACE - The namespace to store certificates.  This defaults to `istio-system` to make the certificates (and their secrets) mountable by istio. 
 
 **Optional Environment Variables:**
 
@@ -110,8 +88,8 @@ This uses jetstack's cert-manager (if installed) to issue certificates. Note abo
 **Debugging Environment Variables:**
 
 * DEBUG_K8S - print out all k8s calls, set to true
-* DEBUG_F5 - print out all f5 calls, set to true
-* MARTINI_ENV
+* INGRESS_DEBUG - print out debug information on ingress, set to true
+* MARTINI_ENV - Always set this to `production`. See https://github.com/go-martini/martini#martini-env
 
 Note that dependencies are managed via `dep` command line tool, run `dep ensure` before building.
 
@@ -121,27 +99,17 @@ $ docker run -p 3000:3000 -e <see below> region-api
 ```
 
 ### Ingress Formats
+Only istio is supported for ingresses currently. All of the Ingress Setting site/app environment variables should follow this format:
 
-f5://ip-address-of-ingress/partition/vip
-istio://host-of-ingress/namespace/ingress-gateway-name (its `istio` label on the deployment)
+```
+istio://host-of-ingress/namespace/ingress-gateway-name 
+```
+
+The `ingress-gateway-name` is the value of the `istio` label on the istio ingress deployment. The `namespace` is the namespace where istio is deployed (usually istio-system). The `host-of-ingress` must either by a qualified domain name or ip address, this is used to assign the IP address via DNS or a cname record if its a hostname. This should be the user-facing ip address or hostname you want new sites to resolve to, not an internal clusterip or service or node IP.
 
 ### Image Pull Secret Formats
 
  Image pull secrets should be held in vault (with the path in vault saved into the environment variable). The secret should have one key called "base64" which contains the base64 encoded JSON objecet in the format of `{"auths":{"registry.hostname.com":{"auth":"...base64authinfo..."},"email":""}}` the "auth" field should have a base64 encoded username:password. The other key should be "name" which contains the name of the secret, usually in the format of `registry.hostname.com-user`. See https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/#log-in-to-docker for an example of the JSON structure that should be base64 encoded and stored in the `base64` field.
-
-### F5 Setup
-
-***Pre-requisetes***
-
-You must have two partitions with two virtual devices on each partition. One for inside and one for outside. The virtual devices are for a application vs site ingresses (e.g, myapp.app.example.io and www.example.io). Each VIP should be configured with the following TLS cipher rules `!SSLv2:!SSLv3:!MD5:!EXPORT:!RSA+3DES:!RSA+RC4:!ECDHE+RC4:!ECDHE+3DES:ECDHE+AES:RSA+AES`.  They should be setup as SNI with a healthy default. Once established configrue the node-watcher and service-watcher apps then continue on to the unipool vs multirule setup below.
-
-*** Unipool vs. Multipool***
-
-The region api works by updating (and adding) ssl client profiles, irules and pools to the F5.  It can operate in two different modes. The multipool mode or unipool mode. The multipool creates a different pool of nodes + ports for each application, where as the unipool uses one pool of nodes and switches the port dynamically in the irule.  These operating modes can be flipped on and off by setting `F5_UNIPOOL` to any value. The service (and node) watcher app is responsible for creating and updating these pools dynamically, while the region api must update and attach the irules to the necessary VIPs. 
-
-For unipool mode you must have one pool named `unipool` with all nodes (kubernetes worker IP addresses) added to it.  The node watcher (when in unipool mode) will update the nodes in this pool automatically.
-
-For multi-pool (non-unipool) mode, both the service watcher and node watcher must not be set in unipool mode. This will create a single pool for each app. Non-unipool mode is not recommended as it does provide higher isolation and fault tolerance (in theory), in practice it has severly taxed the CPU and memory resources of an F5 load balancer.
 
 ## Testing
 
@@ -184,24 +152,3 @@ If your tests are consistently failing run the following on your database:
 delete from apps where name = 'gotest';
 delete from spacesapps where appname = 'gotest';
 ```
-
-
-### Certificate Issues
-
-Golang does not implicitly trust intermediate certificates, even if they are signed by a root certificate authority it does turst. Sometimes machines may not have the right intermediate certificates installed and you'll see warnings similar to this:
-
-```
-Get https://www.digicert.com/services/v2/order/certificate: x509: certificate signed by unknown authority
-Get https://www.digicert.com/services/v2/order/certificate: x509: certificate signed by unknown authority
-certExists Get https://www.digicert.com/services/v2/order/certificate: x509: certificate signed by unknown authority
-2019/01/16 13:27:35 Get https://www.digicert.com/services/v2/order/certificate: x509: certificate signed by unknown authority
-```
-
-When this occurs the website being requested (for an API request most likely) is using an intermediate that isn't explicitly trusted by golang.  To fix this download the certificates that issued the certificate that is erroring and add it to the keychain as "Always Trusted" in osx, or on linux into the trusted ca chain. Most of the time these are some sort of intermediate cert from digicert that must be explicitly trusted: https://www.digicert.com/digicert-root-certificates.htm.
-
-You can also try upgrading golang to get the latest/greatest.
-
-
-
-
-

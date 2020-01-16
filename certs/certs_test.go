@@ -4,15 +4,12 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"github.com/go-martini/martini"
-	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
 	. "github.com/smartystreets/goconvey/convey"
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"region-api/structs"
 	"region-api/utils"
 	"testing"
 )
@@ -22,9 +19,7 @@ var pool *sql.DB
 func Server() *martini.ClassicMartini {
 	m := martini.Classic()
 	m.Use(render.Renderer())
-	m.Post("/v1/certs", binding.Json(structs.CertificateOrder{}), CreateCertificateOrder)
-	m.Get("/v1/certs", GetCertificateOrders)
-	m.Get("/v1/certs/:id", GetCertificateOrderStatus)
+	AddToMartini(m)
 	return m
 }
 
@@ -43,14 +38,12 @@ func TestHandlers(t *testing.T) {
 	Convey("start\n", t, func() {
 		Convey("Given we want to make a request for a new certificate\n", func() {
 			Reset(func() {
-
 				stmt, _ := pool.Prepare("delete from certs where request=$1")
-				_, err := stmt.Exec("1313855")
-				fmt.Println(err)
-
+				stmt.Exec("1313855")
+				issuer, _ := GetIssuer(pool, "cert-manager")
+				issuer.DeleteCertificate("apitest.example.com")
 			})
-
-			var request structs.CertificateOrder
+			var request CertificateOrder
 			request.CommonName = "apitest.example.com"
 			request.SubjectAlternativeNames = []string{"apitest.qa.example.com", "apitest.dev.example.com"}
 			cr := new(bytes.Buffer)
@@ -62,37 +55,39 @@ func TestHandlers(t *testing.T) {
 			m.ServeHTTP(w, r)
 			So(w.Code, ShouldEqual, http.StatusCreated)
 			Convey("We should be able to get a list of cert requests\n", func() {
-
 				r, _ := http.NewRequest("GET", "/v1/certs", cr)
 				w := httptest.NewRecorder()
 				m.ServeHTTP(w, r)
 				So(w.Code, ShouldEqual, http.StatusOK)
-				var certs []structs.CertificateOrder
+				var certs []CertificateOrder
 				decoder := json.NewDecoder(w.Body)
 				if err := decoder.Decode(&certs); err != nil {
 					panic(err)
 				}
-				fmt.Println(certs)
-				var certid string
+				var certid string = ""
 				for _, cert := range certs {
 					if cert.CommonName == "apitest.example.com" {
 						certid = cert.Id
 					}
 				}
-				fmt.Println("Cert ID is: " + certid)
-
+				So(certid, ShouldNotEqual, "")
 				Convey("and we should be able to get the details on one cert\n", func() {
 					r, _ := http.NewRequest("GET", "/v1/certs/"+certid, cr)
 					w := httptest.NewRecorder()
 					m.ServeHTTP(w, r)
 					So(w.Code, ShouldEqual, http.StatusOK)
-					var cert structs.CertificateOrder
+					var cert CertificateOrder
 					decoder := json.NewDecoder(w.Body)
 					if err := decoder.Decode(&cert); err != nil {
 						panic(err)
 					}
-					fmt.Println(cert)
-					So(cert.Status, ShouldEqual, "rejected")
+					So(cert.Status, ShouldEqual, "pending")
+				})
+				Reset(func() {
+					stmt, _ := pool.Prepare("delete from certs where request=$1")
+					stmt.Exec("1313855")
+					issuer, _ := GetIssuer(pool, "cert-manager")
+					issuer.DeleteCertificate("apitest.example.com")
 				})
 			})
 		})

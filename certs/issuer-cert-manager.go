@@ -1,7 +1,6 @@
 package certs
 
 import (
-	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -10,160 +9,86 @@ import (
 	"os"
 	"region-api/router"
 	"region-api/runtime"
-	"region-api/structs"
 	"strconv"
 	"strings"
+	certmanager "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1alpha2"
+	kube "k8s.io/api/core/v1"
+	kubemetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-type certManagerACMEConfig struct {
-	DNS01 struct {
-		Provider string `json:"provider"`
-	} `json:"dns01"`
-	Domains []string `json:"domains"`
-}
-
-type certManagerACMECertificate struct {
-	APIVersion string `json:"apiVersion"`
-	Kind       string `json:"kind"`
-	Metadata   struct {
-		Name        string `json:"name"`
-		Namespace   string `json:"namespace"`
-		Annotations struct {
-			Comments  string `json:"comments,omitempty"`
-			Requestor string `json:"requestor,omitempty"`
-		} `json:"annotations,omitempty"`
-		Labels struct {
-			Id string `json:"akkeris-cert-id,omitempty"`
-		} `json:"labels,omitempty"`
-	} `json:"metadata"`
-	Spec struct {
-		Acme struct {
-			Config []certManagerACMEConfig `json:"config"`
-		} `json:"acme"`
-		CommonName string   `json:"commonName"`
-		DNSNames   []string `json:"dnsNames"`
-		IssuerRef  struct {
-			Kind string `json:"kind"`
-			Name string `json:"name"`
-		} `json:"issuerRef"`
-		SecretName string `json:"secretName"`
-	} `json:"spec"`
-}
-
-type certManagerCertificateStatus struct {
-	Metadata struct {
-		CreationTimestamp string `json:"creationTimestamp,omitempty"`
-		Annotations       struct {
-			Comments  string `json:"comments,omitempty"`
-			Requestor string `json:"requestor,omitempty"`
-		} `json:"annotations,omitempty"`
-		Labels struct {
-			Id string `json:"akkeris-cert-id,omitempty"`
-		} `json:"labels,omitempty"`
-	} `json:"metadata"`
-	Spec struct {
-		CommonName string   `json:"commonName"`
-		DNSNames   []string `json:"dnsNames"`
-		IssuerRef  struct {
-			Kind string `json:"kind"`
-			Name string `json:"name"`
-		} `json:"issuerRef"`
-		SecretName string `json:"secretName"`
-	} `json:"spec"`
-	Status struct {
-		NotAfter   string `json:"notAfter,omitempty"`
-		Conditions []struct {
-			Message string `json:"message"`
-			Reason  string `json:"reason"`
-			Status  string `json:"status"`
-			Type    string `json:"type"`
-		} `json:"conditions"`
-	} `json:"status"`
-}
-
-type certManagerCertificateStatusList struct {
-	Items []certManagerCertificateStatus `json:"items"`
-}
-
-type kubeTlsSecret struct {
-	Kind     string `json:"kind"`
-	Type     string `json:"type"` //"type":"kubernetes.io/tls"
-	Metadata struct {
-		Name      string `json:"name"`
-		Namespace string `json:"namespace"`
-	} `json:"metadata"`
-	Data struct {
-		CaCrt *string `json:"ca.crt,omitempty"`
-		Crt   *string `json:"tls.crt,omitempty"`
-		Key   *string `json:"tls.key,omitempty"`
-	} `json:"data"`
-}
 
 type CertManagerIssuer struct {
 	runtime              runtime.Runtime
-	issuerName           string
 	certificateNamespace string
-	providerName         string
+	clusterIssuers 		 []certmanager.ClusterIssuer
 }
 
-func GetCertManagerIssuer(db *sql.DB) (*CertManagerIssuer, error) {
-	issuerName := os.Getenv("CERTMANAGER_ISSUER_NAME")
-	if issuerName == "" {
-		issuerName = "letsencrypt"
-	}
-	providerName := os.Getenv("CERTMANAGER_PROVIDER_NAME")
-	if providerName == "" {
-		providerName = "aws"
-	}
-	certificateNamespace := os.Getenv("CERT_NAMESPACE")
-	if certificateNamespace == "" {
-		certificateNamespace = "istio-system"
-	}
-	runtimes, err := runtime.GetAllRuntimes(db)
-	// TODO: This is obvious we don't yet support multi-cluster regions.
-	//       and this is an artifact of that, we shouldn't have a 'stack' our
-	//       certificates or ingress are issued from.
+func GetCertManagerIssuers(runtime runtime.Runtime) ([]Issuer, error) {
+	body, code, err := runtime.GenericRequest("get", "/apis/" + certmanager.SchemeGroupVersion.Group + "/" + certmanager.SchemeGroupVersion.Version + "/clusterissuers?limit=500", nil)
 	if err != nil {
 		return nil, err
 	}
-	if len(runtimes) == 0 {
-		return nil, errors.New("No runtime was found wilhe trying to init istio ingress.")
+	if code != http.StatusOK {
+		return nil, errors.New("Unable to find certificate: " + string(body))
 	}
-	runtime := runtimes[0]
-	return &CertManagerIssuer{
-		issuerName:           issuerName,
-		runtime:              runtime,
-		certificateNamespace: certificateNamespace,
-		providerName:         providerName,
-	}, nil
+	var certManagerIssuers certmanager.ClusterIssuerList
+	if err = json.Unmarshal(body, &certManagerIssuers); err != nil {
+		return nil, err
+	}
+	namespace := os.Getenv("CERT_NAMESPACE");
+	if namespace == "" {
+		namespace = "istio-system"
+	}
+	return []Issuer{&CertManagerIssuer{
+		runtime:runtime,
+		certificateNamespace:namespace,
+		clusterIssuers:certManagerIssuers.Items,
+	}}, nil
 }
 
-func CertificateStatusToOrder(status certManagerCertificateStatus) (structs.CertificateOrder, error) {
+func CertificateStatusToOrder(certificate certmanager.Certificate) (CertificateOrder, error) {
 	s := "pending"
-	if len(status.Status.Conditions) > 0 && status.Status.Conditions[0].Type == "Ready" && status.Status.Conditions[0].Status == "True" {
+	if len(certificate.Status.Conditions) > 0 && certificate.Status.Conditions[0].Type == "Ready" && certificate.Status.Conditions[0].Status == "True" {
 		s = "issued"
 	}
 	names := make([]string, 0)
-	for _, d := range status.Spec.DNSNames {
-		if d != status.Spec.CommonName {
+	for _, d := range certificate.Spec.DNSNames {
+		if d != certificate.Spec.CommonName {
 			names = append(names, d)
 		}
 	}
-	return structs.CertificateOrder{
-		Id:                      status.Metadata.Labels.Id,
-		CommonName:              status.Spec.CommonName,
+	annotations := certificate.GetAnnotations();
+	labels := certificate.GetLabels()
+	var comments string = ""
+	var requestor string = ""
+	var id string = ""
+	var create = certificate.GetCreationTimestamp().UTC().String()
+	
+	var expires = ""
+	if certificate.Status.NotAfter != nil {
+		expires = certificate.Status.NotAfter.UTC().String()
+	}
+	if annotations != nil {
+		comments = annotations["comments"]
+		requestor = annotations["requestor"]
+	}
+	if labels != nil {
+		id = labels["akkeris-cert-id"]
+	}
+	return CertificateOrder{
+		Id:                      id,
+		CommonName:              certificate.Spec.CommonName,
 		SubjectAlternativeNames: names,
 		Status:                  s,
-		Comment:                 status.Metadata.Annotations.Comments,
-		Requestor:               status.Metadata.Annotations.Requestor,
-		Issued:                  status.Metadata.CreationTimestamp,
-		Expires:                 status.Status.NotAfter,
+		Comment:                 comments,
+		Requestor:               requestor,
+		Issued:                  create,
+		Expires:                 expires,
 	}, nil
 }
 
-func CertificateStatusesToOrders(statuses []certManagerCertificateStatus) ([]structs.CertificateOrder, error) {
-	orders := make([]structs.CertificateOrder, 0)
-	for _, e := range statuses {
+func CertificateStatusesToOrders(certificates []certmanager.Certificate) ([]CertificateOrder, error) {
+	orders := make([]CertificateOrder, 0)
+	for _, e := range certificates {
 		o, err := CertificateStatusToOrder(e)
 		if err != nil {
 			return nil, err
@@ -173,46 +98,55 @@ func CertificateStatusesToOrders(statuses []certManagerCertificateStatus) ([]str
 	return orders, nil
 }
 
-func (issuer *CertManagerIssuer) CreateOrder(domain string, sans []string, comment string, requestor string) (id string, err error) {
-	var cert certManagerACMECertificate
-	cert.APIVersion = "certmanager.k8s.io/v1alpha1"
+func (issuer *CertManagerIssuer) GetName() string {
+	return "cert-manager"
+}
+
+func (issuer *CertManagerIssuer) CreateOrder(domain string, sans []string, comment string, requestor string, issuerName string) (id string, err error) {
+	var found = false
+	for _, cIssuer := range issuer.clusterIssuers {
+		if cIssuer.GetName() == issuerName {
+			found = true
+		}
+	}
+	if found == false {
+		return "", errors.New("Unable to find issuer " + issuerName)
+	}
+	var cert certmanager.Certificate
+	cert.APIVersion = certmanager.SchemeGroupVersion.Group + "/" + certmanager.SchemeGroupVersion.Version
 	cert.Kind = "Certificate"
-	cert.Metadata.Name = strings.Replace(domain, "*", "star", -1)
-	cert.Metadata.Namespace = issuer.certificateNamespace
-	cert.Metadata.Annotations.Comments = comment
-	cert.Metadata.Annotations.Requestor = requestor
-	newuuid, _ := uuid.NewV4()
-	cert.Metadata.Labels.Id = newuuid.String()
-	var ac certManagerACMEConfig
-	ac.Domains = append(ac.Domains, domain)
-	ac.Domains = append(ac.Domains, sans...)
-	ac.DNS01.Provider = issuer.providerName
-	cert.Spec.Acme.Config = append(cert.Spec.Acme.Config, ac)
-	cert.Spec.CommonName = domain
+	cert.SetName(strings.Replace(domain, "*", "star", -1))
+	cert.SetNamespace(issuer.certificateNamespace)
+	cert.SetAnnotations(map[string]string{"comment":comment, "requestor":requestor})
+	u, _ := uuid.NewV4()
+	cert.SetLabels(map[string]string{"akkeris-cert-id":u.String()})
+	cert.Spec.DNSNames = make([]string, 0)
 	cert.Spec.DNSNames = append(cert.Spec.DNSNames, domain)
 	cert.Spec.DNSNames = append(cert.Spec.DNSNames, sans...)
+	cert.Spec.RenewBefore = &kubemetav1.Duration{Duration:certmanager.DefaultRenewBefore}
+	cert.Spec.CommonName = domain
 	cert.Spec.IssuerRef.Kind = "ClusterIssuer"
-	cert.Spec.IssuerRef.Name = issuer.issuerName
+	cert.Spec.IssuerRef.Name = issuerName
 	cert.Spec.SecretName = strings.Replace(strings.Replace(domain, "*", "star", -1), ".", "-", -1) + "-tls"
-	body, code, err := issuer.runtime.GenericRequest("post", "/apis/certmanager.k8s.io/v1alpha1/namespaces/"+issuer.certificateNamespace+"/certificates", cert)
+	body, code, err := issuer.runtime.GenericRequest("post", "/apis/" + certmanager.SchemeGroupVersion.Group + "/" + certmanager.SchemeGroupVersion.Version + "/namespaces/" + issuer.certificateNamespace + "/certificates", cert)
 	if err != nil {
-		return cert.Metadata.Labels.Id, err
+		return cert.GetLabels()["akkeris-cert-id"], err
 	}
 	if code != http.StatusOK && code != http.StatusCreated {
 		return "", errors.New("Unable to create new certificate. (" + string(body) + " [" + strconv.Itoa(code) + "])")
 	}
-	return cert.Metadata.Labels.Id, nil
+	return cert.GetLabels()["akkeris-cert-id"], nil
 }
 
-func (issuer *CertManagerIssuer) GetOrderStatus(id string) (*structs.CertificateOrder, error) {
-	body, code, err := issuer.runtime.GenericRequest("get", "/apis/certmanager.k8s.io/v1alpha1/namespaces/"+issuer.certificateNamespace+"/certificates?labelSelector=akkeris-cert-id%3D"+id, nil)
+func (issuer *CertManagerIssuer) GetOrderStatus(id string) (*CertificateOrder, error) {
+	body, code, err := issuer.runtime.GenericRequest("get", "/apis/" + certmanager.SchemeGroupVersion.Group + "/" + certmanager.SchemeGroupVersion.Version + "/namespaces/" + issuer.certificateNamespace + "/certificates?labelSelector=akkeris-cert-id%3D"+id, nil)
 	if err != nil {
 		return nil, err
 	}
 	if code != http.StatusOK {
 		return nil, errors.New("Unable to find certificate: " + string(body))
 	}
-	var certStatusList certManagerCertificateStatusList
+	var certStatusList certmanager.CertificateList
 	if err = json.Unmarshal(body, &certStatusList); err != nil {
 		return nil, err
 	}
@@ -226,15 +160,15 @@ func (issuer *CertManagerIssuer) GetOrderStatus(id string) (*structs.Certificate
 	return &order, nil
 }
 
-func (issuer *CertManagerIssuer) GetOrders() (orders []structs.CertificateOrder, err error) {
-	body, code, err := issuer.runtime.GenericRequest("get", "/apis/certmanager.k8s.io/v1alpha1/namespaces/"+issuer.certificateNamespace+"/certificates?labelSelector=akkeris-cert-id", nil)
+func (issuer *CertManagerIssuer) GetOrders() (orders []CertificateOrder, err error) {
+	body, code, err := issuer.runtime.GenericRequest("get", "/apis/" + certmanager.SchemeGroupVersion.Group + "/" + certmanager.SchemeGroupVersion.Version + "/namespaces/" + issuer.certificateNamespace + "/certificates?labelSelector=akkeris-cert-id", nil)
 	if err != nil {
 		return nil, err
 	}
 	if code != http.StatusOK {
 		return nil, errors.New("Unable to find certificate: " + string(body))
 	}
-	var certStatus certManagerCertificateStatusList
+	var certStatus certmanager.CertificateList
 	err = json.Unmarshal(body, &certStatus)
 	if err != nil {
 		return nil, err
@@ -251,14 +185,14 @@ func (issuer *CertManagerIssuer) IsOrderAutoInstalled(ingress router.Ingress) (b
 }
 
 func (issuer *CertManagerIssuer) IsOrderReady(id string) (bool, error) {
-	body, code, err := issuer.runtime.GenericRequest("get", "/apis/certmanager.k8s.io/v1alpha1/namespaces/"+issuer.certificateNamespace+"/certificates?labelSelector=akkeris-cert-id%3D"+id, nil)
+	body, code, err := issuer.runtime.GenericRequest("get", "/apis/" + certmanager.SchemeGroupVersion.Group + "/" + certmanager.SchemeGroupVersion.Version + "/namespaces/" + issuer.certificateNamespace + "/certificates?labelSelector=akkeris-cert-id%3D"+id, nil)
 	if err != nil {
 		return false, err
 	}
 	if code != http.StatusOK {
 		return false, errors.New("Unable to find certificate: " + string(body))
 	}
-	var certStatusList certManagerCertificateStatusList
+	var certStatusList certmanager.CertificateList
 	if err = json.Unmarshal(body, &certStatusList); err != nil {
 		return false, err
 	}
@@ -279,30 +213,42 @@ func (issuer *CertManagerIssuer) IsOrderReady(id string) (bool, error) {
 func (issuer *CertManagerIssuer) GetCertificate(id string, domain string) (pem_cert []byte, pem_key []byte, err error) {
 	name := strings.Replace(domain, "*.", "star.", -1)
 	name = strings.Replace(name, ".", "-", -1) + "-tls"
-	body, code, err := issuer.runtime.GenericRequest("get", "/api/v1/namespaces/"+issuer.certificateNamespace+"/secrets/"+name, nil)
+	body, code, err := issuer.runtime.GenericRequest("get", "/api/v1/namespaces/" + issuer.certificateNamespace + "/secrets/" + name, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 	if code != http.StatusOK {
 		return nil, nil, errors.New("Certificate not found.")
 	}
-	var secret kubeTlsSecret
+	var secret kube.Secret
 	if err = json.Unmarshal(body, &secret); err != nil {
 		return nil, nil, err
 	}
-	if secret.Data.Crt == nil {
+	if secret.Data["tls.crt"] == nil {
 		return nil, nil, errors.New("Unable to decode or get certificate, the tls.crt field was null")
 	}
-	if secret.Data.Key == nil {
+	if secret.Data["tls.key"] == nil {
 		return nil, nil, errors.New("Unable to decode or get certificate, the tls.key field was null")
 	}
-	pem_cert, err = base64.StdEncoding.DecodeString(*secret.Data.Crt)
+	pem_cert, err = base64.StdEncoding.DecodeString(string(secret.Data["tls.crt"]))
 	if err != nil {
 		return nil, nil, err
 	}
-	pem_key, err = base64.StdEncoding.DecodeString(*secret.Data.Key)
+	pem_key, err = base64.StdEncoding.DecodeString(string(secret.Data["tls.key"]))
 	if err != nil {
 		return nil, nil, err
 	}
 	return pem_cert, pem_key, nil
+}
+
+// Used by unit tests, shoudn't be used outside of that.
+func (issuer *CertManagerIssuer) DeleteCertificate(name string) (error) {
+	_, code, err := issuer.runtime.GenericRequest("delete", "/apis/" + certmanager.SchemeGroupVersion.Group + "/" + certmanager.SchemeGroupVersion.Version + "/namespaces/" + issuer.certificateNamespace + "/certificates/" + name, nil)
+	if err != nil {
+		return err
+	}
+	if code != http.StatusOK {
+		return errors.New("Certificate not found.")
+	}
+	return nil
 }

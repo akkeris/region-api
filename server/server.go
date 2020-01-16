@@ -215,13 +215,6 @@ func Server(db *sql.DB) *martini.ClassicMartini {
 	m.Post("/v1/app/deploy", binding.Json(structs.Deployspec{}), app.Deployment)
 	m.Post("/v1/app/deploy/oneoff", binding.Json(structs.OneOffSpec{}), app.OneOffDeployment)
 
-	m.Get("/v1/sites/:site", router.HttpGetSite)
-	m.Get("/v1/domains", router.HttpGetDomains)
-	m.Get("/v1/domains/:domain", router.HttpGetDomain)
-	m.Get("/v1/domains/:domain/records", router.HttpGetDomainRecords)
-	m.Post("/v1/domains/:domain/records", binding.Json(router.DomainRecord{}), router.HttpCreateDomainRecords)
-	m.Delete("/v1/domains/:domain/records/:name", router.HttpRemoveDomainRecords)
-
 	m.Get("/v1/config/sets", config.Listsets)
 	m.Get("/v1/config/set/:setname", config.Dumpset)
 	m.Delete("/v1/config/set/:setname", config.Deleteset)
@@ -297,17 +290,9 @@ func Server(db *sql.DB) *martini.ClassicMartini {
 	m.Get("/v1/service/vault/plans", vault.GetVaultList)
 	m.Get("/v1/service/vault/credentials/**", vault.GetVaultVariablesMasked)
 
-	m.Get("/v1/routers", router.DescribeRouters)
-	m.Get("/v1/router/:router", router.DescribeRouter)
-	m.Post("/v1/router", binding.Json(structs.Routerspec{}), router.CreateRouter)
-	m.Post("/v1/router/:router/path", binding.Json(structs.Routerpathspec{}), router.AddPath)
-	m.Delete("/v1/router/:router/path", binding.Json(structs.Routerpathspec{}), router.DeletePath)
+	router.AddToMartini(m)
+	certs.AddToMartini(m)
 
-	m.Put("/v1/router/:router/path", binding.Json(structs.Routerpathspec{}), router.UpdatePath)
-	m.Put("/v1/router/:router", router.PushRouter)
-	m.Delete("/v1/router/:router", router.DeleteRouter)
-
-	m.Get("/v1/octhc/router", router.Octhc)
 	m.Get("/v1/octhc/kube", utils.Octhc)
 	m.Get("/v1/octhc/service/vault", vault.GetVaultList)
 	m.Get("/v1/octhc/service/rabbitmq", service.Getrabbitmqplans)
@@ -341,11 +326,6 @@ func Server(db *sql.DB) *martini.ClassicMartini {
 	m.Post("/v1/space/:space/app/:app/maintenance", maintenance.EnableMaintenancePage)
 	m.Delete("/v1/space/:space/app/:app/maintenance", maintenance.DisableMaintenancePage)
 	m.Get("/v1/space/:space/app/:app/maintenance", maintenance.MaintenancePageStatus)
-
-	m.Post("/v1/certs", binding.Json(structs.CertificateOrder{}), certs.CreateCertificateOrder)
-	m.Get("/v1/certs", certs.GetCertificateOrders)
-	m.Get("/v1/certs/:id", certs.GetCertificateOrderStatus)
-	m.Post("/v1/certs/:id/install", certs.InstallCertificate)
 
 	m.Get("/v1/utils/service/space/:space/app/:app", utils.GetService)
 	m.Get("/v1/utils/nodes", utils.GetNodes)

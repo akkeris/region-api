@@ -272,11 +272,3 @@ func Listspaces(db *sql.DB, params martini.Params, r render.Render) {
 	r.JSON(200, spaces)
 }
 
-func IsInternalSpace(db *sql.DB, space string) (i bool, e error) {
-	spaceobj, err := getSpace(db, space)
-	if err != nil {
-		utils.LogError("", err)
-		return true, err
-	}
-	return spaceobj.Internal, nil
-}

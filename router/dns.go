@@ -2,20 +2,17 @@ package router
 
 import (
 	"fmt"
+	"context"
 	"errors"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/route53"
-	"github.com/go-martini/martini"
-	"github.com/martini-contrib/binding"
-	"github.com/martini-contrib/render"
-	"net/http"
 	"os"
 	"regexp"
-	utils "region-api/utils"
 	"strings"
 	"sync"
 	"time"
+	"net"
 )
 
 type Domain struct {
@@ -46,176 +43,114 @@ type DNSProvider interface {
 	RemoveDomainRecord(domain Domain, recordType string, name string, values []string) error
 }
 
-func HttpGetDomains(params martini.Params, r render.Render) {
-	dns := GetDnsProvider()
-	domains, err := dns.Domains()
-	if err != nil {
-		utils.ReportError(err, r)
-		return
+func GetDNSRecordType(address string) string {
+	recType := "A"
+	if net.ParseIP(address) == nil {
+		recType = "CNAME"
 	}
-	r.JSON(http.StatusOK, domains)
+	return recType
 }
 
-func HttpGetDomain(params martini.Params, r render.Render) {
-	dns := GetDnsProvider()
-	domains, err := dns.Domain(params["domain"])
+func ResolveDNS(address string, private bool) ([]string, error) {
+	resolver := net.DefaultResolver
+	if !private {
+		resolver = &net.Resolver{
+			PreferGo:true,
+			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+	            d := net.Dialer{}
+	            nameserver := "8.8.8.8"
+	            if os.Getenv("PUBLIC_DNS_RESOLVER") != "" {
+	            	nameserver = os.Getenv("PUBLIC_DNS_RESOLVER")
+	            }
+	            return d.DialContext(ctx, "udp", net.JoinHostPort(nameserver, "53"))
+	        },
+		}
+	}
+	result, err := resolver.LookupHost(context.Background(), address)
 	if err != nil {
-		utils.ReportError(err, r)
-		return
-	}
-	if len(domains) == 0 {
-		r.JSON(http.StatusNotFound, map[string]interface{}{"error": "NOT_FOUND", "error_description": "The domain " + params["domain"] + " was not found."})
-		return
-	}
-	r.JSON(http.StatusOK, domains)
-}
-
-func HttpGetDomainRecords(params martini.Params, r render.Render) {
-	dns := GetDnsProvider()
-	domains, err := dns.Domain(params["domain"])
-	if err != nil {
-		utils.ReportError(err, r)
-		return
-	}
-	if len(domains) == 0 {
-		r.JSON(http.StatusNotFound, map[string]interface{}{"error": "NOT_FOUND", "error_description": "The domain " + params["domain"] + " was not found."})
-		return
-	}
-	records := make([]DomainRecord, 0)
-	for _, domain := range domains {
-		record, err := dns.DomainRecords(domain)
+		r, err := resolver.LookupCNAME(context.Background(), address)
 		if err != nil {
-			utils.ReportError(err, r)
-			return
+			return nil, err
 		}
-		for _, r := range record {
-			r.Domain = &Domain{
-				ProviderId:  domain.ProviderId,
-				Name:        domain.Name,
-				Public:      domain.Public,
-				Metadata:    domain.Metadata,
-				Status:      domain.Status,
-				RecordCount: domain.RecordCount,
-			}
-			records = append(records, r)
-		}
+		result = []string{r}
 	}
-	r.JSON(http.StatusOK, records)
+	return result, nil
 }
 
-func HttpCreateDomainRecords(params martini.Params, spec DomainRecord, berr binding.Errors, r render.Render) {
-	if berr != nil {
-		utils.ReportInvalidRequest(berr[0].Message, r)
-		return
-	}
-	if strings.ToUpper(spec.Type) != "A" && strings.ToUpper(spec.Type) != "AAAA" && strings.ToUpper(spec.Type) != "CNAME" {
-		utils.ReportInvalidRequest("Only A, AAAA and CNAME records may be added to a domain record.", r)
-		return
-	}
-	if strings.ToUpper(strings.Trim(params["domain"], ".")) == strings.ToUpper(strings.Trim(spec.Name, ".")) {
-		utils.ReportInvalidRequest("Entries cannot be created for the root domain.", r)
-		return
-	}
-	if spec.Name == "" {
-		utils.ReportInvalidRequest("Entries cannot be created for the root domain.", r)
-		return
-	}
-
+func SetDomainName(config *FullIngressConfig, fqdn string, internal bool) (error) {
 	dns := GetDnsProvider()
-	domains, err := dns.Domain(params["domain"])
-	records := make([]DomainRecord, 0)
+	domains, err := dns.Domain(fqdn)
 	if err != nil {
-		utils.ReportError(err, r)
-		return
-	}
-	if len(domains) == 0 {
-		r.JSON(http.StatusNotFound, map[string]interface{}{"error": "NOT_FOUND", "error_description": "The domain " + params["domain"] + " was not found."})
-		return
+		return err
 	}
 
+	// Set the DNS 
 	for _, domain := range domains {
-		if err = dns.CreateDomainRecord(domain, spec.Type, spec.Name, spec.Values); err != nil {
-			utils.ReportError(err, r)
-			return
-		}
-		records = append(records, DomainRecord{
-			Type:   spec.Type,
-			Name:   spec.Name,
-			Values: spec.Values,
-			Domain: &Domain{
-				ProviderId:  domain.ProviderId,
-				Name:        domain.Name,
-				Public:      domain.Public,
-				Metadata:    domain.Metadata,
-				Status:      domain.Status,
-				RecordCount: domain.RecordCount,
-			},
-		})
-	}
-	r.JSON(http.StatusCreated, records)
-}
-
-func HttpRemoveDomainRecords(params martini.Params, r render.Render) {
-	dns := GetDnsProvider()
-	if strings.Contains(strings.ToLower(params["domain"]), strings.ToLower(params["name"])) || strings.ToLower(params["name"]) == strings.ToLower(params["domain"]) {
-		r.JSON(http.StatusConflict, map[string]interface{}{"error": "CONFLICT", "error_description": "The name entry to delete was the domain itself."})
-		return
-	}
-	if strings.ToUpper(strings.Trim(params["domain"], ".")) == strings.ToUpper(strings.Trim(params["name"], ".")) {
-		utils.ReportInvalidRequest("Entries cannot be removed for the root of the domain.", r)
-		return
-	}
-	if params["name"] == "" {
-		utils.ReportInvalidRequest("Entries cannot be removed for the root of the domain.", r)
-		return
-	}
-
-	domains, err := dns.Domain(params["domain"])
-	if err != nil {
-		utils.ReportError(err, r)
-		return
-	}
-	if len(domains) == 0 {
-		r.JSON(http.StatusNotFound, map[string]interface{}{"error": "NOT_FOUND", "error_description": "The domain " + params["domain"] + " was not found."})
-		return
-	}
-
-	toRemoveRecords := make([]DomainRecord, 0)
-	for _, domain := range domains {
-		records, err := dns.DomainRecords(domain)
-		if err != nil {
-			utils.ReportError(err, r)
-			return
-		}
-		for _, record := range records {
-			// we only allow removal of A or CNAME records
-			if record.Name == params["name"] && (strings.ToUpper(record.Type) == "A" || strings.ToUpper(record.Type) == "AAAA" || strings.ToUpper(record.Type) == "CNAME") {
-				record.Domain = &Domain{
-					ProviderId:  domain.ProviderId,
-					Name:        domain.Name,
-					Public:      domain.Public,
-					Metadata:    domain.Metadata,
-					Status:      domain.Status,
-					RecordCount: domain.RecordCount,
+		if domain.Public && !internal {
+			record, err := ResolveDNS(fqdn, false)
+			if err == nil && record[0] == config.PublicExternal.Address {
+				if os.Getenv("INGRESS_DEBUG") == "true" {
+					fmt.Printf("[ingress] Setting public external address was unnecessary, it already is set: %s == %s\n", fqdn, config.PublicExternal.Address)
 				}
-				toRemoveRecords = append(toRemoveRecords, record)
+				continue;
+			} else {
+				if os.Getenv("INGRESS_DEBUG") == "true" {
+					fmt.Printf("[ingress] Setting public external address to: %s = %s\n", fqdn, config.PublicExternal.Address)
+					if err != nil {
+						fmt.Printf("[ingress]  - Because: %s\n", err.Error())
+					} else {
+						fmt.Printf("[ingress]  - Due to %#+v != %s\n", record, config.PublicExternal.Address)
+					}
+				}
+			}
+			if err := dns.CreateDomainRecord(domain, GetDNSRecordType(config.PublicExternal.Address), fqdn, []string{config.PublicExternal.Address}); err != nil {
+				return fmt.Errorf("Error: Failed to create public (external) dns: %s", err.Error())
+			}
+		}
+		if !domain.Public && !internal {
+			record, err := ResolveDNS(fqdn, true)
+			if err == nil && record[0] == config.PublicInternal.Address {
+				if os.Getenv("INGRESS_DEBUG") == "true" {
+					fmt.Printf("[ingress] Setting public internal address was unnecessary, it already is set: %s == %s\n", fqdn, config.PublicInternal.Address)
+				}
+				continue;
+			} else {
+				if os.Getenv("INGRESS_DEBUG") == "true" {
+					fmt.Printf("[ingress] Setting public internal address to: %s = %s\n", fqdn, config.PublicInternal.Address)
+					if err != nil {
+						fmt.Printf("[ingress]  - Because: %s\n", err.Error())
+					} else {
+						fmt.Printf("[ingress]  - Due to %#+v != %s\n", record, config.PublicInternal.Address)
+					}
+				}
+			}
+			if err := dns.CreateDomainRecord(domain, GetDNSRecordType(config.PublicInternal.Address), fqdn, []string{config.PublicInternal.Address}); err != nil {
+				return fmt.Errorf("Error: Failed to create private (external) dns: %s", err.Error())
+			}
+		}
+		if !domain.Public && internal {
+			record, err := ResolveDNS(fqdn, true)
+			if err == nil && record[0] == config.PrivateInternal.Address {
+				if os.Getenv("INGRESS_DEBUG") == "true" {
+					fmt.Printf("[ingress] Setting private internal address was unnecessary, it already is set: %s == %s\n", fqdn, config.PrivateInternal.Address)
+				}
+				continue;
+			} else {
+				if os.Getenv("INGRESS_DEBUG") == "true" {
+					fmt.Printf("[ingress] Setting private internal address to: %s = %s\n", fqdn, config.PrivateInternal.Address)
+					if err != nil {
+						fmt.Printf("[ingress]  - Because: %s\n", err.Error())
+					} else {
+						fmt.Printf("[ingress]  - Due to %#+v != %s\n", record, config.PrivateInternal.Address)
+					}
+				}
+			}
+			if err := dns.CreateDomainRecord(domain, GetDNSRecordType(config.PrivateInternal.Address), fqdn, []string{config.PrivateInternal.Address}); err != nil {
+				return fmt.Errorf("Error: Failed to create private (internal) dns: %s", err.Error())
 			}
 		}
 	}
-
-	if len(toRemoveRecords) == 0 {
-		r.JSON(http.StatusNotFound, map[string]interface{}{"error": "NOT_FOUND", "error_description": "The domain " + params["name"] + " was not found."})
-		return
-	}
-
-	for _, rrec := range toRemoveRecords {
-		if err = dns.RemoveDomainRecord(*rrec.Domain, rrec.Type, rrec.Name, rrec.Values); err != nil {
-			utils.ReportError(err, r)
-			return
-		}
-	}
-
-	r.JSON(http.StatusCreated, toRemoveRecords)
+	return nil
 }
 
 func GetDnsProvider() DNSProvider {

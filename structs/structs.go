@@ -2,26 +2,8 @@ package structs
 
 import (
 	"time"
-
 	"gopkg.in/guregu/null.v3/zero"
 )
-
-type CertificateOrder struct {
-	Id                      string   `json:"id,omitempty"`
-	CommonName              string   `json:"common_name"`
-	SubjectAlternativeNames []string `json:"subject_alternative_names"`
-	Status                  string   `json:"status,omitempty"` // can be pending, approved, issued, rejected
-	Comment                 string   `json:"comment,omitempty"`
-	Requestor               string   `json:"requestor,omitempty"`
-	Issued                  string   `json:"issued,omitempty"`
-	Expires                 string   `json:"expires,omitempty"`
-}
-
-type Certificate struct {
-	Order       string `json:"order"`
-	Key         string `json:"key"`
-	Certificate string `json:"certificate"`
-}
 
 type Namespec struct {
 	Name string `json:"name"`
@@ -30,23 +12,6 @@ type Namespec struct {
 type KV struct {
 	Key   string `json:"key"`
 	Value string `json:"value"`
-}
-
-type Routerpathspec struct {
-	Domain      string `json:"domain"`
-	Path        string `json:"path"`
-	Space       string `json:"space"`
-	App         string `json:"app"`
-	ReplacePath string `json:"replacepath"`
-	Port        string `json:"port"`
-}
-
-type Routerspec struct {
-	Domain          string           `json:"domain"`
-	Internal        bool             `json:"internal"`
-	VSNamespace     string           `json:"vsnamespace"`
-	ResourceVersion string           `json:"resourceVersion"`
-	Paths           []Routerpathspec `json:"paths"`
 }
 
 type HttpFilters struct {

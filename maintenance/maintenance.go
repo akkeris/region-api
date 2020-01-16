@@ -6,13 +6,12 @@ import (
 	"github.com/martini-contrib/render"
 	"net/http"
 	router "region-api/router"
-	space "region-api/space"
 	structs "region-api/structs"
 	utils "region-api/utils"
 )
 
 func EnableMaintenancePage(db *sql.DB, params martini.Params, r render.Render) {
-	internal, err := space.IsInternalSpace(db, params["space"])
+	internal, err := utils.IsInternalSpace(db, params["space"])
 	if err != nil {
 		utils.ReportError(err, r)
 		return
@@ -30,7 +29,7 @@ func EnableMaintenancePage(db *sql.DB, params martini.Params, r render.Render) {
 }
 
 func DisableMaintenancePage(db *sql.DB, params martini.Params, r render.Render) {
-	internal, err := space.IsInternalSpace(db, params["space"])
+	internal, err := utils.IsInternalSpace(db, params["space"])
 	if err != nil {
 		utils.ReportError(err, r)
 		return
@@ -48,7 +47,7 @@ func DisableMaintenancePage(db *sql.DB, params martini.Params, r render.Render) 
 }
 
 func MaintenancePageStatus(db *sql.DB, params martini.Params, r render.Render) {
-	internal, err := space.IsInternalSpace(db, params["space"])
+	internal, err := utils.IsInternalSpace(db, params["space"])
 	if err != nil {
 		utils.ReportError(err, r)
 		return
