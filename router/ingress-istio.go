@@ -144,14 +144,14 @@ type Destination struct {
 
 type Routes struct {
 	Destination Destination `json:"destination"`
-	CorsPolicy CorsPolicy 	`json:"corsPolicy"`
 }
 
 type HTTP struct {
-	Match   []Match 	`json:"match"`
-	Route   []Routes 	`json:"route"`
-	Rewrite *Rewrite 	`json:"rewrite,omitempty"`
-	Headers *Headers 	`json:"headers,omitempty"`
+	Match      []Match      `json:"match"`
+	Route      []Routes 	`json:"route"`
+	Rewrite    *Rewrite 	`json:"rewrite,omitempty"`
+	Headers    *Headers 	`json:"headers,omitempty"`
+	CorsPolicy *CorsPolicy 	`json:"corsPolicy,omitempty"`
 }
 
 type VirtualService struct {
@@ -290,9 +290,9 @@ func (ingress *IstioIngress) DeleteGateway(domain string) error {
 	return nil
 }
 
-func (ingress *IstioIngress) AppVirtualService(space string, app string) (*VirtualService, error) {
+func (ingress *IstioIngress) GetVirtualService(name string) (*VirtualService, error) {
 	var vs *VirtualService
-	body, code, err := ingress.runtime.GenericRequest("get", "/apis/" + IstioNetworkingAPIVersion + "/namespaces/sites-system/virtualservices/"+app+"-"+space, nil)
+	body, code, err := ingress.runtime.GenericRequest("get", "/apis/" + IstioNetworkingAPIVersion + "/namespaces/sites-system/virtualservices/" + name, nil)
 	if err != nil {
 		return vs, err
 	}
@@ -305,8 +305,8 @@ func (ingress *IstioIngress) AppVirtualService(space string, app string) (*Virtu
 	return vs, nil
 }
 
-func (ingress *IstioIngress) UpdateAppVirtualService(vs *VirtualService, space string, app string) error {
-	body, code, err := ingress.runtime.GenericRequest("put", "/apis/" + IstioNetworkingAPIVersion + "/namespaces/sites-system/virtualservices/"+app+"-"+space, vs)
+func (ingress *IstioIngress) UpdateVirtualService(vs *VirtualService, name string) (error) {
+	body, code, err := ingress.runtime.GenericRequest("put", "/apis/" + IstioNetworkingAPIVersion + "/namespaces/sites-system/virtualservices/" + name, vs)
 	if err != nil {
 		return err
 	}
@@ -314,6 +314,14 @@ func (ingress *IstioIngress) UpdateAppVirtualService(vs *VirtualService, space s
 		return errors.New("Unable to update virtual service: " + string(body))
 	}
 	return nil
+}
+
+func (ingress *IstioIngress) AppVirtualService(space string, app string) (*VirtualService, error) {
+	return ingress.GetVirtualService(app + "-" + space)
+}
+
+func (ingress *IstioIngress) UpdateAppVirtualService(vs *VirtualService, space string, app string) error {
+	return ingress.UpdateVirtualService(vs, app + "-" + space)
 }
 
 func (ingress *IstioIngress) InstallOrUpdateVirtualService(domain string, vs *VirtualService, exists bool) error {
@@ -799,6 +807,57 @@ func (ingress *IstioIngress) CreateOrUpdateRouter(domain string, internal bool, 
 		return err
 	}
 	return ingress.InstallOrUpdateVirtualService(domain, vs, exists)
+}
+
+func (ingress *IstioIngress) InstallOrUpdateCORSAuthFilter(vsname string, path string, allowOrigin []string, allowMethods []string, allowHeaders []string, exposeHeaders []string, maxAge time.Duration, allowCredentials bool) (error) {
+	virtualService, err := ingress.GetVirtualService(vsname)
+	if err != nil {
+		if err.Error() == "virtual service was not found" {
+			// Go ahead and ignore setting this.  We can't as there's no deployment yet.
+			return nil
+		}
+		return err
+	}
+	for i, http := range virtualService.Spec.HTTP {
+		for _, match := range http.Match {
+			if strings.HasPrefix(path, match.URI.Prefix) || match.URI.Exact == path || match.URI.Prefix == path {
+				virtualService.Spec.HTTP[i].CorsPolicy = &CorsPolicy{
+					AllowOrigin:allowOrigin,
+					AllowMethods:allowMethods,
+					AllowHeaders:allowHeaders,
+					ExposeHeaders:exposeHeaders,
+					MaxAge:maxAge,
+					AllowCredentials:allowCredentials,
+				}
+			}
+		}
+	}
+	if err = ingress.UpdateVirtualService(virtualService, vsname); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (ingress *IstioIngress) DeleteCORSAuthFilter(vsname string, path string) (error) {
+	virtualService, err := ingress.GetVirtualService(vsname)
+	if err != nil {
+		if err.Error() == "virtual service was not found" {
+			// Go ahead and ignore setting this.  We can't as there's no deployment yet.
+			return nil
+		}
+		return err
+	}
+	for i, http := range virtualService.Spec.HTTP {
+		for _, match := range http.Match {
+			if strings.HasPrefix(path, match.URI.Prefix) || match.URI.Exact == path || match.URI.Prefix == path {
+				virtualService.Spec.HTTP[i].CorsPolicy = nil
+			}
+		}
+	}
+	if err = ingress.UpdateVirtualService(virtualService, vsname); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (ingress *IstioIngress) SetMaintenancePage(app string, space string, value bool) error {

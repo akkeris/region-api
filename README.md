@@ -68,10 +68,10 @@ Set the following environment variables, if this is first time running it see th
 
 **Cert Manager Certificate Issuer**
 
-This uses jetstack's cert-manager (if installed) to issue certificates. Note above, you may only have the settings for digicert or cert manager set.  For example setting `DIGICERT_SECRET` will automatically pick it as the certificate issuer and these settings will be ignored.
+This uses jetstack's cert-manager (if installed) to issue certificates. By default this is the only issuer manager that's supported. 
 
 * DEFAULT_ISSUER - The clusterissuer to use by default when ordering a new certificate (one may be specified when ordering a cert)
-* CERT_NAMESPACE - The namespace to store certificates.  This defaults to `istio-system` to make the certificates (and their secrets) mountable by istio. This has no affect on DigiCert Certificate Issuer as it stores its certificates in vault.
+* CERT_NAMESPACE - The namespace to store certificates.  This defaults to `istio-system` to make the certificates (and their secrets) mountable by istio. 
 
 **Optional Environment Variables:**
 
@@ -89,7 +89,7 @@ This uses jetstack's cert-manager (if installed) to issue certificates. Note abo
 
 * DEBUG_K8S - print out all k8s calls, set to true
 * INGRESS_DEBUG - print out debug information on ingress, set to true
-* MARTINI_ENV
+* MARTINI_ENV - Always set this to `production`. See https://github.com/go-martini/martini#martini-env
 
 Note that dependencies are managed via `dep` command line tool, run `dep ensure` before building.
 
@@ -99,8 +99,13 @@ $ docker run -p 3000:3000 -e <see below> region-api
 ```
 
 ### Ingress Formats
+Only istio is supported for ingresses currently. All of hte Ingress Setting site/app environment variables should follow this format:
 
-istio://host-of-ingress/namespace/ingress-gateway-name (its `istio` label on the deployment)
+```
+istio://host-of-ingress/namespace/ingress-gateway-name 
+```
+
+The `ingress-gateway-name` is the value of the `istio` label on the istio ingress deployment. The `namespace` is the namespace where istio is deployed (usually istio-system). The `host-of-ingress` must either by a qualified domain name or ip address, this is used to assign the IP address via DNS or a cname record if its a hostname. This should be the user-facing ip address or hostname you want new sites to resolve to, not an internal clusterip or service or node IP.
 
 ### Image Pull Secret Formats
 

@@ -14,8 +14,6 @@ import (
 	"strings"
 )
 
-
-
 func GetPaths(db *sql.DB, domain string) ([]Route, error) {
 	stmt, err := db.Prepare("select distinct regexp_replace(path, '/$', '') as path, space, app, replacepath from routerpaths where domain=$1 order by path desc")
 	if err != nil {
@@ -28,6 +26,25 @@ func GetPaths(db *sql.DB, domain string) ([]Route, error) {
 	for rows.Next() {
 		pathspec := Route{Domain: domain}
 		if err := rows.Scan(&pathspec.Path, &pathspec.Space, &pathspec.App, &pathspec.ReplacePath); err != nil {
+			return nil, err
+		}
+		pathspecs = append(pathspecs, pathspec)
+	}
+	return pathspecs, nil
+}
+
+func GetPathsByApp(db *sql.DB, app string, space string) ([]Route, error) {
+	stmt, err := db.Prepare("select distinct regexp_replace(path, '/$', '') as path, domain, space, app, replacepath from routerpaths where app=$1 and space=$2 order by path desc")
+	if err != nil {
+		return nil, err
+	}
+	defer stmt.Close()
+	rows, err := stmt.Query(app, space)
+	defer rows.Close()
+	var pathspecs []Route
+	for rows.Next() {
+		pathspec := Route{}
+		if err := rows.Scan(&pathspec.Path, &pathspec.Domain, &pathspec.Space, &pathspec.App, &pathspec.ReplacePath); err != nil {
 			return nil, err
 		}
 		pathspecs = append(pathspecs, pathspec)
