@@ -99,7 +99,7 @@ $ docker run -p 3000:3000 -e <see below> region-api
 ```
 
 ### Ingress Formats
-Only istio is supported for ingresses currently. All of hte Ingress Setting site/app environment variables should follow this format:
+Only istio is supported for ingresses currently. All of the Ingress Setting site/app environment variables should follow this format:
 
 ```
 istio://host-of-ingress/namespace/ingress-gateway-name 
