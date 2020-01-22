@@ -355,13 +355,19 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 					jwksUri = val
 				}
 				if val, ok := filter.Data["audiences"]; ok {
-					audiences = strings.Split(val, ",")
+					if val != "" {
+						audiences = strings.Split(val, ",")
+					}
 				}
 				if val, ok := filter.Data["excludes"]; ok {
-					excludes = strings.Split(val, ",")
+					if val != "" {
+						excludes = strings.Split(val, ",")
+					}
 				}
 				if val, ok := filter.Data["includes"]; ok {
-					includes = strings.Split(val, ",")
+					if val != "" {
+						includes = strings.Split(val, ",")
+					}
 				}
 				if jwksUri == "" {
 					fmt.Printf("WARNING: Invalid jwt configuration, uri was not valid: %s\n", jwksUri)
@@ -382,16 +388,24 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 				max_age := time.Second * 86400
 				allow_credentials := false
 				if val, ok := filter.Data["allow_origin"]; ok {
-					allow_origin = strings.Split(val, ",")
+					if val != "" {
+						allow_origin = strings.Split(val, ",")
+					}
 				}
 				if val, ok := filter.Data["allow_methods"]; ok {
-					allow_methods = strings.Split(val, ",")
+					if val != "" {
+						allow_methods = strings.Split(val, ",")
+					}
 				}
 				if val, ok := filter.Data["allow_headers"]; ok {
-					allow_headers = strings.Split(val, ",")
+					if val != "" {
+						allow_headers = strings.Split(val, ",")
+					}
 				}
 				if val, ok := filter.Data["expose_headers"]; ok {
-					expose_headers = strings.Split(val, ",");
+					if val != "" {
+						expose_headers = strings.Split(val, ",");
+					}
 				}
 				if val, ok := filter.Data["max_age"]; ok {
 					age, err := strconv.ParseInt(val, 10, 32)
