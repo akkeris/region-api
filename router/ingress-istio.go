@@ -234,8 +234,11 @@ func GetIstioIngress(db *sql.DB, config *IngressConfig) (*IstioIngress, error) {
 	}, nil
 }
 
-func (ingress *IstioIngress) VirtualServiceExists(domain string) (bool, string, error) {
-	body, code, err := ingress.runtime.GenericRequest("get", "/apis/" + IstioNetworkingAPIVersion + "/namespaces/sites-system/virtualservices/"+domain, nil)
+func (ingress *IstioIngress) VirtualServiceExists(name string) (bool, string, error) {
+	if os.Getenv("INGRESS_DEBUG") == "true" {
+		fmt.Printf("[ingress] Istio - checking if virtual service exists %s\n", name)
+	}
+	body, code, err := ingress.runtime.GenericRequest("get", "/apis/" + IstioNetworkingAPIVersion + "/namespaces/sites-system/virtualservices/" + name, nil)
 	if err != nil {
 		return false, "", err
 	}
@@ -264,8 +267,11 @@ func (ingress *IstioIngress) GatewayExists(domain string) (bool, error) {
 	}
 }
 
-func (ingress *IstioIngress) DeleteVirtualService(domain string) error {
-	body, code, err := ingress.runtime.GenericRequest("delete", "/apis/" + IstioNetworkingAPIVersion + "/namespaces/sites-system/virtualservices/"+domain, nil)
+func (ingress *IstioIngress) DeleteVirtualService(name string) error {
+	if os.Getenv("INGRESS_DEBUG") == "true" {
+		fmt.Printf("[ingress] Istio - deleting virtual service for %s\n", name)
+	}
+	body, code, err := ingress.runtime.GenericRequest("delete", "/apis/" + IstioNetworkingAPIVersion + "/namespaces/sites-system/virtualservices/" + name, nil)
 	if err != nil {
 		return err
 	}
@@ -291,6 +297,9 @@ func (ingress *IstioIngress) DeleteGateway(domain string) error {
 }
 
 func (ingress *IstioIngress) GetVirtualService(name string) (*VirtualService, error) {
+	if os.Getenv("INGRESS_DEBUG") == "true" {
+		fmt.Printf("[ingress] Istio - getting virtual service %s\n", name)
+	}
 	var vs *VirtualService
 	body, code, err := ingress.runtime.GenericRequest("get", "/apis/" + IstioNetworkingAPIVersion + "/namespaces/sites-system/virtualservices/" + name, nil)
 	if err != nil {
@@ -306,6 +315,9 @@ func (ingress *IstioIngress) GetVirtualService(name string) (*VirtualService, er
 }
 
 func (ingress *IstioIngress) UpdateVirtualService(vs *VirtualService, name string) (error) {
+	if os.Getenv("INGRESS_DEBUG") == "true" {
+		fmt.Printf("[ingress] Istio - updating virtual service %s\n", name)
+	}
 	body, code, err := ingress.runtime.GenericRequest("put", "/apis/" + IstioNetworkingAPIVersion + "/namespaces/sites-system/virtualservices/" + name, vs)
 	if err != nil {
 		return err
@@ -554,6 +566,9 @@ func (ingress *IstioIngress) DeleteUberSiteGateway(domain string, certificate st
 }
 
 func (ingress *IstioIngress) InstallOrUpdateJWTAuthFilter(appname string, space string, fqdn string, port int64, issuer string, jwksUri string, audiences []string, excludes []string, includes []string) (error) {
+	if os.Getenv("INGRESS_DEBUG") == "true" {
+		fmt.Printf("[ingress] Istio installing or updating JWT Auth filter for %s-%s with %s\n", appname, space, jwksUri)
+	}
 	var jwtPolicy Policy
 	jwtPolicy.Kind = "Policy"
 	jwtPolicy.APIVersion = IstioAuthenticationAPIVersion
@@ -601,6 +616,9 @@ func (ingress *IstioIngress) InstallOrUpdateJWTAuthFilter(appname string, space 
 }
 
 func (ingress *IstioIngress) DeleteJWTAuthFilter(appname string, space string, fqdn string, port int64) (error) {
+	if os.Getenv("INGRESS_DEBUG") == "true" {
+		fmt.Printf("[ingress] Istio - deleting any JWT Auth filter for %s-%s\n", appname, space)
+	}
 	body, code, err := ingress.runtime.GenericRequest("delete", "/apis/" + IstioAuthenticationAPIVersion + "/namespaces/" + space + "/policies/" + appname, nil)
 	if err != nil {
 		return err
@@ -810,16 +828,26 @@ func (ingress *IstioIngress) CreateOrUpdateRouter(domain string, internal bool, 
 }
 
 func (ingress *IstioIngress) InstallOrUpdateCORSAuthFilter(vsname string, path string, allowOrigin []string, allowMethods []string, allowHeaders []string, exposeHeaders []string, maxAge time.Duration, allowCredentials bool) (error) {
+	if os.Getenv("INGRESS_DEBUG") == "true" {
+		fmt.Printf("[ingress] Istio - Installing or updating CORS auth filter for %s at path %s\n", vsname, path)
+	}
 	virtualService, err := ingress.GetVirtualService(vsname)
 	if err != nil {
 		if err.Error() == "virtual service was not found" {
-			// Go ahead and ignore setting this.  We can't as there's no deployment yet.
-			return nil
+			virtualService = &VirtualService{}
+			virtualService.Kind = "VirtualService"
+			virtualService.APIVersion = IstioNetworkingAPIVersion
+			virtualService.SetName(vsname)
+			virtualService.SetNamespace("sites-system")
+		} else {
+			return err
 		}
-		return err
 	}
 	for i, http := range virtualService.Spec.HTTP {
 		for _, match := range http.Match {
+			if os.Getenv("INGRESS_DEBUG") == "true" {
+				fmt.Printf("[ingress] Looking to add CORS policy, comparing path: %s with match prefix %s and match exact %s\n", path, match.URI.Prefix, match.URI.Exact)
+			}
 			if strings.HasPrefix(path, match.URI.Prefix) || match.URI.Exact == path || match.URI.Prefix == path {
 				virtualService.Spec.HTTP[i].CorsPolicy = &CorsPolicy{
 					AllowOrigin:allowOrigin,
@@ -839,6 +867,9 @@ func (ingress *IstioIngress) InstallOrUpdateCORSAuthFilter(vsname string, path s
 }
 
 func (ingress *IstioIngress) DeleteCORSAuthFilter(vsname string, path string) (error) {
+	if os.Getenv("INGRESS_DEBUG") == "true" {
+		fmt.Printf("[ingress] Removing CORS filter for %s at path %s\n", vsname, path)
+	}
 	virtualService, err := ingress.GetVirtualService(vsname)
 	if err != nil {
 		if err.Error() == "virtual service was not found" {

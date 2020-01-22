@@ -372,6 +372,9 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 					}
 				}
 			} else if filter.Type == "cors" {
+				if os.Getenv("INGRESS_DEBUG") == "true" {
+					fmt.Printf("[ingress] Adding CORS filter %#+v\n", filter)
+				}
 				allow_origin := make([]string, 0)
 				allow_methods := make([]string, 0)
 				allow_headers := make([]string, 0)
@@ -428,7 +431,7 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 		// If we don't have a CORS filter remove it from the app and any sites it may be associated with.
 		// this is effectively a no-op if there is no CORS auth filter in the first place
 		if !foundCorsFilter {
-			if err := siteIngress.DeleteCORSAuthFilter(appname + "-" + space, "/"); err != nil {
+			if err := appIngress.DeleteCORSAuthFilter(appname + "-" + space, "/"); err != nil {
 				fmt.Printf("WARNING: There was an error removing the CORS auth filter from the app: %s\n", err.Error())
 			}
 			routes, err := ingress.GetPathsByApp(db, appname, space)
