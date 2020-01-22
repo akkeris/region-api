@@ -128,7 +128,7 @@ type CorsPolicy struct {
 	AllowMethods []string 	`json:"allowMethods"`
 	AllowHeaders []string 	`json:"allowHeaders"`
 	ExposeHeaders []string 	`json:"exposeHeaders"`
-	MaxAge time.Duration 	`json:"maxAge"`
+	MaxAge string `json:"maxAge"`
 	AllowCredentials bool 	`json:"allowCredentials"`
 }
 
@@ -850,7 +850,7 @@ func (ingress *IstioIngress) InstallOrUpdateCORSAuthFilter(vsname string, path s
 				AllowMethods:allowMethods,
 				AllowHeaders:allowHeaders,
 				ExposeHeaders:exposeHeaders,
-				MaxAge:maxAge,
+				MaxAge:maxAge.String(),
 				AllowCredentials:allowCredentials,
 			}
 		} else {
@@ -864,7 +864,7 @@ func (ingress *IstioIngress) InstallOrUpdateCORSAuthFilter(vsname string, path s
 						AllowMethods:allowMethods,
 						AllowHeaders:allowHeaders,
 						ExposeHeaders:exposeHeaders,
-						MaxAge:maxAge,
+						MaxAge:maxAge.String(),
 						AllowCredentials:allowCredentials,
 					}
 				}
