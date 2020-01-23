@@ -3,6 +3,7 @@ package router
 import (
 	"database/sql"
 	"fmt"
+	"encoding/json"
 	"github.com/go-martini/martini"
 	_ "github.com/lib/pq" //driver
 	"github.com/martini-contrib/binding"
@@ -15,7 +16,7 @@ import (
 )
 
 func GetPaths(db *sql.DB, domain string) ([]Route, error) {
-	stmt, err := db.Prepare("select distinct regexp_replace(path, '/$', '') as path, space, app, replacepath from routerpaths where domain=$1 order by path desc")
+	stmt, err := db.Prepare("select distinct regexp_replace(path, '/$', '') as path, space, app, replacepath, filters from routerpaths where domain=$1 order by path desc")
 	if err != nil {
 		return nil, err
 	}
@@ -25,16 +26,26 @@ func GetPaths(db *sql.DB, domain string) ([]Route, error) {
 	var pathspecs []Route
 	for rows.Next() {
 		pathspec := Route{Domain: domain}
-		if err := rows.Scan(&pathspec.Path, &pathspec.Space, &pathspec.App, &pathspec.ReplacePath); err != nil {
+		filters := make([]structs.HttpFilters, 0)
+		filtersBytes := make([]byte, 0)
+		if err := rows.Scan(&pathspec.Path, &pathspec.Space, &pathspec.App, &pathspec.ReplacePath, &filtersBytes); err != nil {
+			fmt.Printf("Error: cannot pull database records: " + err.Error())
 			return nil, err
 		}
+		if filtersBytes != nil && string(filtersBytes) != "" {
+			if err := json.Unmarshal(filtersBytes, &filters); err != nil {
+				fmt.Printf("Error: cannot unmarshal filter information: %s - original data: %s\n", err.Error(), string(filtersBytes))
+				return nil, err
+			}
+		}
+		pathspec.Filters = filters
 		pathspecs = append(pathspecs, pathspec)
 	}
 	return pathspecs, nil
 }
 
 func GetPathsByApp(db *sql.DB, app string, space string) ([]Route, error) {
-	stmt, err := db.Prepare("select distinct regexp_replace(path, '/$', '') as path, domain, space, app, replacepath from routerpaths where app=$1 and space=$2 order by path desc")
+	stmt, err := db.Prepare("select distinct regexp_replace(path, '/$', '') as path, domain, space, app, replacepath, filters from routerpaths where app=$1 and space=$2 order by path desc")
 	if err != nil {
 		return nil, err
 	}
@@ -44,9 +55,17 @@ func GetPathsByApp(db *sql.DB, app string, space string) ([]Route, error) {
 	var pathspecs []Route
 	for rows.Next() {
 		pathspec := Route{}
-		if err := rows.Scan(&pathspec.Path, &pathspec.Domain, &pathspec.Space, &pathspec.App, &pathspec.ReplacePath); err != nil {
+		filters := make([]structs.HttpFilters, 0)
+		filtersBytes := make([]byte, 0)
+		if err := rows.Scan(&pathspec.Path, &pathspec.Domain, &pathspec.Space, &pathspec.App, &pathspec.ReplacePath, &filtersBytes); err != nil {
 			return nil, err
 		}
+		if filtersBytes != nil && string(filtersBytes) != "" {
+			if err := json.Unmarshal(filtersBytes, &filters); err != nil {
+				return nil, err
+			}
+		}
+		pathspec.Filters = filters
 		pathspecs = append(pathspecs, pathspec)
 	}
 	return pathspecs, nil
@@ -168,8 +187,17 @@ func HttpAddPath(db *sql.DB, spec Route, berr binding.Errors, r render.Render) {
 	}
 
 	spec.App = strings.Replace(spec.App, "-"+spec.Space, "", -1)
+	filtersJson := make([]byte, 0)
 
-	_, err = db.Exec("INSERT INTO routerpaths(domain, path, space, app, replacepath) VALUES($1,$2,$3,$4,$5)", spec.Domain, spec.Path, spec.Space, spec.App, spec.ReplacePath)
+	if spec.Filters != nil {
+		filtersJson, err = json.Marshal(spec.Filters);
+		if err != nil {
+			utils.ReportInvalidRequest("Cannot marshal filters: " + err.Error(), r)
+			return
+		}
+	}
+
+	_, err = db.Exec("INSERT INTO routerpaths(domain, path, space, app, replacepath, filters) VALUES($1,$2,$3,$4,$5,$6)", spec.Domain, spec.Path, spec.Space, spec.App, spec.ReplacePath, string(filtersJson))
 	if err != nil {
 		utils.ReportError(err, r)
 		return

@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"region-api/structs"
 	kube "k8s.io/api/core/v1"
 	kubemetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -690,8 +691,8 @@ func (ingress *IstioIngress) GetCertificateFromDomain(domain string) string {
 	return certName
 }
 
-func createHTTPSpecForVS(app string, space string, domain string, adjustedPath string, rewritePath string, forwardedPath string, port int32) HTTP {
-	return HTTP{
+func createHTTPSpecForVS(app string, space string, domain string, adjustedPath string, rewritePath string, forwardedPath string, port int32, filters []structs.HttpFilters) HTTP {
+	http := HTTP{
 		Match: []Match{Match{
 			URI:StringMatch{
 				Prefix: forwardedPath,
@@ -727,6 +728,65 @@ func createHTTPSpecForVS(app string, space string, domain string, adjustedPath s
 			},
 		},
 	}
+
+	for _, filter := range filters {
+		if filter.Type == "cors" {
+			if os.Getenv("INGRESS_DEBUG") == "true" {
+				fmt.Printf("[ingress] Adding CORS filter to site %#+v\n", filter)
+			}
+			allow_origin := make([]string, 0)
+			allow_methods := make([]string, 0)
+			allow_headers := make([]string, 0)
+			expose_headers := make([]string, 0)
+			max_age := time.Second * 86400
+			allow_credentials := false
+			if val, ok := filter.Data["allow_origin"]; ok {
+				if val != "" {
+					allow_origin = strings.Split(val, ",")
+				}
+			}
+			if val, ok := filter.Data["allow_methods"]; ok {
+				if val != "" {
+					allow_methods = strings.Split(val, ",")
+				}
+			}
+			if val, ok := filter.Data["allow_headers"]; ok {
+				if val != "" {
+					allow_headers = strings.Split(val, ",")
+				}
+			}
+			if val, ok := filter.Data["expose_headers"]; ok {
+				if val != "" {
+					expose_headers = strings.Split(val, ",")
+				}
+			}
+			if val, ok := filter.Data["max_age"]; ok {
+				age, err := strconv.ParseInt(val, 10, 32)
+				if err == nil {
+					max_age = time.Second * time.Duration(age)
+				} else {
+					fmt.Printf("WARNING: Unable to convert max_age to value %s\n", val)
+				}
+			}
+			if val, ok := filter.Data["allow_credentials"]; ok {
+				if val == "true" {
+					allow_credentials = true
+				} else {
+					allow_credentials = false
+				}
+			}
+			http.CorsPolicy = &CorsPolicy{
+				AllowOrigin:allow_origin,
+				AllowMethods:allow_methods,
+				AllowHeaders:allow_headers,
+				ExposeHeaders:expose_headers,
+				MaxAge:max_age.String(),
+				AllowCredentials:allow_credentials,
+			}
+		}
+	}
+
+	return http
 }
 
 func PrepareVirtualServiceForCreateorUpdate(domain string, internal bool, paths []Route) (*VirtualService, error) {
@@ -755,10 +815,10 @@ func PrepareVirtualServiceForCreateorUpdate(domain string, internal bool, paths 
 	for _, value := range paths {
 		path := removeLeadingSlash(value.Path)
 		vs.Spec.HTTP = append(vs.Spec.HTTP, 
-			createHTTPSpecForVS(value.App, value.Space, value.Domain, removeSlash(path), addSlash(value.ReplacePath), removeSlash(path) + "/", defaultPort))
+			createHTTPSpecForVS(value.App, value.Space, value.Domain, removeSlash(path), addSlash(value.ReplacePath), removeSlash(path) + "/", defaultPort, value.Filters))
 		if removeSlashSlash(value.Path) == removeSlash(value.Path) {
 			vs.Spec.HTTP = append(vs.Spec.HTTP, 
-				createHTTPSpecForVS(value.App, value.Space, value.Domain, removeSlashSlash(value.Path), value.ReplacePath, removeSlashSlash(path), defaultPort))
+				createHTTPSpecForVS(value.App, value.Space, value.Domain, removeSlashSlash(value.Path), value.ReplacePath, removeSlashSlash(path), defaultPort, value.Filters))
 		}
 	}
 	return &vs, nil
@@ -824,7 +884,10 @@ func (ingress *IstioIngress) CreateOrUpdateRouter(domain string, internal bool, 
 	if err = ingress.InstallOrUpdateUberSiteGateway(domain, ingress.GetCertificateFromDomain(domain), internal); err != nil {
 		return err
 	}
-	return ingress.InstallOrUpdateVirtualService(domain, vs, exists)
+	if err = ingress.InstallOrUpdateVirtualService(domain, vs, exists); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (ingress *IstioIngress) InstallOrUpdateCORSAuthFilter(vsname string, path string, allowOrigin []string, allowMethods []string, allowHeaders []string, exposeHeaders []string, maxAge time.Duration, allowCredentials bool) (error) {
@@ -833,15 +896,8 @@ func (ingress *IstioIngress) InstallOrUpdateCORSAuthFilter(vsname string, path s
 	}
 	virtualService, err := ingress.GetVirtualService(vsname)
 	if err != nil {
-		if err.Error() == "virtual service was not found" {
-			virtualService = &VirtualService{}
-			virtualService.Kind = "VirtualService"
-			virtualService.APIVersion = IstioNetworkingAPIVersion
-			virtualService.SetName(vsname)
-			virtualService.SetNamespace("sites-system")
-		} else {
-			return err
-		}
+		// not yet deployed
+		return nil
 	}
 	for i, http := range virtualService.Spec.HTTP {
 		if http.Match == nil || len(http.Match) == 0 {

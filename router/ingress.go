@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"time"
+	"region-api/structs"
 )
 
 type Route struct {
@@ -16,6 +17,7 @@ type Route struct {
 	App         string `json:"app"`
 	ReplacePath string `json:"replacepath"`
 	Port        string `json:"port"`
+	Filters  	[]structs.HttpFilters `json:"filters,omitempty"`
 }
 
 type Router struct {
