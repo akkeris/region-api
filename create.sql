@@ -140,6 +140,14 @@ begin
         CONSTRAINT routerpaths_pkey PRIMARY KEY (domain, path, space, app)
     );
 
+    if not exists (SELECT NULL 
+              FROM INFORMATION_SCHEMA.COLUMNS
+             WHERE table_name = 'routerpaths'
+              AND column_name = 'filters'
+              and table_schema = 'public') then
+        alter table routerpaths add column filters text;
+    end if; 
+
     create table if not exists routers
     (
         routerid UUID PRIMARY KEY NOT NULL,
