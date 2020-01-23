@@ -582,25 +582,25 @@ func (ingress *IstioIngress) InstallOrUpdateJWTAuthFilter(appname string, space 
 		jwtPolicy.APIVersion = IstioAuthenticationAPIVersion
 		jwtPolicy.SetName(appname)
 		jwtPolicy.SetNamespace(space)
-		jwtPolicy.Spec.Origins = []OriginAuthenticationMethod{ 
-			OriginAuthenticationMethod{
-				Jwt:Jwt{
-					Issuer: issuer,
-					JwksUri: jwksUri,
-					Audiences: audiences,
-				},
-			},
-		}
-		jwtPolicy.Spec.PrincipalBinding = "USE_ORIGIN"
-		jwtPolicy.Spec.Targets = []TargetSelector{
-			TargetSelector{
-				Name: appname,
-			},
-		}
 	} else {
 		if err = json.Unmarshal(body, &jwtPolicy); err != nil {
 			return err
 		}
+	}
+	jwtPolicy.Spec.Origins = []OriginAuthenticationMethod{ 
+		OriginAuthenticationMethod{
+			Jwt:Jwt{
+				Issuer: issuer,
+				JwksUri: jwksUri,
+				Audiences: audiences,
+			},
+		},
+	}
+	jwtPolicy.Spec.PrincipalBinding = "USE_ORIGIN"
+	jwtPolicy.Spec.Targets = []TargetSelector{
+		TargetSelector{
+			Name: appname,
+		},
 	}
 	
 	if len(excludes) > 0 || len(includes) > 0 {
