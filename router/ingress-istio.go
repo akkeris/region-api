@@ -950,7 +950,6 @@ func (ingress *IstioIngress) DeleteCORSAuthFilter(vsname string, path string) (e
 			virtualService.Spec.HTTP[i].CorsPolicy = nil
 		} else {
 			for _, match := range http.Match {
-
 				if os.Getenv("INGRESS_DEBUG") == "true" {
 					fmt.Printf("[ingress] Looking to remove CORS policy, comparing path: %s with match prefix %s and match exact %s\n", path, match.URI.Prefix, match.URI.Exact)
 				}
