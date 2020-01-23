@@ -914,7 +914,7 @@ func (ingress *IstioIngress) InstallOrUpdateCORSAuthFilter(vsname string, path s
 				if os.Getenv("INGRESS_DEBUG") == "true" {
 					fmt.Printf("[ingress] Looking to add CORS policy, comparing path: %s with match prefix %s and match exact %s\n", path, match.URI.Prefix, match.URI.Exact)
 				}
-				if strings.HasPrefix(path, match.URI.Prefix) || match.URI.Exact == path || match.URI.Prefix == path {
+				if strings.HasPrefix(match.URI.Prefix, path) || match.URI.Exact == path || match.URI.Prefix == path {
 					virtualService.Spec.HTTP[i].CorsPolicy = &CorsPolicy{
 						AllowOrigin:allowOrigin,
 						AllowMethods:allowMethods,
@@ -946,9 +946,17 @@ func (ingress *IstioIngress) DeleteCORSAuthFilter(vsname string, path string) (e
 		return err
 	}
 	for i, http := range virtualService.Spec.HTTP {
-		for _, match := range http.Match {
-			if strings.HasPrefix(path, match.URI.Prefix) || match.URI.Exact == path || match.URI.Prefix == path {
-				virtualService.Spec.HTTP[i].CorsPolicy = nil
+		if http.Match == nil || len(http.Match) == 0 {
+			virtualService.Spec.HTTP[i].CorsPolicy = nil
+		} else {
+			for _, match := range http.Match {
+
+				if os.Getenv("INGRESS_DEBUG") == "true" {
+					fmt.Printf("[ingress] Looking to remove CORS policy, comparing path: %s with match prefix %s and match exact %s\n", path, match.URI.Prefix, match.URI.Exact)
+				}
+				if strings.HasPrefix(match.URI.Prefix, path) || match.URI.Exact == path || match.URI.Prefix == path {
+					virtualService.Spec.HTTP[i].CorsPolicy = nil
+				}
 			}
 		}
 	}
