@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"region-api/structs"
 	kube "k8s.io/api/core/v1"
 	kubemetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -128,7 +129,7 @@ type CorsPolicy struct {
 	AllowMethods []string 	`json:"allowMethods"`
 	AllowHeaders []string 	`json:"allowHeaders"`
 	ExposeHeaders []string 	`json:"exposeHeaders"`
-	MaxAge time.Duration 	`json:"maxAge"`
+	MaxAge string `json:"maxAge"`
 	AllowCredentials bool 	`json:"allowCredentials"`
 }
 
@@ -234,8 +235,11 @@ func GetIstioIngress(db *sql.DB, config *IngressConfig) (*IstioIngress, error) {
 	}, nil
 }
 
-func (ingress *IstioIngress) VirtualServiceExists(domain string) (bool, string, error) {
-	body, code, err := ingress.runtime.GenericRequest("get", "/apis/" + IstioNetworkingAPIVersion + "/namespaces/sites-system/virtualservices/"+domain, nil)
+func (ingress *IstioIngress) VirtualServiceExists(name string) (bool, string, error) {
+	if os.Getenv("INGRESS_DEBUG") == "true" {
+		fmt.Printf("[ingress] Istio - checking if virtual service exists %s\n", name)
+	}
+	body, code, err := ingress.runtime.GenericRequest("get", "/apis/" + IstioNetworkingAPIVersion + "/namespaces/sites-system/virtualservices/" + name, nil)
 	if err != nil {
 		return false, "", err
 	}
@@ -264,8 +268,11 @@ func (ingress *IstioIngress) GatewayExists(domain string) (bool, error) {
 	}
 }
 
-func (ingress *IstioIngress) DeleteVirtualService(domain string) error {
-	body, code, err := ingress.runtime.GenericRequest("delete", "/apis/" + IstioNetworkingAPIVersion + "/namespaces/sites-system/virtualservices/"+domain, nil)
+func (ingress *IstioIngress) DeleteVirtualService(name string) error {
+	if os.Getenv("INGRESS_DEBUG") == "true" {
+		fmt.Printf("[ingress] Istio - deleting virtual service for %s\n", name)
+	}
+	body, code, err := ingress.runtime.GenericRequest("delete", "/apis/" + IstioNetworkingAPIVersion + "/namespaces/sites-system/virtualservices/" + name, nil)
 	if err != nil {
 		return err
 	}
@@ -291,6 +298,9 @@ func (ingress *IstioIngress) DeleteGateway(domain string) error {
 }
 
 func (ingress *IstioIngress) GetVirtualService(name string) (*VirtualService, error) {
+	if os.Getenv("INGRESS_DEBUG") == "true" {
+		fmt.Printf("[ingress] Istio - getting virtual service %s\n", name)
+	}
 	var vs *VirtualService
 	body, code, err := ingress.runtime.GenericRequest("get", "/apis/" + IstioNetworkingAPIVersion + "/namespaces/sites-system/virtualservices/" + name, nil)
 	if err != nil {
@@ -306,6 +316,9 @@ func (ingress *IstioIngress) GetVirtualService(name string) (*VirtualService, er
 }
 
 func (ingress *IstioIngress) UpdateVirtualService(vs *VirtualService, name string) (error) {
+	if os.Getenv("INGRESS_DEBUG") == "true" {
+		fmt.Printf("[ingress] Istio - updating virtual service %s\n", name)
+	}
 	body, code, err := ingress.runtime.GenericRequest("put", "/apis/" + IstioNetworkingAPIVersion + "/namespaces/sites-system/virtualservices/" + name, vs)
 	if err != nil {
 		return err
@@ -554,11 +567,26 @@ func (ingress *IstioIngress) DeleteUberSiteGateway(domain string, certificate st
 }
 
 func (ingress *IstioIngress) InstallOrUpdateJWTAuthFilter(appname string, space string, fqdn string, port int64, issuer string, jwksUri string, audiences []string, excludes []string, includes []string) (error) {
+	if os.Getenv("INGRESS_DEBUG") == "true" {
+		fmt.Printf("[ingress] Istio installing or updating JWT Auth filter for %s-%s with %s\n", appname, space, jwksUri)
+	}
+	
+	body, code, err := ingress.runtime.GenericRequest("get", "/apis/" + IstioAuthenticationAPIVersion +  "/namespaces/" + space + "/policies/" + appname, nil)
+	if err != nil {
+		return err
+	}
+
 	var jwtPolicy Policy
-	jwtPolicy.Kind = "Policy"
-	jwtPolicy.APIVersion = IstioAuthenticationAPIVersion
-	jwtPolicy.SetName(appname)
-	jwtPolicy.SetNamespace(space)
+	if code == http.StatusNotFound {
+		jwtPolicy.Kind = "Policy"
+		jwtPolicy.APIVersion = IstioAuthenticationAPIVersion
+		jwtPolicy.SetName(appname)
+		jwtPolicy.SetNamespace(space)
+	} else {
+		if err = json.Unmarshal(body, &jwtPolicy); err != nil {
+			return err
+		}
+	}
 	jwtPolicy.Spec.Origins = []OriginAuthenticationMethod{ 
 		OriginAuthenticationMethod{
 			Jwt:Jwt{
@@ -574,7 +602,8 @@ func (ingress *IstioIngress) InstallOrUpdateJWTAuthFilter(appname string, space 
 			Name: appname,
 		},
 	}
-	if len(excludes) > 0 {
+	
+	if len(excludes) > 0 || len(includes) > 0 {
 		jwtPolicy.Spec.Origins[0].Jwt.TriggerRules = make([]TriggerRule, 1)
 		jwtPolicy.Spec.Origins[0].Jwt.TriggerRules[0].ExcludedPaths = make([]StringMatch, 0)
 		jwtPolicy.Spec.Origins[0].Jwt.TriggerRules[0].IncludedPaths = make([]StringMatch, 0)
@@ -585,9 +614,9 @@ func (ingress *IstioIngress) InstallOrUpdateJWTAuthFilter(appname string, space 
 			jwtPolicy.Spec.Origins[0].Jwt.TriggerRules[0].IncludedPaths = append(jwtPolicy.Spec.Origins[0].Jwt.TriggerRules[0].IncludedPaths, StringMatch{Prefix:include})
 		}
 	}
-
-	body, code, err := ingress.runtime.GenericRequest("post", "/apis/" + jwtPolicy.APIVersion +  "/namespaces/" + space + "/policies", jwtPolicy)
-	if err != nil {
+	if code == http.StatusNotFound {
+		body, code, err = ingress.runtime.GenericRequest("post", "/apis/" + jwtPolicy.APIVersion +  "/namespaces/" + space + "/policies", jwtPolicy)
+	} else {
 		body, code, err = ingress.runtime.GenericRequest("put", "/apis/" + jwtPolicy.APIVersion +  "/namespaces/" + space + "/policies/" + appname, jwtPolicy)
 	}
 	if err != nil {
@@ -601,6 +630,9 @@ func (ingress *IstioIngress) InstallOrUpdateJWTAuthFilter(appname string, space 
 }
 
 func (ingress *IstioIngress) DeleteJWTAuthFilter(appname string, space string, fqdn string, port int64) (error) {
+	if os.Getenv("INGRESS_DEBUG") == "true" {
+		fmt.Printf("[ingress] Istio - deleting any JWT Auth filter for %s-%s\n", appname, space)
+	}
 	body, code, err := ingress.runtime.GenericRequest("delete", "/apis/" + IstioAuthenticationAPIVersion + "/namespaces/" + space + "/policies/" + appname, nil)
 	if err != nil {
 		return err
@@ -672,8 +704,8 @@ func (ingress *IstioIngress) GetCertificateFromDomain(domain string) string {
 	return certName
 }
 
-func createHTTPSpecForVS(app string, space string, domain string, adjustedPath string, rewritePath string, forwardedPath string, port int32) HTTP {
-	return HTTP{
+func createHTTPSpecForVS(app string, space string, domain string, adjustedPath string, rewritePath string, forwardedPath string, port int32, filters []structs.HttpFilters) HTTP {
+	http := HTTP{
 		Match: []Match{Match{
 			URI:StringMatch{
 				Prefix: forwardedPath,
@@ -709,6 +741,65 @@ func createHTTPSpecForVS(app string, space string, domain string, adjustedPath s
 			},
 		},
 	}
+
+	for _, filter := range filters {
+		if filter.Type == "cors" {
+			if os.Getenv("INGRESS_DEBUG") == "true" {
+				fmt.Printf("[ingress] Adding CORS filter to site %#+v\n", filter)
+			}
+			allow_origin := make([]string, 0)
+			allow_methods := make([]string, 0)
+			allow_headers := make([]string, 0)
+			expose_headers := make([]string, 0)
+			max_age := time.Second * 86400
+			allow_credentials := false
+			if val, ok := filter.Data["allow_origin"]; ok {
+				if val != "" {
+					allow_origin = strings.Split(val, ",")
+				}
+			}
+			if val, ok := filter.Data["allow_methods"]; ok {
+				if val != "" {
+					allow_methods = strings.Split(val, ",")
+				}
+			}
+			if val, ok := filter.Data["allow_headers"]; ok {
+				if val != "" {
+					allow_headers = strings.Split(val, ",")
+				}
+			}
+			if val, ok := filter.Data["expose_headers"]; ok {
+				if val != "" {
+					expose_headers = strings.Split(val, ",")
+				}
+			}
+			if val, ok := filter.Data["max_age"]; ok {
+				age, err := strconv.ParseInt(val, 10, 32)
+				if err == nil {
+					max_age = time.Second * time.Duration(age)
+				} else {
+					fmt.Printf("WARNING: Unable to convert max_age to value %s\n", val)
+				}
+			}
+			if val, ok := filter.Data["allow_credentials"]; ok {
+				if val == "true" {
+					allow_credentials = true
+				} else {
+					allow_credentials = false
+				}
+			}
+			http.CorsPolicy = &CorsPolicy{
+				AllowOrigin:allow_origin,
+				AllowMethods:allow_methods,
+				AllowHeaders:allow_headers,
+				ExposeHeaders:expose_headers,
+				MaxAge:max_age.String(),
+				AllowCredentials:allow_credentials,
+			}
+		}
+	}
+
+	return http
 }
 
 func PrepareVirtualServiceForCreateorUpdate(domain string, internal bool, paths []Route) (*VirtualService, error) {
@@ -737,10 +828,10 @@ func PrepareVirtualServiceForCreateorUpdate(domain string, internal bool, paths 
 	for _, value := range paths {
 		path := removeLeadingSlash(value.Path)
 		vs.Spec.HTTP = append(vs.Spec.HTTP, 
-			createHTTPSpecForVS(value.App, value.Space, value.Domain, removeSlash(path), addSlash(value.ReplacePath), removeSlash(path) + "/", defaultPort))
+			createHTTPSpecForVS(value.App, value.Space, value.Domain, removeSlash(path), addSlash(value.ReplacePath), removeSlash(path) + "/", defaultPort, value.Filters))
 		if removeSlashSlash(value.Path) == removeSlash(value.Path) {
 			vs.Spec.HTTP = append(vs.Spec.HTTP, 
-				createHTTPSpecForVS(value.App, value.Space, value.Domain, removeSlashSlash(value.Path), value.ReplacePath, removeSlashSlash(path), defaultPort))
+				createHTTPSpecForVS(value.App, value.Space, value.Domain, removeSlashSlash(value.Path), value.ReplacePath, removeSlashSlash(path), defaultPort, value.Filters))
 		}
 	}
 	return &vs, nil
@@ -806,34 +897,56 @@ func (ingress *IstioIngress) CreateOrUpdateRouter(domain string, internal bool, 
 	if err = ingress.InstallOrUpdateUberSiteGateway(domain, ingress.GetCertificateFromDomain(domain), internal); err != nil {
 		return err
 	}
-	return ingress.InstallOrUpdateVirtualService(domain, vs, exists)
+	if err = ingress.InstallOrUpdateVirtualService(domain, vs, exists); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (ingress *IstioIngress) InstallOrUpdateCORSAuthFilter(vsname string, path string, allowOrigin []string, allowMethods []string, allowHeaders []string, exposeHeaders []string, maxAge time.Duration, allowCredentials bool) (error) {
 	virtualService, err := ingress.GetVirtualService(vsname)
 	if err != nil {
-		if err.Error() == "virtual service was not found" {
-			// Go ahead and ignore setting this.  We can't as there's no deployment yet.
-			return nil
-		}
-		return err
+		// not yet deployed
+		return nil
 	}
+	var dirty = false
 	for i, http := range virtualService.Spec.HTTP {
-		for _, match := range http.Match {
-			if strings.HasPrefix(path, match.URI.Prefix) || match.URI.Exact == path || match.URI.Prefix == path {
-				virtualService.Spec.HTTP[i].CorsPolicy = &CorsPolicy{
-					AllowOrigin:allowOrigin,
-					AllowMethods:allowMethods,
-					AllowHeaders:allowHeaders,
-					ExposeHeaders:exposeHeaders,
-					MaxAge:maxAge,
-					AllowCredentials:allowCredentials,
+		if http.Match == nil || len(http.Match) == 0 {
+			virtualService.Spec.HTTP[0].CorsPolicy = &CorsPolicy{
+				AllowOrigin:allowOrigin,
+				AllowMethods:allowMethods,
+				AllowHeaders:allowHeaders,
+				ExposeHeaders:exposeHeaders,
+				MaxAge:maxAge.String(),
+				AllowCredentials:allowCredentials,
+			}
+			dirty = true
+		} else {
+			for _, match := range http.Match {
+				if os.Getenv("INGRESS_DEBUG") == "true" {
+					fmt.Printf("[ingress] Looking to add CORS policy, comparing path: %s with match prefix %s and match exact %s\n", path, match.URI.Prefix, match.URI.Exact)
+				}
+				if strings.HasPrefix(match.URI.Prefix, path) || match.URI.Exact == path || match.URI.Prefix == path {
+					virtualService.Spec.HTTP[i].CorsPolicy = &CorsPolicy{
+						AllowOrigin:allowOrigin,
+						AllowMethods:allowMethods,
+						AllowHeaders:allowHeaders,
+						ExposeHeaders:exposeHeaders,
+						MaxAge:maxAge.String(),
+						AllowCredentials:allowCredentials,
+					}
+					dirty = true
 				}
 			}
 		}
 	}
-	if err = ingress.UpdateVirtualService(virtualService, vsname); err != nil {
-		return err
+	if dirty == true {
+		if os.Getenv("INGRESS_DEBUG") == "true" {
+			fmt.Printf("[ingress] Istio - Installing or updating CORS auth filter for %s at path %s: %#+v\n", vsname, path, virtualService)
+		}
+		if err = ingress.UpdateVirtualService(virtualService, vsname); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -847,15 +960,30 @@ func (ingress *IstioIngress) DeleteCORSAuthFilter(vsname string, path string) (e
 		}
 		return err
 	}
+	var dirty = false
 	for i, http := range virtualService.Spec.HTTP {
-		for _, match := range http.Match {
-			if strings.HasPrefix(path, match.URI.Prefix) || match.URI.Exact == path || match.URI.Prefix == path {
-				virtualService.Spec.HTTP[i].CorsPolicy = nil
+		if http.Match == nil || len(http.Match) == 0 {
+			virtualService.Spec.HTTP[i].CorsPolicy = nil
+			dirty = true
+		} else {
+			for _, match := range http.Match {
+				if os.Getenv("INGRESS_DEBUG") == "true" {
+					fmt.Printf("[ingress] Looking to remove CORS policy, comparing path: %s with match prefix %s and match exact %s\n", path, match.URI.Prefix, match.URI.Exact)
+				}
+				if strings.HasPrefix(match.URI.Prefix, path) || match.URI.Exact == path || match.URI.Prefix == path {
+					virtualService.Spec.HTTP[i].CorsPolicy = nil
+					dirty = true
+				}
 			}
 		}
 	}
-	if err = ingress.UpdateVirtualService(virtualService, vsname); err != nil {
-		return err
+	if dirty == true {
+		if os.Getenv("INGRESS_DEBUG") == "true" {
+			fmt.Printf("[ingress] Removing CORS filter for %s at path %s\n", vsname, path)
+		}
+		if err = ingress.UpdateVirtualService(virtualService, vsname); err != nil {
+			return err
+		}
 	}
 	return nil
 }
