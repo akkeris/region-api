@@ -570,27 +570,40 @@ func (ingress *IstioIngress) InstallOrUpdateJWTAuthFilter(appname string, space 
 	if os.Getenv("INGRESS_DEBUG") == "true" {
 		fmt.Printf("[ingress] Istio installing or updating JWT Auth filter for %s-%s with %s\n", appname, space, jwksUri)
 	}
+	
+	body, code, err := ingress.runtime.GenericRequest("get", "/apis/" + IstioAuthenticationAPIVersion +  "/namespaces/" + space + "/policies", nil)
+	if err != nil {
+		return err
+	}
+
 	var jwtPolicy Policy
-	jwtPolicy.Kind = "Policy"
-	jwtPolicy.APIVersion = IstioAuthenticationAPIVersion
-	jwtPolicy.SetName(appname)
-	jwtPolicy.SetNamespace(space)
-	jwtPolicy.Spec.Origins = []OriginAuthenticationMethod{ 
-		OriginAuthenticationMethod{
-			Jwt:Jwt{
-				Issuer: issuer,
-				JwksUri: jwksUri,
-				Audiences: audiences,
+	if code == http.StatusNotFound {
+		jwtPolicy.Kind = "Policy"
+		jwtPolicy.APIVersion = IstioAuthenticationAPIVersion
+		jwtPolicy.SetName(appname)
+		jwtPolicy.SetNamespace(space)
+		jwtPolicy.Spec.Origins = []OriginAuthenticationMethod{ 
+			OriginAuthenticationMethod{
+				Jwt:Jwt{
+					Issuer: issuer,
+					JwksUri: jwksUri,
+					Audiences: audiences,
+				},
 			},
-		},
+		}
+		jwtPolicy.Spec.PrincipalBinding = "USE_ORIGIN"
+		jwtPolicy.Spec.Targets = []TargetSelector{
+			TargetSelector{
+				Name: appname,
+			},
+		}
+	} else {
+		if err = json.Unmarshal(body, &jwtPolicy); err != nil {
+			return err
+		}
 	}
-	jwtPolicy.Spec.PrincipalBinding = "USE_ORIGIN"
-	jwtPolicy.Spec.Targets = []TargetSelector{
-		TargetSelector{
-			Name: appname,
-		},
-	}
-	if len(excludes) > 0 {
+	
+	if len(excludes) > 0 || len(includes) > 0 {
 		jwtPolicy.Spec.Origins[0].Jwt.TriggerRules = make([]TriggerRule, 1)
 		jwtPolicy.Spec.Origins[0].Jwt.TriggerRules[0].ExcludedPaths = make([]StringMatch, 0)
 		jwtPolicy.Spec.Origins[0].Jwt.TriggerRules[0].IncludedPaths = make([]StringMatch, 0)
@@ -601,9 +614,9 @@ func (ingress *IstioIngress) InstallOrUpdateJWTAuthFilter(appname string, space 
 			jwtPolicy.Spec.Origins[0].Jwt.TriggerRules[0].IncludedPaths = append(jwtPolicy.Spec.Origins[0].Jwt.TriggerRules[0].IncludedPaths, StringMatch{Prefix:include})
 		}
 	}
-
-	body, code, err := ingress.runtime.GenericRequest("post", "/apis/" + jwtPolicy.APIVersion +  "/namespaces/" + space + "/policies", jwtPolicy)
-	if err != nil || !(code == http.StatusOK && code == http.StatusCreated) {
+	if code == http.StatusNotFound {
+		body, code, err = ingress.runtime.GenericRequest("post", "/apis/" + jwtPolicy.APIVersion +  "/namespaces/" + space + "/policies", jwtPolicy)
+	} else {
 		body, code, err = ingress.runtime.GenericRequest("put", "/apis/" + jwtPolicy.APIVersion +  "/namespaces/" + space + "/policies/" + appname, jwtPolicy)
 	}
 	if err != nil {
