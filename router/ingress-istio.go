@@ -571,7 +571,7 @@ func (ingress *IstioIngress) InstallOrUpdateJWTAuthFilter(appname string, space 
 		fmt.Printf("[ingress] Istio installing or updating JWT Auth filter for %s-%s with %s\n", appname, space, jwksUri)
 	}
 	
-	body, code, err := ingress.runtime.GenericRequest("get", "/apis/" + IstioAuthenticationAPIVersion +  "/namespaces/" + space + "/policies", nil)
+	body, code, err := ingress.runtime.GenericRequest("get", "/apis/" + IstioAuthenticationAPIVersion +  "/namespaces/" + space + "/policies/" + appname, nil)
 	if err != nil {
 		return err
 	}
