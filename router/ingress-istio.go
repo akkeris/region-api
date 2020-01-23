@@ -757,7 +757,7 @@ func createHTTPSpecForVS(app string, space string, domain string, adjustedPath s
 			}
 			if val, ok := filter.Data["expose_headers"]; ok {
 				if val != "" {
-					expose_headers = strings.Split(val, ",");
+					expose_headers = strings.Split(val, ",")
 				}
 			}
 			if val, ok := filter.Data["max_age"]; ok {
