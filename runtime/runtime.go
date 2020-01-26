@@ -557,88 +557,25 @@ type Runtime interface {
 var stackRuntimeCache map[string]Runtime = make(map[string]Runtime)
 var stackToSpaceCache map[string]string = make(map[string]string)
 
+// Stubs, incase we ever have more than one stack in a region.
 func GetRuntimeStack(db *sql.DB, stack string) (rt Runtime, e error) {
-	// Cache for the win!
-	i, ok := stackRuntimeCache[stack]
-	if ok {
-		return i, nil
-	}
-
-	var (
-		stackn            string
-		description       string
-		api_server        string
-		api_version       string
-		image_pull_secret string
-		auth_type         string
-		auth_vault_path   string
-	)
-	rows := db.QueryRow("select stacks.stack, stacks.description, stacks.api_server, stacks.api_version, stacks.image_pull_secret, stacks.auth_type, stacks.auth_vault_path from stacks where stacks.stack = $1", stack)
-	err := rows.Scan(&stackn, &description, &api_server, &api_version, &image_pull_secret, &auth_type, &auth_vault_path)
-	if err != nil {
-		return nil, err
-	}
-	// If necessary we could flip on the type of runtime to use here:
-	stackRuntimeCache[stack] = NewKubernetes(&KubernetesConfig{Name: stackn, APIServer: api_server, APIVersion: api_version, ImagePullSecret: image_pull_secret, AuthType: auth_type, AuthVaultPath: auth_vault_path})
+	// At the moment we only support kubernetes, but incase this 
+	// should change this would be an opportune time to grab an interface
+	// to a different runtime.
+	stackRuntimeCache[stack] = NewKubernetes(&KubernetesConfig{Name: stackn})
 	return stackRuntimeCache[stack], nil
 }
 
+// Stubs, incase we ever have more than one stack in a region.
 func GetRuntimeFor(db *sql.DB, space string) (rt Runtime, e error) {
-	// Cache for the win!
-	j, ok := stackToSpaceCache[space]
-	if ok {
-		i, ok := stackRuntimeCache[j]
-		if ok {
-			return i, nil
-		}
-	}
-
-	var (
-		stack             string
-		description       string
-		api_server        string
-		api_version       string
-		image_pull_secret string
-		auth_type         string
-		auth_vault_path   string
-	)
-	rows := db.QueryRow("select stacks.stack, stacks.description, stacks.api_server, stacks.api_version, stacks.image_pull_secret, stacks.auth_type, stacks.auth_vault_path from stacks join spaces on spaces.stack = stacks.stack where spaces.name = $1", space)
-	err := rows.Scan(&stack, &description, &api_server, &api_version, &image_pull_secret, &auth_type, &auth_vault_path)
-	if err != nil {
-		return nil, err
-	}
-	stackToSpaceCache[space] = stack
-	// If necessary we could flip on the type of runtime to use here:
-	stackRuntimeCache[stack] = NewKubernetes(&KubernetesConfig{Name: stack, APIServer: api_server, APIVersion: api_version, ImagePullSecret: image_pull_secret, AuthType: auth_type, AuthVaultPath: auth_vault_path})
-	return stackRuntimeCache[stack], nil
+	return GetRuntimeStack(db, "ds1")
 }
 
+// Stubs, incase we ever have more than one stack in a region.
 func GetAllRuntimes(db *sql.DB) (rt []Runtime, e error) {
-	rows, err := db.Query("select stacks.stack, stacks.description, stacks.api_server, stacks.api_version, stacks.image_pull_secret, stacks.auth_type, stacks.auth_vault_path from stacks")
-	if err != nil {
-		return nil, err
+	r, e := GetRuntimeStack(db, "ds1")
+	if e != nil {
+		return nil, e
 	}
-
-	defer rows.Close()
-	runtimes := []Runtime{}
-	for rows.Next() {
-		var (
-			stack             string
-			description       string
-			api_server        string
-			api_version       string
-			image_pull_secret string
-			auth_type         string
-			auth_vault_path   string
-		)
-		err := rows.Scan(&stack, &description, &api_server, &api_version, &image_pull_secret, &auth_type, &auth_vault_path)
-		if err != nil {
-			return nil, err
-		}
-		// If necessary we could flip on the type of runtime to use here:
-		stackRuntimeCache[stack] = NewKubernetes(&KubernetesConfig{Name: stack, APIServer: api_server, APIVersion: api_version, ImagePullSecret: image_pull_secret, AuthType: auth_type, AuthVaultPath: auth_vault_path})
-		runtimes = append(runtimes, stackRuntimeCache[stack])
-	}
-
-	return runtimes, nil
+	return []Runtime{r}, nil
 }

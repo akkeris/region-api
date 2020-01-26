@@ -18,7 +18,11 @@ import (
 	"sync"
 	"time"
 
-	vault "github.com/akkeris/vault-client"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/rest"
 )
 
 type KubeRequest struct {
@@ -34,6 +38,7 @@ type Kubernetes struct {
 	defaultApiServerVersion string
 	clientToken             string
 	imagePullSecret         string
+	config					*rest.Config
 	client                  *http.Client
 	mutex                   *sync.Mutex
 	debug                   bool
@@ -41,67 +46,39 @@ type Kubernetes struct {
 
 type KubernetesConfig struct {
 	Name            string
-	APIServer       string
-	APIVersion      string
 	ImagePullSecret string
-	AuthType        string
-	AuthVaultPath   string
 }
 
 func NewKubernetes(config *KubernetesConfig) (r Runtime) {
-	log.Println("Using kubernetes server " + config.APIServer)
-	if config.ImagePullSecret == "" {
-		log.Fatalln("No kubernetes name was available! Aborting.")
-	}
-	if config.ImagePullSecret == "" {
-		log.Fatalln("No kubernetes image pull secret was available! Aborting.")
-	}
-	if config.APIServer == "" {
-		log.Fatalln("No kubernetes api server was available! Aborting.")
-	}
-	if config.APIVersion == "" {
-		log.Fatalln("No kubernetes api version was available! Aborting.")
-	}
-	if config.AuthType == "" {
-		log.Fatalln("No kubernetes auth type was available! Aborting.")
-	}
-	if config.AuthVaultPath == "" {
-		log.Fatalln("No kubernetes auth vault path was available! Aborting.")
-	}
-	var rt Kubernetes
-	rt.clientType = config.AuthType
-	rt.apiServer = config.APIServer
-	rt.defaultApiServerVersion = config.APIVersion
-	rt.imagePullSecret = config.ImagePullSecret
-	rt.mutex = &sync.Mutex{}
-	rt.debug = os.Getenv("DEBUG_K8S") == "true"
-	if rt.clientType == "cert" {
-		secret := vault.GetSecret(config.AuthVaultPath)
-		admin_crt := strings.Replace(vault.GetFieldFromVaultSecret(secret, "admin-crt"), "\\n", "\n", -1)
-		admin_key := strings.Replace(vault.GetFieldFromVaultSecret(secret, "admin-key"), "\\n", "\n", -1)
-		cert, err := tls.X509KeyPair([]byte(admin_crt), []byte(admin_key))
+
+		// Check if we have a service account in cluster
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		// Check if we have a kubeconfig path.
+		var kubeconfig *string
+		if home := homeDir(); home != "" {
+			kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
+		} else {
+			kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
+		}
+		flag.Parse()
+
+		// use the current context in kubeconfig
+		config, err = clientcmd.BuildConfigFromFlags("", *kubeconfig)
 		if err != nil {
-			log.Println(admin_crt)
-			log.Println(admin_key)
-			log.Println("Failed to obtain kubernetes certificate for " + rt.apiServer)
-			log.Fatalln(err)
+			panic(err.Error())
 		}
-		caCertPool := x509.NewCertPool()
-		ca_crt := strings.Replace(vault.GetFieldFromVaultSecret(secret, "ca-crt"), "\\n", "\n", -1)
-		caCertPool.AppendCertsFromPEM([]byte(ca_crt))
-		tlsConfig := &tls.Config{
-			Certificates: []tls.Certificate{cert},
-			RootCAs:      caCertPool,
-		}
-		tlsConfig.BuildNameToCertificate()
-		rt.client = &http.Client{Transport: &http.Transport{TLSClientConfig: tlsConfig}}
-	} else if rt.clientType == "token" {
-		rt.clientToken = vault.GetField(config.AuthVaultPath, "token")
-		rt.client = &http.Client{}
-	} else {
-		log.Fatalln("No valid authentication method was found for kubernetes " + rt.apiServer)
 	}
 
+	var rt Kubernetes
+	rt.clientType = "token"
+	rt.apiServer = config.config.Host
+	rt.defaultApiServerVersion = "v1"
+	rt.imagePullSecret = ""
+	rt.mutex = &sync.Mutex{}
+	rt.debug = os.Getenv("DEBUG_K8S") == "true"
+	rt.clientToken = config.config.BearerToken
+	rt.client = &http.Client{}
 	var rts Runtime = Runtime(rt)
 	return rts
 }
