@@ -1,7 +1,6 @@
 package certs
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"github.com/nu7hatch/gouuid"
@@ -230,15 +229,7 @@ func (issuer *CertManagerIssuer) GetCertificate(id string, domain string) (pem_c
 	if secret.Data["tls.key"] == nil {
 		return nil, nil, errors.New("Unable to decode or get certificate, the tls.key field was null")
 	}
-	pem_cert, err = base64.StdEncoding.DecodeString(string(secret.Data["tls.crt"]))
-	if err != nil {
-		return nil, nil, err
-	}
-	pem_key, err = base64.StdEncoding.DecodeString(string(secret.Data["tls.key"]))
-	if err != nil {
-		return nil, nil, err
-	}
-	return pem_cert, pem_key, nil
+	return secret.Data["tls.crt"], secret.Data["tls.key"], nil
 }
 
 // Used by unit tests, shoudn't be used outside of that.
