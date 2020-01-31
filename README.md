@@ -4,24 +4,21 @@ HTTP API for regional akkeris actions, it integrates with kubernetes, and servic
 
 [![CircleCI](https://circleci.com/gh/akkeris/region-api.svg?style=svg)](https://circleci.com/gh/akkeris/region-api)
 
-## Installation
-
-### Setup
-
-When you first run alamo-api on a brand new database it will create the necessary infrastructure, you should first set the following environment variables, they only need to be set when first ran on an empty database.  Note that these only need to be set on first launch, afterwards they can be removed safely, they will have no affect if ran on a database that's already been populated:
-
-* KUBERNETES_API_SERVER - the hostname of the kubernetes server
-* KUBERNETES_API_VERSION - the api version of the kubernetes server (usually v1)
-* KUBERNETES_CLIENT_TYPE - either token or cert
-* KUBERNETES_CERT_SECRET - the path to the certificate secrets in vault, only applicable if KUBERNETES_CLIENT_TYPE=cert
-* KUBERNETES_TOKEN_SECRET - the path to the token secret in vault, only applicable if KUBERNETES_CLIENT_TYPE=token
-* KUBERNETES_IMAGE_PULL_SECRET - the path to the image pull secret in vault
-
-Ensure you've set the environment variables in the running section below.
-
 ## Running
 
-### Environment
+### Required Resources 
+
+**Kubernetes**
+
+The region api requires a kubernetes runtime. When running in a kubernetes cluster it administrates it using a service account provided in its deployment. The service account should have the ability to read, write and delete services, deployments, configmaps, virtual services, certificates, gateways, secrets (within istio-system only), jobs and pods in all namespaces (unless otherwise specified). 
+
+To run this out-of-cluster specify the path to a kube config file using `--kubeconfig` flag, the current context in the kube config file is used.  If no service account or `--kubeconfig` is specified then the region api defaults to using the current context in `$HOME/.kube/config`. 
+
+**Postgres Database**
+
+The region api requires a postgres 9.6+ database specified with the `PITDB` environment variable.
+
+### Required Environment Variables
 
 Set the following environment variables, if this is first time running it see the Setup section.
 
@@ -53,7 +50,6 @@ Set the following environment variables, if this is first time running it see th
 * MONGODB_BROKER_URL - todo, get brokers to register with alamo-api, otherwise this is the host of the broker
 * INFLUXDB_URL - The influx DB url to retrieve http metrics and other custom app data
 * PROMETHEUS_URL - The prometheus DB url to retrieve metrics pod data for apps
-* NEPTUNE_BROKER_URL - todo, get brokers to register with alamo-api, otherwise this is the host of the broker
 * INFLUXDB_BROKER_URL - influx database broker
 * CASSANDRA_BROKER_URL - cassandra database broker
 * KAFKA_BROKERS - The kafka brokers for this region
@@ -80,9 +76,6 @@ This uses jetstack's cert-manager (if installed) to issue certificates. By defau
 * LOGSHUTTLE_SERVICE_HOST, LOGSHUTTLE_SERVICE_PORT - where to find the logshuttle
 * LOGSESSION_SERVICE_HOST, LOGSESSION_SERVICE_PORT - where to find the logsession
 * DOMAIN_BLACKLIST - a comma delimited list of domains or regular expressions that should NOT be in the control of akkeris (region-api), this can be the provider id or domain name (provider id in aws is the hosted zone)
-* SUBSCRIPTION_URL
-* FEATURE_DEFAULT_OCTHC - a true or false value to enable octhc feature
-* FEATURE_DEFAULT_OPSGENIE - a true or false value to enable opsgenie feature
 * PUBLIC_DNS_RESOLVER - Used to see if DNS records are already set, this is used incase region api is in a VPN/VPC network. Defaults to 8.8.8.8
 
 **Debugging Environment Variables:**
