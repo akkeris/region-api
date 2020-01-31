@@ -561,6 +561,25 @@ func HttpRemoveDomainRecords(params martini.Params, r render.Render) {
 	r.JSON(http.StatusCreated, toRemoveRecords)
 }
 
+func HttpGetInstalledCertificates(db *sql.DB, params martini.Params, r render.Render) {
+	internal, err := IsInternalRouter(db, params["domain"])
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	ingress, err := GetSiteIngress(db, internal)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	certs, err := ingress.GetInstalledCertificates(params["domain"]);
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	r.JSON(http.StatusOK, certs)
+}
+
 func AddToMartini(m *martini.ClassicMartini) {
 	m.Get("/v1/octhc/router", HttpOcthc)
 	m.Get("/v1/routers", HttpDescribeRouters)
@@ -577,4 +596,5 @@ func AddToMartini(m *martini.ClassicMartini) {
 	m.Get("/v1/domains/:domain/records", HttpGetDomainRecords)
 	m.Post("/v1/domains/:domain/records", binding.Json(DomainRecord{}), HttpCreateDomainRecords)
 	m.Delete("/v1/domains/:domain/records/:name", HttpRemoveDomainRecords)
+	m.Get("/v1/certificates/:domain", HttpGetInstalledCertificates)
 }
