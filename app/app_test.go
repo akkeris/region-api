@@ -51,7 +51,6 @@ func Server() *martini.ClassicMartini {
 	m.Get("/v1/space/:space/apps", Describespace)              //describeapp.go
 	m.Get("/v1/space/:space/app/:appname", DescribeappInSpace) //describeapp.go
 
-	m.Get("/v1/space/:space/app/:appname/deployments", GetDeployments) //replicasets.go
 	m.Post("/v1/space/:space/app/:appname/restart", Restart)           //restart.go
 	m.Get("/v1/space/:space/app/:app/status", Spaceappstatus)          //status.go
 	m.Get("/v1/kube/podstatus/:space/:app", PodStatus)                 //status.go
