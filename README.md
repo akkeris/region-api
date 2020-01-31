@@ -18,13 +18,18 @@ To run this out-of-cluster specify the path to a kube config file using `--kubec
 
 The region api requires a postgres 9.6+ database specified with the `PITDB` environment variable.
 
+**AWS Account**
+
+
 ### Required Environment Variables
 
 Set the following environment variables, if this is first time running it see the Setup section.
 
 * PITDB - A postgres database url formatted as postgres://user:pass@host:port/db
+* AWS_ACCESS_KEY_ID - Acceess key id for AWS
+* AWS_SECRET_ACCESS_KEY - Access secret for AWS
 * REGION - The region this region-api is running in, this should match the cloud providers definition of "region", e.g., us-west-2 for AWS Oregon Region.
-* IMAGE_PULL_SECRET - The path in vault for credentials when pulling images from the registry, if not needed, leave blank, see Image Pull Secret Format section for information how this should be formatted in vault.
+* IMAGE_PULL_SECRET - The name of the secret to use when pulling images from the registry. Leave blank if the docker repository is public, defaults to "".
 * ENABLE_AUTH - true or false value, set to false for tests
 * ALAMO_API_AUTH_SECRET - If ENABLE_AUTH is set to true, this is the path in vault to find the secret, if not needed, leave blank.
 * INTERNAL_DOMAIN - The internal domain e.g.., internalapps.example.com
@@ -41,13 +46,13 @@ Set the following environment variables, if this is first time running it see th
 * SITES_PUBLIC_INTERNAL=(see ingress format)
 * SITES_PUBLIC_EXTERNAL=(see ingress format)
 * SITES_PRIVATE_INTERNAL=(see ingress format)
-* ISTIO_DOWNPAGE - The maintenance page to use, this should be the service host for an app in akkeris. Defaults to `akkeris404.akkeris-system.svc.cluster.local`.
+* ISTIO_DOWNPAGE - The maintenance page to use, this should be the service host for an app in akkeris. Defaults to `akkeris404.akkeris-system.svc.cluster.local`
 
 **Broker Settings**
 
 * SERVICES - A comma delimited list of urls for open service brokers to use e.g., (https://user:pass@hostname/,https://:token@hostname/)
-* RABBITMQ_BROKER_URL - todo, get brokers to register with alamo-api, otherwise this is the host of the broker
-* MONGODB_BROKER_URL - todo, get brokers to register with alamo-api, otherwise this is the host of the broker
+* RABBITMQ_BROKER_URL - this is the host of the broker
+* MONGODB_BROKER_URL - this is the host of the broker
 * INFLUXDB_URL - The influx DB url to retrieve http metrics and other custom app data
 * PROMETHEUS_URL - The prometheus DB url to retrieve metrics pod data for apps
 * INFLUXDB_BROKER_URL - influx database broker
@@ -66,7 +71,7 @@ Set the following environment variables, if this is first time running it see th
 
 This uses jetstack's cert-manager (if installed) to issue certificates. By default this is the only issuer manager that's supported. 
 
-* DEFAULT_ISSUER - The clusterissuer to use by default when ordering a new certificate (one may be specified when ordering a cert)
+* DEFAULT_ISSUER - The clusterissuer to use by default when ordering a new certificate (one may be specified when ordering a cert). Defaults to `letsencrypt`.
 * CERT_NAMESPACE - The namespace to store certificates.  This defaults to `istio-system` to make the certificates (and their secrets) mountable by istio. 
 
 **Optional Environment Variables:**
@@ -99,10 +104,6 @@ istio://host-of-ingress/namespace/ingress-gateway-name
 ```
 
 The `ingress-gateway-name` is the value of the `istio` label on the istio ingress deployment. The `namespace` is the namespace where istio is deployed (usually istio-system). The `host-of-ingress` must either by a qualified domain name or ip address, this is used to assign the IP address via DNS or a cname record if its a hostname. This should be the user-facing ip address or hostname you want new sites to resolve to, not an internal clusterip or service or node IP.
-
-### Image Pull Secret Formats
-
- Image pull secrets should be held in vault (with the path in vault saved into the environment variable). The secret should have one key called "base64" which contains the base64 encoded JSON objecet in the format of `{"auths":{"registry.hostname.com":{"auth":"...base64authinfo..."},"email":""}}` the "auth" field should have a base64 encoded username:password. The other key should be "name" which contains the name of the secret, usually in the format of `registry.hostname.com-user`. See https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/#log-in-to-docker for an example of the JSON structure that should be base64 encoded and stored in the `base64` field.
 
 ## Testing
 
