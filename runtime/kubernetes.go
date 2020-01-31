@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"reflect"
 	structs "region-api/structs"
@@ -17,10 +18,9 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
+	"flag"
+	"path/filepath"
+	kube "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/rest"
 )
@@ -44,14 +44,515 @@ type Kubernetes struct {
 	debug                   bool
 }
 
-type KubernetesConfig struct {
-	Name            string
-	ImagePullSecret string
+type Specspec struct {
+	Replicas int `json:"replicas"`
 }
 
-func NewKubernetes(config *KubernetesConfig) (r Runtime) {
+type Metadataspec struct {
+	Name      string `json:"name"`
+	Namespace string `json:"namespace"`
+}
 
-		// Check if we have a service account in cluster
+type Itemspec struct {
+	Metadata struct {
+		Name string `json:"name"`
+	} `json:"metadata"`
+}
+
+type Scalespec struct {
+	Metadata Metadataspec `json:"metadata"`
+	Spec     Specspec     `json:"spec"`
+}
+
+type Statusspec struct {
+	Status string `json:"status"`
+}
+
+type Dataspec struct {
+	Dockercfg string `json:".dockerconfigjson"`
+}
+
+type Secretspec struct {
+	Metadata struct {
+		Name string `json:"name"`
+	} `json:"metadata"`
+	Data Dataspec `json:"data"`
+	Type string   `json:"type"`
+}
+
+type Itemsspec struct {
+	Items []Itemspec `json:"items"`
+}
+
+type Serviceaccountspec struct {
+	Metadata         structs.Namespec   `json:"metadata"`
+	ImagePullSecrets []structs.Namespec `json:"imagePullSecrets,omitempty"`
+}
+
+type Namespacespec struct {
+	Metadata struct {
+		Name   string `json:"name"`
+		Labels struct {
+			Internal string `json:"akkeris.io/internal,omitempty"`
+		} `json:"labels,omitempty"`
+		Annotations struct {
+			ComplianceTags string `json:"akkeris.io/compliancetags,omitempty"`
+		}
+	} `json:"metadata"`
+}
+
+type ContainerPort struct {
+	ContainerPort int `json:"containerPort"`
+}
+
+type TcpCheck struct {
+	Port int `json:"port,omitempty"`
+}
+
+type HttpCheck struct {
+	Port int    `json:"port,omitempty"`
+	Path string `json:"path,omitempty"`
+}
+
+type ReadinessProbe struct {
+	TCPSocket      *TcpCheck  `json:"tcpSocket,omitempty"`
+	HTTPGET        *HttpCheck `json:"httpGet,omitempty"`
+	TimeoutSeconds int        `json:"timeoutSeconds,omitempty"`
+	PeriodSeconds  int        `json:"periodSeconds,omitEmpty"`
+}
+
+type ContainerItem struct {
+	Name             string                  `json:"name"`
+	Image            string                  `json:"image"`
+	Args             []string                `json:"args,omitempty"`
+	Command          []string                `json:"command,omitempty"`
+	Env              []structs.EnvVar        `json:"env,omitempty"`
+	Ports            []ContainerPort         `json:"ports,omitempty"`
+	ImagePullPolicy  string                  `json:"imagePullPolicy,omitempty"`
+	ImagePullSecrets []structs.Namespec      `json:"imagePullSecrets,omitempty"`
+	Resources        structs.ResourceSpec    `json:"resources,omitempty"`
+	ReadinessProbe   *ReadinessProbe         `json:"readinessProbe,omitempty"`
+	SecurityContext  structs.SecurityContext `json:"securityContext,omitempty"`
+	VolumeMounts     []structs.VolumeMounts  `json:"volumeMounts",omitempty`
+}
+
+type Createspec struct {
+	Message  string `json:"name"`
+	Metadata struct {
+		Uid string `json:"uid"`
+	} `json:"metadata"`
+}
+
+type PortItem struct {
+	Name       string `json:"name,omitempty"`
+	Protocol   string `json:"protocol"`
+	Port       int    `json:"port"`
+	TargetPort int    `json:"targetPort"`
+	NodePort   int    `json:"nodePort"`
+}
+
+type Service struct {
+	Kind     string `json:"kind"`
+	Metadata struct {
+		Annotations struct {
+			ServiceBetaKubernetesIoAwsLoadBalancerInternal string `json:"service.beta.kubernetes.io/aws-load-balancer-internal"`
+		} `json:"annotations"`
+		Name      string            `json:"name"`
+		Namespace string            `json:"namespace"`
+		Labels    map[string]string `json:"labels"`
+	} `json:"metadata"`
+	Spec struct {
+		Selector struct {
+			Name string `json:"name"`
+		} `json:"selector"`
+		Ports []PortItem `json:"ports"`
+		Type  string     `json:"type"`
+	} `json:"spec"`
+}
+
+type KubeService struct {
+	Kind       string `json:"kind"`
+	APIVersion string `json:"apiVersion"`
+	Metadata   struct {
+		Name              string            `json:"name"`
+		Namespace         string            `json:"namespace"`
+		SelfLink          string            `json:"selfLink"`
+		UID               string            `json:"uid"`
+		ResourceVersion   string            `json:"resourceVersion"`
+		CreationTimestamp time.Time         `json:"creationTimestamp"`
+		Labels            map[string]string `json:"labels"`
+		Annotations       struct {
+			ServiceBetaKubernetesIoAwsLoadBalancerInternal string `json:"service.beta.kubernetes.io/aws-load-balancer-internal"`
+		} `json:"annotations"`
+	} `json:"metadata"`
+	Spec struct {
+		Ports []struct {
+			Name       string `json:"name,omitempty"`
+			Protocol   string `json:"protocol"`
+			Port       int    `json:"port"`
+			TargetPort int    `json:"targetPort"`
+			NodePort   int    `json:"nodePort"`
+		} `json:"ports"`
+		Selector struct {
+			Name string `json:"name"`
+		} `json:"selector"`
+		ClusterIP       string `json:"clusterIP"`
+		Type            string `json:"type"`
+		SessionAffinity string `json:"sessionAffinity"`
+	} `json:"spec"`
+}
+
+type ServiceCollectionspec struct {
+	Items []Service `json:"items"`
+}
+
+type Deploymentspec struct {
+	Metadata struct {
+		Name      string            `json:"name"`
+		Namespace string            `json:"namespace"`
+		Labels    map[string]string `json:"labels,omitempty"`
+	} `json:"metadata"`
+	Spec struct {
+		RevisionHistoryLimit int `json:"revisionHistoryLimit"`
+		Metadata             struct {
+			Annotations struct {
+				SidecarIstioIOStatus string `json:"sidecar.istio.io/status"`
+			} `json:"annotations,omitempty"`
+		} `json:"metadata",omitempty`
+		Replicas int `json:"replicas"`
+		Strategy struct {
+			Type          string `json:"type,omitempty"`
+			RollingUpdate struct {
+				MaxUnavailable interface{} `json:"maxUnavailable"`
+				MaxSurge       interface{} `json:"maxSurge,omitempty"`
+			} `json:"rollingUpdate"`
+		} `json:"strategy"`
+		Selector struct {
+			MatchLabels struct {
+				Name    string `json:"name"`
+				App     string `json:"app,omitempty"`
+				Version string `json:"version,omitempty"`
+			} `json:"matchLabels"`
+		} `json:"selector"`
+		Template struct {
+			Metadata struct {
+				Name        string            `json:"name"`
+				Labels      map[string]string `json:"labels,omitempty"`
+				Annotations struct {
+					SidecarIstioIoInject string `json:"sidecar.istio.io/inject"`
+					AkkerisIORestartTime string `json:"akkeris.io/restartTime,omitempty"`
+				} `json:"annotations,omitempty"`
+			} `json:"metadata"`
+			Spec struct {
+				Containers                    []ContainerItem    `json:"containers"`
+				ImagePullPolicy               string             `json:"imagePullPolicy,omitempty"`
+				ImagePullSecrets              []structs.Namespec `json:"imagePullSecrets,omitempty"`
+				DnsPolicy                     string             `json:"dnsPolicy,omitempty"`
+				InitContainers                *[]ContainerItem   `json:"initContainers,omitempty"`
+				Volumes                       *[]structs.Volumes `json:"volumes,omitempty"`
+				TerminationGracePeriodSeconds int                `json:"terminationGracePeriodSeconds,omitempty"`
+			} `json:"spec"`
+		} `json:"template"`
+	} `json:"spec"`
+}
+
+type DeploymentCollectionspec struct {
+	Items []Deploymentspec `json:"items"`
+}
+
+type ReplicationController struct {
+	Metadata struct {
+		Name      string `json:"name"`
+		Namespace string `json:"namespace"`
+	} `json:"metadata"`
+	Spec struct {
+		Replicas int `json:"replicas"`
+		Selector struct {
+			Name string `json:"name"`
+		} `json:"selector"`
+		Template struct {
+			Metadata struct {
+				Name   string `json:"name"`
+				Labels struct {
+					Name string `json:"name"`
+				} `json:"labels"`
+			} `json:"metadata"`
+			Spec struct {
+				Containers      []ContainerItem `json:"containers"`
+				ImagePullPolicy string          `json:"imagePullPolicy,omitempty"`
+			} `json:"spec"`
+		} `json:"template"`
+	} `json:"spec"`
+}
+
+type OneOffPod struct {
+	APIVersion string `json:"apiVersion"`
+	Kind       string `json:"kind"`
+	Metadata   struct {
+		Name   string `json:"name"`
+		Labels struct {
+			Name  string `json:"name"`
+			Space string `json:"space"`
+		} `json:"labels"`
+		Namespace string `json:"namespace"`
+	} `json:"metadata"`
+	Spec struct {
+		Containers                    []ContainerItem    `json:"containers"`
+		ImagePullPolicy               string             `json:"imagePullPolicy,omitempty"`
+		ImagePullSecrets              []structs.Namespec `json:"imagePullSecrets,omitempty"`
+		RestartPolicy                 string             `json:"restartPolicy"`
+		TerminationGracePeriodSeconds int                `json:"terminationGracePeriodSeconds"`
+		DnsPolicy                     string             `json:"dnsPolicy,omitempty"`
+	} `json:"spec"`
+}
+
+type CronJob struct {
+	Metadata struct {
+		Name      string `json:"name"`
+		Namespace string `json:"namespace"`
+		Labels    struct {
+			Name  string `json:"name"`
+			Space string `json:"space"`
+		} `json:"labels"`
+	} `json:"metadata"`
+	Spec struct {
+		Schedule                string `json:"schedule"`
+		StartingDeadlineSeconds int    `json:"startingDeadlineSeconds"`
+		ConcurrencyPolicy       string `json:"concurrencyPolicy"`
+		Suspend                 bool   `json:"suspend"`
+		JobTemplate             Job    `json:"jobTemplate"`
+	} `json:"spec"`
+}
+
+type Job struct {
+	Metadata struct {
+		Name                       string `json:"name"`
+		Namespace                  string `json:"namespace"`
+		DeletionGracePeriodSeconds int    `json:"deletionGracePeriodSeconds,omitempty"`
+		Labels                     struct {
+			Name  string `json:"name"`
+			Space string `json:"space"`
+		} `json:"labels"`
+	} `json:"metadata"`
+	Spec struct {
+		Parallelism           int `json:"parallelism,omitempty"`
+		Completions           int `json:"completions,omitempty"`
+		ActiveDeadlineSeconds int `json:"activeDeadlineSeconds,omitempty"`
+		Template              struct {
+			Metadata struct {
+				Name      string `json:"name"`
+				Namespace string `json:"namespace"`
+				Labels    struct {
+					Name  string `json:"name"`
+					Space string `json:"space"`
+				} `json:"labels"`
+			} `json:"metadata"`
+			Spec struct {
+				Containers       []ContainerItem    `json:"containers"`
+				NodeSelector     string             `json:"nodeSelector,omitempty"`
+				ImagePullSecrets []structs.Namespec `json:"imagePullSecrets,omitempty"`
+				RestartPolicy    string             `json:"restartPolicy"`
+				DnsPolicy        string             `json:"dnsPolicy,omitempty"`
+			} `json:"spec"`
+		} `json:"template"`
+	} `json:"spec"`
+}
+
+type PodStatusspec struct {
+	HostIP     string `json:"hostIP"`
+	Phase      string `json:"phase"`
+	Reason     string `json:"reason"`
+	Message    string `json:"message"`
+	Conditions []struct {
+		Type               string      `json:"type"`
+		Status             string      `json:"status"`
+		LastProbeTime      interface{} `json:"lastProbeTime"`
+		LastTransitionTime time.Time   `json:"lastTransitionTime"`
+	} `json:"conditions"`
+	StartTime         time.Time `json:"startTime"`
+	ContainerStatuses []struct {
+		Name      string                 `json:"name"`
+		State     map[string]interface{} `json:"state"`
+		LastState struct {
+		} `json:"lastState"`
+		Ready        bool `json:"ready"`
+		RestartCount int  `json:"restartCount"`
+	} `json:"containerStatuses"`
+}
+
+type PodStatusItems struct {
+	Metadata struct {
+		Name      string `json:"name"`
+		Namespace string `json:"namespace"`
+	} `json:"metadata"`
+	Status PodStatusspec `json:"status"`
+}
+
+type PodStatus struct {
+	Items []PodStatusItems `json:"items"`
+}
+
+type ReplicaSetList struct {
+	Kind       string `json:"kind"`
+	APIVersion string `json:"apiVersion"`
+	Metadata   struct {
+		SelfLink        string `json:"selfLink"`
+		ResourceVersion string `json:"resourceVersion"`
+	} `json:"metadata"`
+	Items []ReplicaSetSpec `json:"items"`
+}
+
+type ReplicaSetSpec struct {
+	Metadata struct {
+		Name              string    `json:"name"`
+		Namespace         string    `json:"namespace"`
+		SelfLink          string    `json:"selfLink"`
+		UID               string    `json:"uid"`
+		ResourceVersion   string    `json:"resourceVersion"`
+		Generation        int       `json:"generation"`
+		CreationTimestamp time.Time `json:"creationTimestamp"`
+		Labels            struct {
+			Name            string `json:"name"`
+			PodTemplateHash string `json:"pod-template-hash"`
+		} `json:"labels"`
+		Annotations struct {
+			DeploymentKubernetesIoRevision string `json:"deployment.kubernetes.io/revision"`
+		} `json:"annotations"`
+	} `json:"metadata"`
+	Spec struct {
+		Replicas int `json:"replicas"`
+		Selector struct {
+			MatchLabels struct {
+				Name            string `json:"name"`
+				PodTemplateHash string `json:"pod-template-hash"`
+			} `json:"matchLabels"`
+		} `json:"selector"`
+		Template struct {
+			Metadata struct {
+				Name              string      `json:"name"`
+				CreationTimestamp interface{} `json:"creationTimestamp"`
+				Labels            struct {
+					Name            string `json:"name"`
+					PodTemplateHash string `json:"pod-template-hash"`
+				} `json:"labels"`
+			} `json:"metadata"`
+			Spec struct {
+				Containers []struct {
+					Name  string `json:"name"`
+					Image string `json:"image"`
+					Ports []struct {
+						ContainerPort int    `json:"containerPort"`
+						Protocol      string `json:"protocol"`
+					} `json:"ports"`
+					Env []struct {
+						Name  string `json:"name"`
+						Value string `json:"value"`
+					} `json:"env"`
+					Resources struct {
+					} `json:"resources"`
+					TerminationMessagePath string `json:"terminationMessagePath"`
+					ImagePullPolicy        string `json:"imagePullPolicy,omitempty"`
+				} `json:"containers"`
+				RestartPolicy                 string `json:"restartPolicy"`
+				TerminationGracePeriodSeconds int    `json:"terminationGracePeriodSeconds"`
+				DNSPolicy                     string `json:"dnsPolicy"`
+				SecurityContext               struct {
+				} `json:"securityContext"`
+				ImagePullSecrets []struct {
+					Name string `json:"name"`
+				} `json:"imagePullSecrets,omitempty"`
+			} `json:"spec"`
+		} `json:"template"`
+	} `json:"spec"`
+	Status struct {
+		Replicas           int `json:"replicas"`
+		ObservedGeneration int `json:"observedGeneration"`
+	} `json:"status"`
+}
+
+type Revisionspec struct {
+	Revision int `json:"revision"`
+}
+
+type Rollbackspec struct {
+	ApiVersion         string            `json:"apiVersion"`
+	Name               string            `json:"name"`
+	UpdatedAnnotations map[string]string `json:"updatedAnnotations,omitempty"`
+	RollbackTo         Revisionspec      `json:"rollbackTo"`
+}
+
+type JobScaleGet struct {
+	Kind       string `json:"kind"`
+	APIVersion string `json:"apiVersion"`
+	Metadata   struct {
+		Name              string    `json:"name"`
+		Namespace         string    `json:"namespace"`
+		SelfLink          string    `json:"selfLink"`
+		UID               string    `json:"uid"`
+		ResourceVersion   string    `json:"resourceVersion"`
+		CreationTimestamp time.Time `json:"creationTimestamp"`
+		Labels            struct {
+			Name  string `json:"name"`
+			Space string `json:"space"`
+		} `json:"labels"`
+	} `json:"metadata"`
+	Spec struct {
+		Parallelism           int `json:"parallelism"`
+		Completions           int `json:"completions"`
+		ActiveDeadlineSeconds int `json:"activeDeadlineSeconds"`
+		Selector              struct {
+			MatchLabels struct {
+				ControllerUID string `json:"controller-uid"`
+			} `json:"matchLabels"`
+		} `json:"selector"`
+		Template struct {
+			Metadata struct {
+				Name              string      `json:"name"`
+				Namespace         string      `json:"namespace"`
+				CreationTimestamp interface{} `json:"creationTimestamp"`
+				Labels            struct {
+					ControllerUID string `json:"controller-uid"`
+					JobName       string `json:"job-name"`
+					Name          string `json:"name"`
+					Space         string `json:"space"`
+				} `json:"labels"`
+			} `json:"metadata"`
+			Spec struct {
+				Containers []struct {
+					Name  string `json:"name"`
+					Image string `json:"image"`
+					Env   []struct {
+						Name  string `json:"name"`
+						Value string `json:"value"`
+					} `json:"env"`
+					TerminationMessagePath   string `json:"terminationMessagePath"`
+					TerminationMessagePolicy string `json:"terminationMessagePolicy"`
+					ImagePullPolicy          string `json:"imagePullPolicy,omitempty"`
+				} `json:"containers"`
+				RestartPolicy                 string `json:"restartPolicy"`
+				TerminationGracePeriodSeconds int    `json:"terminationGracePeriodSeconds"`
+				DNSPolicy                     string `json:"dnsPolicy"`
+				SecurityContext               struct {
+				} `json:"securityContext"`
+				ImagePullSecrets []struct {
+					Name string `json:"name"`
+				} `json:"imagePullSecrets,omitempty"`
+				SchedulerName string `json:"schedulerName"`
+			} `json:"spec"`
+		} `json:"template"`
+	} `json:"spec"`
+}
+
+
+func homeDir() string {
+	if h := os.Getenv("HOME"); h != "" {
+		return h
+	}
+	return os.Getenv("USERPROFILE") // windows
+}
+
+func NewKubernetes(name string, imagePullSecret string) (r Runtime) {
+	// Check if we have a service account in cluster
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		// Check if we have a kubeconfig path.
@@ -71,14 +572,46 @@ func NewKubernetes(config *KubernetesConfig) (r Runtime) {
 	}
 
 	var rt Kubernetes
-	rt.clientType = "token"
-	rt.apiServer = config.config.Host
+	if strings.HasPrefix(config.Host, "https://") {
+		uri, err := url.Parse(config.Host)
+		if err != nil {
+			panic(err)
+		}
+		rt.apiServer = uri.Hostname()
+		if uri.Port() != "" {
+			rt.apiServer = rt.apiServer + ":" + uri.Port()
+		}
+	} else {
+		rt.apiServer = config.Host
+	}
+
+	var tlsConfig *tls.Config = &tls.Config{}
+	if config.TLSClientConfig.CAData != nil && len(config.TLSClientConfig.CAData) != 0 {
+		certs := x509.NewCertPool()
+		if ok := certs.AppendCertsFromPEM([]byte(config.TLSClientConfig.CAData)); ok {
+			tlsConfig.RootCAs = certs;
+			tlsConfig.BuildNameToCertificate()
+		}
+	}
+
+	if config.TLSClientConfig.CertData != nil && len(config.TLSClientConfig.CertData) != 0 {
+		rt.clientType = "mtls"
+		cert, err := tls.X509KeyPair(config.TLSClientConfig.CertData, config.TLSClientConfig.KeyData)
+		if err != nil {
+			panic(err)
+		}
+		tlsConfig.Certificates = []tls.Certificate{cert}
+		tlsConfig.BuildNameToCertificate()
+	} else {
+		rt.clientType = "token"
+		rt.clientToken = config.BearerToken
+	}
+
+	rt.client = &http.Client{Transport: &http.Transport{TLSClientConfig: tlsConfig}}
 	rt.defaultApiServerVersion = "v1"
-	rt.imagePullSecret = ""
+	rt.imagePullSecret = imagePullSecret
 	rt.mutex = &sync.Mutex{}
 	rt.debug = os.Getenv("DEBUG_K8S") == "true"
-	rt.clientToken = config.config.BearerToken
-	rt.client = &http.Client{}
 	var rts Runtime = Runtime(rt)
 	return rts
 }
@@ -256,7 +789,7 @@ func (rt Kubernetes) CreateDeployment(deployment *structs.Deployment) (err error
 	return nil
 }
 
-func (rt Kubernetes) GetDeployment(space string, app string) (*Deploymentspec, error) {
+func (rt Kubernetes) getDeployment(space string, app string) (*Deploymentspec, error) {
 	if space == "" {
 		return nil, errors.New("FATAL ERROR: Unable to get deployment, space is blank.")
 	}
@@ -313,7 +846,7 @@ func (rt Kubernetes) DeleteDeployment(space string, app string) (e error) {
 }
 
 func (rt Kubernetes) RestartDeployment(space string, app string) (e error) {
-	deployment, e := rt.GetDeployment(space, app)
+	deployment, e := rt.getDeployment(space, app)
 	if e != nil {
 		if e.Error() == "deployment not found" {
 			// Sometimes a restart can get issued for an app that has yet to be deployed,
@@ -328,19 +861,6 @@ func (rt Kubernetes) RestartDeployment(space string, app string) (e error) {
 
 	_, e = rt.k8sRequest("put", "/apis/apps/v1/namespaces/"+space+"/deployments/"+app, deployment)
 	return e
-}
-
-func (rt Kubernetes) GetDeployments() (*DeploymentCollectionspec, error) {
-	resp, e := rt.k8sRequest("get", "/apis/apps/v1/deployments", nil)
-	if e != nil {
-		return nil, e
-	}
-	var deployments DeploymentCollectionspec
-	e = json.Unmarshal(resp.Body, &deployments)
-	if e != nil {
-		return nil, e
-	}
-	return &deployments, nil
 }
 
 func (rt Kubernetes) GetDeploymentHistory(space string, app string) (dslist []structs.DeploymentsSpec, e error) {
@@ -584,6 +1104,39 @@ func (rt Kubernetes) CreateSecret(space string, name string, data string, mimety
 	return &secret, nil
 }
 
+func (rt Kubernetes)  CopySecret(secretName string, fromNamespace string, toNamespace string) (error) {
+	if fromNamespace == "" {
+		return errors.New("FATAL ERROR: Unable to get service, space is blank.")
+	}
+	if toNamespace == "" {
+		return errors.New("FATAL ERROR: Unable to get service, the app is blank.")
+	}
+	
+	var secret kube.Secret
+	resp, err := rt.k8sRequest("get", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+fromNamespace+"/secrets/" + secretName, nil)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return errors.New("Unable to copy secret, invalid response code from kubernetes on fetch: " + resp.Status)
+	}
+
+	if err := json.Unmarshal(resp.Body, &secret); err != nil {
+		return err
+	}
+
+	secret.SetNamespace(toNamespace)
+	
+	resp, err = rt.k8sRequest("post", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+toNamespace+"/secrets", secret)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
+		return errors.New("Unable to create secret on copy, invalid response code from kubernetes: " + resp.Status)
+	}
+	return nil
+}
+
 func (rt Kubernetes) AddImagePullSecretToSpace(space string) (e error) {
 	var sa Serviceaccountspec = Serviceaccountspec{Metadata: structs.Namespec{Name: "default"}}
 	var ipss []structs.Namespec
@@ -598,7 +1151,7 @@ func (rt Kubernetes) AddImagePullSecretToSpace(space string) (e error) {
 
 func (rt Kubernetes) GetCurrentImage(space string, app string) (i string, e error) {
 	var image string
-	deployment, err := rt.GetDeployment(space, app)
+	deployment, err := rt.getDeployment(space, app)
 	if err != nil {
 		return "", err
 	}
@@ -773,15 +1326,15 @@ func (rt Kubernetes) GetService(space string, app string) (KubeService, error) {
 	return response, nil
 }
 
-func (rt Kubernetes) CreateService(space string, app string, port int, labels map[string]string, features structs.Features) (c *Createspec, e error) {
+func (rt Kubernetes) CreateService(space string, app string, port int, labels map[string]string, features structs.Features) (e error) {
 	if space == "" {
-		return nil, errors.New("FATAL ERROR: Unable to create service, space is blank.")
+		return errors.New("FATAL ERROR: Unable to create service, space is blank.")
 	}
 	if app == "" {
-		return nil, errors.New("FATAL ERROR: Unable to create service, the app is blank.")
+		return errors.New("FATAL ERROR: Unable to create service, the app is blank.")
 	}
 	if port < 1 || port > 65535 {
-		return nil, errors.New("Invalid port range on CreateService: " + strconv.Itoa(port))
+		return errors.New("Invalid port range on CreateService: " + strconv.Itoa(port))
 	}
 
 	var service Service
@@ -809,29 +1362,29 @@ func (rt Kubernetes) CreateService(space string, app string, port int, labels ma
 
 	resp, e := rt.k8sRequest("post", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+space+"/services", service)
 	if e != nil {
-		return nil, e
+		return e
 	}
 	var response Createspec
 	e = json.Unmarshal(resp.Body, &response)
 	if e != nil {
-		return nil, e
+		return e
 	}
-	return &response, nil
+	return nil
 }
 
-func (rt Kubernetes) UpdateService(space string, app string, port int, labels map[string]string, features structs.Features) (c *Createspec, e error) {
+func (rt Kubernetes) UpdateService(space string, app string, port int, labels map[string]string, features structs.Features) (e error) {
 	if space == "" {
-		return nil, errors.New("Unable to update service, space is blank.")
+		return errors.New("Unable to update service, space is blank.")
 	}
 	if app == "" {
-		return nil, errors.New("Unable to update service, the app is blank.")
+		return errors.New("Unable to update service, the app is blank.")
 	}
 	if port < 1 || port > 65535 {
-		return nil, errors.New("Invalid port range on UpdateService: " + strconv.Itoa(port))
+		return errors.New("Invalid port range on UpdateService: " + strconv.Itoa(port))
 	}
 	existingservice, e := rt.GetService(space, app)
 	if e != nil {
-		return nil, e
+		return e
 	}
 	if features.Http2EndToEndService {
 		existingservice.Spec.Ports[0].Name = "http2"
@@ -845,14 +1398,14 @@ func (rt Kubernetes) UpdateService(space string, app string, port int, labels ma
 
 	resp, e := rt.k8sRequest("put", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+space+"/services/"+app, existingservice)
 	if e != nil {
-		return nil, e
+		return e
 	}
 	var response Createspec
 	e = json.Unmarshal(resp.Body, &response)
 	if e != nil {
-		return nil, e
+		return e
 	}
-	return &response, nil
+	return nil
 }
 
 func (rt Kubernetes) DeleteService(space string, app string) (e error) {

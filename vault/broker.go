@@ -3,10 +3,7 @@ package vault
 import (
 	"encoding/json"
 	"github.com/bitly/go-simplejson"
-	"github.com/go-martini/martini"
-	"github.com/martini-contrib/render"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	structs "region-api/structs"
@@ -17,26 +14,11 @@ import (
 var list []string
 var mutex = &sync.Mutex{}
 
-func GetVaultList(params martini.Params, r render.Render) {
-	r.JSON(200, list)
+func GetList() []string {
+	return list
 }
 
-func GetVaultListPeriodic() {
-	var newlist []string
-	for _, element := range getVaultPaths() {
-		newlist = append(newlist, getVaultList(element)...)
-	}
-	mutex.Lock()
-	list = newlist
-	mutex.Unlock()
-}
-
-func getVaultPaths() []string {
-	secrets_array := strings.Split(os.Getenv("SECRETS"), ",")
-	return secrets_array
-}
-
-func getVaultList(path string) []string {
+func getVaultList(path string) ([]string) {
 	vault_addr := os.Getenv("VAULT_ADDR")
 	vault_token := os.Getenv("VAULT_TOKEN")
 	var vaultlist structs.VaultList
@@ -46,7 +28,7 @@ func getVaultList(path string) []string {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Println(err)
+		panic(err)
 	}
 	defer resp.Body.Close()
 	bb, _ := ioutil.ReadAll(resp.Body)
@@ -66,33 +48,20 @@ func getVaultList(path string) []string {
 		}
 	}
 	return list
-
 }
 
-func GetVaultVariablesMasked(params martini.Params, r render.Render) {
-	secret := params["_1"]
-	var masked []structs.Creds
-	creds := getCreds(secret)
-	for _, element := range creds {
-		ukey := strings.ToUpper(element.Key)
-		if strings.Contains(ukey, "PASSWORD") || strings.Contains(ukey, "SECRET") || strings.Contains(ukey, "KEY") || strings.Contains(ukey, "TOKEN") {
-			if strings.HasPrefix(secret, "secret/prod") || strings.HasPrefix(secret, "secret/stage") || strings.HasPrefix(secret, "secret/stg") || strings.HasPrefix(secret, "secret/xo") {
-				element.Value = "(redacted)"
-			}
-			masked = append(masked, element)
-		}
-		if !strings.Contains(ukey, "PASSWORD") && !strings.Contains(ukey, "SECRET") && !strings.Contains(ukey, "KEY") && !strings.Contains(ukey, "TOKEN") {
-			masked = append(masked, element)
-		}
+func GetVaultListPeriodic() {
+	var newlist []string
+	secrets_array := strings.Split(os.Getenv("SECRETS"), ",")
+	for _, element := range secrets_array {
+		newlist = append(newlist, getVaultList(element)...)
 	}
-	r.JSON(200, masked)
+	mutex.Lock()
+	list = newlist
+	mutex.Unlock()
 }
 
-func GetVaultVariables(secret string) []structs.Creds {
-	return getCreds(secret)
-}
-
-func getCreds(secret string) []structs.Creds {
+func GetVaultVariables(secret string) ([]structs.Creds) {
 	type Creds struct {
 		Key   string `json:"key"`
 		Value string `json:"value"`
@@ -130,3 +99,22 @@ func getCreds(secret string) []structs.Creds {
 	}
 	return creds
 }
+
+func GetVaultVariablesMasked(secret string) ([]structs.Creds) {
+	var masked []structs.Creds
+	creds := GetVaultVariables(secret)
+	for _, element := range creds {
+		ukey := strings.ToUpper(element.Key)
+		if strings.Contains(ukey, "PASSWORD") || strings.Contains(ukey, "SECRET") || strings.Contains(ukey, "KEY") || strings.Contains(ukey, "TOKEN") {
+			if strings.HasPrefix(secret, "secret/prod") || strings.HasPrefix(secret, "secret/stage") || strings.HasPrefix(secret, "secret/stg") || strings.HasPrefix(secret, "secret/xo") {
+				element.Value = "(redacted)"
+			}
+			masked = append(masked, element)
+		}
+		if !strings.Contains(ukey, "PASSWORD") && !strings.Contains(ukey, "SECRET") && !strings.Contains(ukey, "KEY") && !strings.Contains(ukey, "TOKEN") {
+			masked = append(masked, element)
+		}
+	}
+	return masked
+}
+
