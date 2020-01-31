@@ -327,12 +327,12 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 	// Create/update service
 	if finalport != -1 {
 		if !deploymentExists {
-			if _, err := rt.CreateService(space, appname, finalport, deploy1.Labels, deploy1.Features); err != nil {
+			if err := rt.CreateService(space, appname, finalport, deploy1.Labels, deploy1.Features); err != nil {
 				utils.ReportError(err, r)
 				return
 			}
 		} else {
-			if _, err := rt.UpdateService(space, appname, finalport, deploy1.Labels, deploy1.Features); err != nil {
+			if err := rt.UpdateService(space, appname, finalport, deploy1.Labels, deploy1.Features); err != nil {
 				utils.ReportError(err, r)
 				return
 			}
