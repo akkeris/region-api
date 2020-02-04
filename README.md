@@ -4,30 +4,34 @@ HTTP API for regional akkeris actions, it integrates with kubernetes, and servic
 
 [![CircleCI](https://circleci.com/gh/akkeris/region-api.svg?style=svg)](https://circleci.com/gh/akkeris/region-api)
 
-## Installation
-
-### Setup
-
-When you first run alamo-api on a brand new database it will create the necessary infrastructure, you should first set the following environment variables, they only need to be set when first ran on an empty database.  Note that these only need to be set on first launch, afterwards they can be removed safely, they will have no affect if ran on a database that's already been populated:
-
-* KUBERNETES_API_SERVER - the hostname of the kubernetes server
-* KUBERNETES_API_VERSION - the api version of the kubernetes server (usually v1)
-* KUBERNETES_CLIENT_TYPE - either token or cert
-* KUBERNETES_CERT_SECRET - the path to the certificate secrets in vault, only applicable if KUBERNETES_CLIENT_TYPE=cert
-* KUBERNETES_TOKEN_SECRET - the path to the token secret in vault, only applicable if KUBERNETES_CLIENT_TYPE=token
-* KUBERNETES_IMAGE_PULL_SECRET - the path to the image pull secret in vault
-
-Ensure you've set the environment variables in the running section below.
-
 ## Running
 
-### Environment
+### Required Resources 
+
+**Kubernetes**
+
+The region api requires a kubernetes runtime. When running in a kubernetes cluster that it administrates, a service account must be specified in its deployment manifest. The service account should have the ability to read, write and delete services, deployments, configmaps, virtual services, certificates, gateways, secrets (within istio-system only), jobs and pods in all namespaces (unless otherwise specified). 
+
+When running the region api out-of-cluster (i.e. locally), a kubeconfig file can be specified using the `--kubeconfig` flag. This will instruct the region api to use the current context in the provided kubeconfig file. 
+
+If no service account or `--kubeconfig` is specified, the region api will use the current context in `$HOME/.kube/config` by default. 
+
+**Postgres Database**
+
+The region api requires a postgres 9.6+ database specified with the `PITDB` environment variable.
+
+**AWS Account**
+
+
+### Required Environment Variables
 
 Set the following environment variables, if this is first time running it see the Setup section.
 
 * PITDB - A postgres database url formatted as postgres://user:pass@host:port/db
+* AWS_ACCESS_KEY_ID - Acceess key id for AWS
+* AWS_SECRET_ACCESS_KEY - Access secret for AWS
 * REGION - The region this region-api is running in, this should match the cloud providers definition of "region", e.g., us-west-2 for AWS Oregon Region.
-* IMAGE_PULL_SECRET - The path in vault for credentials when pulling images from the registry, if not needed, leave blank, see Image Pull Secret Format section for information how this should be formatted in vault.
+* IMAGE_PULL_SECRET - The name of the secret to use when pulling images from the registry. Leave blank if the docker repository is public, defaults to "".
 * ENABLE_AUTH - true or false value, set to false for tests
 * ALAMO_API_AUTH_SECRET - If ENABLE_AUTH is set to true, this is the path in vault to find the secret, if not needed, leave blank.
 * INTERNAL_DOMAIN - The internal domain e.g.., internalapps.example.com
@@ -44,16 +48,15 @@ Set the following environment variables, if this is first time running it see th
 * SITES_PUBLIC_INTERNAL=(see ingress format)
 * SITES_PUBLIC_EXTERNAL=(see ingress format)
 * SITES_PRIVATE_INTERNAL=(see ingress format)
-* ISTIO_DOWNPAGE - The maintenance page to use, this should be the service host for an app in akkeris. Defaults to `akkeris404.akkeris-system.svc.cluster.local`.
+* ISTIO_DOWNPAGE - The maintenance page to use, this should be the service host for an app in akkeris. Defaults to `akkeris404.akkeris-system.svc.cluster.local`
 
 **Broker Settings**
 
 * SERVICES - A comma delimited list of urls for open service brokers to use e.g., (https://user:pass@hostname/,https://:token@hostname/)
-* RABBITMQ_BROKER_URL - todo, get brokers to register with alamo-api, otherwise this is the host of the broker
-* MONGODB_BROKER_URL - todo, get brokers to register with alamo-api, otherwise this is the host of the broker
+* RABBITMQ_BROKER_URL - this is the host of the broker
+* MONGODB_BROKER_URL - this is the host of the broker
 * INFLUXDB_URL - The influx DB url to retrieve http metrics and other custom app data
 * PROMETHEUS_URL - The prometheus DB url to retrieve metrics pod data for apps
-* NEPTUNE_BROKER_URL - todo, get brokers to register with alamo-api, otherwise this is the host of the broker
 * INFLUXDB_BROKER_URL - influx database broker
 * CASSANDRA_BROKER_URL - cassandra database broker
 * KAFKA_BROKERS - The kafka brokers for this region
@@ -70,7 +73,7 @@ Set the following environment variables, if this is first time running it see th
 
 This uses jetstack's cert-manager (if installed) to issue certificates. By default this is the only issuer manager that's supported. 
 
-* DEFAULT_ISSUER - The clusterissuer to use by default when ordering a new certificate (one may be specified when ordering a cert)
+* DEFAULT_ISSUER - The clusterissuer to use by default when ordering a new certificate (one may be specified when ordering a cert). Defaults to `letsencrypt`.
 * CERT_NAMESPACE - The namespace to store certificates.  This defaults to `istio-system` to make the certificates (and their secrets) mountable by istio. 
 
 **Optional Environment Variables:**
@@ -80,9 +83,6 @@ This uses jetstack's cert-manager (if installed) to issue certificates. By defau
 * LOGSHUTTLE_SERVICE_HOST, LOGSHUTTLE_SERVICE_PORT - where to find the logshuttle
 * LOGSESSION_SERVICE_HOST, LOGSESSION_SERVICE_PORT - where to find the logsession
 * DOMAIN_BLACKLIST - a comma delimited list of domains or regular expressions that should NOT be in the control of akkeris (region-api), this can be the provider id or domain name (provider id in aws is the hosted zone)
-* SUBSCRIPTION_URL
-* FEATURE_DEFAULT_OCTHC - a true or false value to enable octhc feature
-* FEATURE_DEFAULT_OPSGENIE - a true or false value to enable opsgenie feature
 * PUBLIC_DNS_RESOLVER - Used to see if DNS records are already set, this is used incase region api is in a VPN/VPC network. Defaults to 8.8.8.8
 
 **Debugging Environment Variables:**
@@ -106,10 +106,6 @@ istio://host-of-ingress/namespace/ingress-gateway-name
 ```
 
 The `ingress-gateway-name` is the value of the `istio` label on the istio ingress deployment. The `namespace` is the namespace where istio is deployed (usually istio-system). The `host-of-ingress` must either by a qualified domain name or ip address, this is used to assign the IP address via DNS or a cname record if its a hostname. This should be the user-facing ip address or hostname you want new sites to resolve to, not an internal clusterip or service or node IP.
-
-### Image Pull Secret Formats
-
- Image pull secrets should be held in vault (with the path in vault saved into the environment variable). The secret should have one key called "base64" which contains the base64 encoded JSON objecet in the format of `{"auths":{"registry.hostname.com":{"auth":"...base64authinfo..."},"email":""}}` the "auth" field should have a base64 encoded username:password. The other key should be "name" which contains the name of the secret, usually in the format of `registry.hostname.com-user`. See https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/#log-in-to-docker for an example of the JSON structure that should be base64 encoded and stored in the `base64` field.
 
 ## Testing
 

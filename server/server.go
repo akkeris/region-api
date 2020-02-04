@@ -16,11 +16,10 @@ import (
 	"region-api/app"
 	"region-api/certs"
 	"region-api/config"
-	"region-api/features"
 	"region-api/jobs"
 	"region-api/maintenance"
-	"region-api/monitor"
 	"region-api/router"
+	"region-api/runtime"
 	"region-api/service"
 	"region-api/space"
 	"region-api/structs"
@@ -139,7 +138,6 @@ func InitOldServiceEndpoints(m *martini.ClassicMartini) {
 	m.Get("/v1/service/kafka/cluster/:cluster/consumer-groups/:consumerGroupName/members", service.GetConsumerGroupMembersV1)
 	m.Post("/v1/service/kafka/cluster/:cluster/consumer-groups/:consumerGroupName/seek", binding.Json(structs.KafkaConsumerGroupSeekRequest{}), service.SeekConsumerGroupV1)
 
-
 	m.Get("/v1/service/influxdb/plans", service.GetInfluxdbPlans)
 	m.Get("/v1/service/influxdb/url/:servicename", service.GetInfluxdbURL)
 	m.Post("/v1/service/influxdb/instance", binding.Json(structs.Provisionspec{}), service.ProvisionInfluxdb)
@@ -149,12 +147,6 @@ func InitOldServiceEndpoints(m *martini.ClassicMartini) {
 	m.Get("/v1/service/cassandra/url/:servicename", service.GetCassandraURL)
 	m.Post("/v1/service/cassandra/instance", binding.Json(structs.Provisionspec{}), service.ProvisionCassandra)
 	m.Delete("/v1/service/cassandra/instance/:servicename", service.DeleteCassandra)
-
-	m.Get("/v1/service/neptune/plans", service.GetNeptunePlans)
-	m.Get("/v1/service/neptune/url/:servicename", service.GetNeptuneURL)
-	m.Post("/v1/service/neptune/instance", binding.Json(structs.Provisionspec{}), service.ProvisionNeptune)
-	m.Delete("/v1/service/neptune/instance/:servicename", service.DeleteNeptune)
-	m.Post("/v1/service/neptune/instance/tag", binding.Json(structs.Tagspec{}), service.TagNeptune)
 
 	m.Get("/v1/service/rabbitmq/plans", service.Getrabbitmqplans)
 	m.Post("/v1/service/rabbitmq/instance", binding.Json(structs.Provisionspec{}), service.Provisionrabbitmq)
@@ -209,11 +201,10 @@ func Server(db *sql.DB) *martini.ClassicMartini {
 
 	// cause the dns provider to begin caching itself.
 	go router.GetDnsProvider()
+	// cause runtime to cache itself.
+	go runtime.GetAllRuntimes(db)
 
 	m.Get("/v2/config", GetInfo)
-
-	m.Post("/v1/app/deploy", binding.Json(structs.Deployspec{}), app.Deployment)
-	m.Post("/v1/app/deploy/oneoff", binding.Json(structs.OneOffSpec{}), app.OneOffDeployment)
 
 	m.Get("/v1/config/sets", config.Listsets)
 	m.Get("/v1/config/set/:setname", config.Dumpset)
@@ -229,17 +220,31 @@ func Server(db *sql.DB) *martini.ClassicMartini {
 	m.Post("/v1/app", binding.Json(structs.Appspec{}), app.Createapp)
 	m.Patch("/v1/app", binding.Json(structs.Appspec{}), app.Updateapp)
 	m.Delete("/v1/app/:appname", app.Deleteapp)
-
+	m.Post("/v1/app/deploy", binding.Json(structs.Deployspec{}), app.Deployment)
+	m.Post("/v1/app/deploy/oneoff", binding.Json(structs.OneOffSpec{}), app.OneOffDeployment)
 	m.Post("/v1/app/bind", binding.Json(structs.Bindspec{}), app.Createbind)
 	m.Delete("/v1/app/:appname/bind/:bindspec", app.Unbindapp)
-
 	m.Get("/v1/app/:appname", app.Describeapp)
 	m.Get("/v1/space/:space/app/:app/instance", app.GetInstances)
 	m.Get("/v1/space/:space/app/:appname/instance/:instanceid/log", app.GetAppLogs)
 	m.Delete("/v1/space/:space/app/:app/instance/:instanceid", app.DeleteInstance)
 	m.Get("/v1/apps", app.Listapps)
 	m.Get("/v1/apps/plans", app.GetPlans)
+	m.Post("/v1/space/:space/app/:app/rollback/:revision", app.Rollback)
+	m.Post("/v1/space/:space/app/:appname/bind", binding.Json(structs.Bindspec{}), app.Createbind)
+	m.Delete("/v1/space/:space/app/:appname/bind/**", app.Unbindapp)
+	m.Post("/v1/space/:space/app/:appname/bindmap/:bindtype/:bindname", binding.Json(structs.Bindmapspec{}), app.Createbindmap)
+	m.Get("/v1/space/:space/app/:appname/bindmap/:bindtype/:bindname", app.Getbindmaps)
+	m.Delete("/v1/space/:space/app/:appname/bindmap/:bindtype/:bindname/:mapid", app.Deletebindmap)
+	m.Get("/v1/space/:space/apps", app.Describespace)
+	m.Get("/v1/space/:space/app/:appname", app.DescribeappInSpace)
+	m.Get("/v1/space/:space/app/:appname/configvars", app.GetAllConfigVars)
+	m.Get("/v1/space/:space/app/:appname/configvars/:bindtype/:bindname", app.GetServiceConfigVars)
+	m.Post("/v1/space/:space/app/:appname/restart", app.Restart)
+	m.Get("/v1/space/:space/app/:app/status", app.Spaceappstatus)
+	m.Get("/v1/kube/podstatus/:space/:app", app.PodStatus)
 
+	m.Get("/v1/spaces", space.Listspaces)
 	m.Post("/v1/space", binding.Json(structs.Spacespec{}), space.Createspace)
 	m.Delete("/v1/space/:space", binding.Json(structs.Spacespec{}), space.Deletespace)
 	m.Get("/v1/space/:space", space.Space)
@@ -249,52 +254,13 @@ func Server(db *sql.DB) *martini.ClassicMartini {
 	m.Delete("/v1/space/:space/app/:app/healthcheck", space.DeleteAppHealthCheck)
 	m.Put("/v1/space/:space/app/:app/plan", binding.Json(structs.Spaceappspec{}), space.UpdateAppPlan)
 	m.Put("/v1/space/:space/app/:app/scale", binding.Json(structs.Spaceappspec{}), space.ScaleApp)
-	m.Post("/v1/space/:space/app/:app/rollback/:revision", app.Rollback)
 	m.Delete("/v1/space/:space/app/:app", space.DeleteApp)
 
-	m.Post("/v1/space/:space/app/:appname/bind", binding.Json(structs.Bindspec{}), app.Createbind)
-	m.Delete("/v1/space/:space/app/:appname/bind/**", app.Unbindapp)
-
-	m.Post("/v1/space/:space/app/:appname/bindmap/:bindtype/:bindname", binding.Json(structs.Bindmapspec{}), app.Createbindmap)
-	m.Get("/v1/space/:space/app/:appname/bindmap/:bindtype/:bindname", app.Getbindmaps)
-	m.Delete("/v1/space/:space/app/:appname/bindmap/:bindtype/:bindname/:mapid", app.Deletebindmap)
-
-	m.Get("/v1/spaces", space.Listspaces)
-	m.Get("/v1/space/:space/apps", app.Describespace)
-	m.Get("/v1/space/:space/app/:appname", app.DescribeappInSpace)
-
-	m.Get("/v1/space/:space/app/:appname/deployments", app.GetDeployments)
-	m.Get("/v1/space/:space/app/:appname/configvars", app.GetAllConfigVars)
-	m.Get("/v1/space/:space/app/:appname/configvars/:bindtype/:bindname", app.GetServiceConfigVars)
-	m.Post("/v1/space/:space/app/:appname/restart", app.Restart)
-	m.Get("/v1/space/:space/app/:app/status", app.Spaceappstatus)
-	m.Get("/v1/kube/podstatus/:space/:app", app.PodStatus)
-	m.Get("/v1/services", utils.GetServices)
-	m.Get("/v1/deployments", utils.GetDeployments)
-
-	m.Get("/v1/space/:space/app/:app/subscribers", app.GetSubscribersDB)
-	m.Delete("/v1/space/:space/app/:app/subscriber", binding.Json(structs.Subscriberspec{}), app.RemoveSubscriberDB)
-	m.Post("/v1/space/:space/app/:app/subscriber", binding.Json(structs.Subscriberspec{}), app.AddSubscriberDB)
-
-	m.Put("/v1/feature/opsgenie/space/:space/app/:app/:optionvalue", features.UpdateOpsgenieOption)
-	m.Get("/v1/feature/opsgenie/space/:space/app/:app", features.GetOpsgenieOption)
-
-	m.Put("/v1/feature/octhc/space/:space/app/:app/:optionvalue", features.UpdateOcthcOption)
-	m.Get("/v1/feature/octhc/space/:space/app/:app", features.GetOcthcOption)
-
-	m.Post("/v1/monitor/callback", binding.Json(structs.NagiosAlert{}), monitor.Callback)
-	m.Get("/v1/space/:space/app/:app/callback", monitor.GetCallbacks)
-	m.Post("/v1/space/:space/app/:app/callback", binding.Json(structs.Callbackspec{}), monitor.CreateCallback)
-	m.Delete("/v1/space/:space/app/:app/callback/tag/:tag/method/:method", monitor.DeleteCallback)
-
-	m.Get("/v1/service/vault/plans", vault.GetVaultList)
-	m.Get("/v1/service/vault/credentials/**", vault.GetVaultVariablesMasked)
-
+	vault.AddToMartini(m)
 	router.AddToMartini(m)
 	certs.AddToMartini(m)
 
 	m.Get("/v1/octhc/kube", utils.Octhc)
-	m.Get("/v1/octhc/service/vault", vault.GetVaultList)
 	m.Get("/v1/octhc/service/rabbitmq", service.Getrabbitmqplans)
 	m.Get("/v1/octhc/kubesystem", utils.GetKubeSystemPods)
 
@@ -396,52 +362,6 @@ func CreateDB(db *sql.DB) {
 	if err != nil {
 		log.Println("Error: Unable to run migration scripts, execution failed.")
 		log.Fatalln(err)
-	}
-
-	// This will inspect the stacks, if we have environment variables for a stack and
-	// one does not exist in our database we'll create a record for it.
-	var defaultStack = "ds1"
-	if os.Getenv("DEFAULT_STACK") != "" {
-		defaultStack = os.Getenv("DEFAULT_STACK")
-	}
-	var stackCount int
-	err = db.QueryRow("select count(*) as stacks from stacks").Scan(&stackCount)
-	if err != nil {
-		log.Println("Error: Unable to determine how many stacks are available.")
-		log.Fatalln(err)
-	}
-	var spacesCount int
-	err = db.QueryRow("select count(*) as spaces from spaces").Scan(&spacesCount)
-	if err != nil {
-		log.Println("Error: Unable to determine how many spaces are available.")
-		log.Fatalln(err)
-	}
-
-	if stackCount == 0 && os.Getenv("KUBERNETES_API_SERVER") != "" {
-		authType := os.Getenv("KUBERNETES_CLIENT_TYPE")
-		authPath := os.Getenv("KUBERNETES_CERT_SECRET")
-		if authType == "token" {
-			os.Getenv("KUBERNETES_TOKEN_SECRET")
-		}
-		_, err := db.Exec("insert into stacks (stack, description, api_server, api_version, image_pull_secret, auth_type, auth_vault_path) values ($1, $2, $3, $4, $5, $6, $7) on conflict (stack) do nothing",
-			defaultStack, "", os.Getenv("KUBERNETES_API_SERVER"), os.Getenv("KUBERNETES_API_VERSION"), os.Getenv("KUBERNETES_IMAGE_PULL_SECRET"), authType, authPath)
-		if err != nil {
-			log.Println("Error: Unable to insert default kubernetes stack.")
-			log.Fatalln(err)
-		}
-		if spacesCount == 0 {
-			_, err = db.Exec("insert into spaces (name, internal, compliancetags, stack) values ('default', false, '', $1)", defaultStack)
-			if err != nil {
-				log.Println("Error: Unable to insert default kubernetes stack.")
-				log.Fatalln(err)
-			}
-		} else {
-			_, err = db.Exec("update spaces set stack=$1", defaultStack)
-			if err != nil {
-				log.Println("Error: Unable to insert default kubernetes stack.")
-				log.Fatalln(err)
-			}
-		}
 	}
 }
 

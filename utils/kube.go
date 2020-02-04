@@ -30,42 +30,6 @@ func Octhc(db *sql.DB, params martini.Params, r render.Render) {
 	r.JSON(http.StatusOK, service)
 }
 
-func GetDeployments(db *sql.DB, params martini.Params, r render.Render) {
-	rts, err := runtime.GetAllRuntimes(db)
-	if err != nil {
-		ReportError(err, r)
-		return
-	}
-	list := []runtime.Deploymentspec{}
-	for _, rt := range rts {
-		deployments, err := rt.GetDeployments()
-		if err != nil {
-			ReportError(err, r)
-			return
-		}
-		list = append(list, deployments.Items...)
-	}
-	r.JSON(http.StatusOK, list)
-}
-
-func GetServices(db *sql.DB, params martini.Params, r render.Render) {
-	rts, err := runtime.GetAllRuntimes(db)
-	if err != nil {
-		ReportError(err, r)
-		return
-	}
-	list := []runtime.Service{}
-	for _, rt := range rts {
-		services, err := rt.GetServices()
-		if err != nil {
-			ReportError(err, r)
-			return
-		}
-		list = append(list, services.Items...)
-	}
-	r.JSON(http.StatusOK, list)
-}
-
 func GetService(db *sql.DB, params martini.Params, r render.Render) {
 	space := params["space"]
 	app := params["app"]
