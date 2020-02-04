@@ -111,25 +111,15 @@ func Deletespace(db *sql.DB, params martini.Params, r render.Render) {
 		return
 	}
 
-	if _, err = getSpace(db, space); err != nil {
-		if err.Error() == "sql: no rows in result set" {
-			r.JSON(http.StatusNotFound, structs.Messagespec{Status: http.StatusNotFound, Message: "The specified space does not exist"})
-			return
-		} else {
-			utils.ReportError(err, r)
-			return
-		}
-	}
-
 	pods, err := rt.GetPodsBySpace(space)
-	if err != nil {
+	if err != nil && err.Error() != "space does not exist" {
 		utils.ReportError(err, r)
 		return
-	}
-
-	if len(pods.Items) != 0 {
-		r.JSON(http.StatusConflict, structs.Messagespec{Status: http.StatusConflict, Message: "The space cannot be deleted as it still has pods in it."})
-		return
+	} else if err == nil {
+		if len(pods.Items) != 0 {
+			r.JSON(http.StatusConflict, structs.Messagespec{Status: http.StatusConflict, Message: "The space cannot be deleted as it still has pods in it."})
+			return
+		}
 	}
 
 	var appsCount int
@@ -144,13 +134,13 @@ func Deletespace(db *sql.DB, params martini.Params, r render.Render) {
 		return
 	}
 
-	if err = rt.DeleteSpace(space); err != nil {
+	// this must happen after GetRuntimeFor.
+	if _, err = db.Exec("delete from spaces where name = $1", space); err != nil {
 		utils.ReportError(err, r)
 		return
 	}
 
-	// this must happen after GetRuntimeFor.
-	if _, err = db.Exec("delete from spaces where name = $1", space); err != nil {
+	if err = rt.DeleteSpace(space); err != nil {
 		utils.ReportError(err, r)
 		return
 	}

@@ -50,10 +50,6 @@ func Server() *martini.ClassicMartini {
 	m.Get("/v1/space/:space/app/:app/status", app.Spaceappstatus)          //status.go
 	m.Get("/v1/kube/podstatus/:space/:app", app.PodStatus)                 //status.go
 
-	m.Get("/v1/space/:space/app/:app/subscribers", app.GetSubscribersDB)                                             //subscriber.go
-	m.Delete("/v1/space/:space/app/:app/subscriber", binding.Json(structs.Subscriberspec{}), app.RemoveSubscriberDB) //subscriber.go
-	m.Post("/v1/space/:space/app/:app/subscriber", binding.Json(structs.Subscriberspec{}), app.AddSubscriberDB)      //subscriber.go
-
 	//Helper endpoints for creating an app in a space these are not tested here
 	m.Delete("/v1/space/:space/app/:app", DeleteApp)
 	m.Post("/v1/space", binding.Json(structs.Spacespec{}), Createspace)

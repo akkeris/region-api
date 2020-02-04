@@ -50,9 +50,13 @@ func getVaultList(path string) ([]string) {
 	return list
 }
 
+func GetVaultPaths() ([]string) {
+	return strings.Split(os.Getenv("SECRETS"), ",")
+}
+
 func GetVaultListPeriodic() {
 	var newlist []string
-	secrets_array := strings.Split(os.Getenv("SECRETS"), ",")
+	secrets_array := GetVaultPaths();
 	for _, element := range secrets_array {
 		newlist = append(newlist, getVaultList(element)...)
 	}

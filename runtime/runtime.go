@@ -10,6 +10,7 @@ type Runtime interface {
 	GenericRequest(method string, path string, payload interface{}) ([]byte, int, error)
 	Scale(space string, app string, amount int) (e error)
 	GetService(space string, app string) (service KubeService, e error)
+	ServiceExists(space string, app string) (bool, error)
 	CreateService(space string, app string, port int, labels map[string]string, features structs.Features) (e error)
 	UpdateService(space string, app string, port int, labels map[string]string, features structs.Features) (e error)
 	DeleteService(space string, app string) (e error)
@@ -57,7 +58,11 @@ var stackRuntimeCache map[string]Runtime = make(map[string]Runtime)
 
 // Stubs, incase we ever have more than one stack in a region.
 func GetRuntimeStack(db *sql.DB, stack string) (rt Runtime, e error) {
-	// Cache for the win!
+	// Cache for the win! This is also very critical to cache as some
+	// config is loaded from files that can switch during runtime and
+	// we'd like to force the choice of the runtime at the beginning
+	// to prevent getting (accidently) a different runtime after we've
+	// been running for a while.
 	i, ok := stackRuntimeCache[stack]
 	if ok {
 		return i, nil

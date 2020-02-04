@@ -19,6 +19,7 @@ import (
 	"region-api/jobs"
 	"region-api/maintenance"
 	"region-api/router"
+	"region-api/runtime"
 	"region-api/service"
 	"region-api/space"
 	"region-api/structs"
@@ -200,6 +201,8 @@ func Server(db *sql.DB) *martini.ClassicMartini {
 
 	// cause the dns provider to begin caching itself.
 	go router.GetDnsProvider()
+	// cause runtime to cache itself.
+	go runtime.GetAllRuntimes(db)
 
 	m.Get("/v2/config", GetInfo)
 

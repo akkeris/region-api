@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"fmt"
 	"region-api/utils"
 	"testing"
 )
@@ -40,7 +41,8 @@ func TestHandlers(t *testing.T) {
 			Reset(func() {
 				stmt, _ := pool.Prepare("delete from certs where request=$1")
 				stmt.Exec("1313855")
-				issuer, _ := GetIssuer(pool, "cert-manager")
+				issuer, err := GetIssuer(pool, "cert-manager")
+				ShouldNotBeNil(err)
 				issuer.DeleteCertificate("apitest.example.com")
 			})
 			var request CertificateOrder
@@ -65,6 +67,7 @@ func TestHandlers(t *testing.T) {
 					panic(err)
 				}
 				var certid string = ""
+				fmt.Printf("Certs: %#+v", certs)
 				for _, cert := range certs {
 					if cert.CommonName == "apitest.example.com" {
 						certid = cert.Id
@@ -82,12 +85,13 @@ func TestHandlers(t *testing.T) {
 						panic(err)
 					}
 					So(cert.Status, ShouldEqual, "pending")
-				})
-				Reset(func() {
-					stmt, _ := pool.Prepare("delete from certs where request=$1")
-					stmt.Exec("1313855")
-					issuer, _ := GetIssuer(pool, "cert-manager")
-					issuer.DeleteCertificate("apitest.example.com")
+
+					Reset(func() {
+						stmt, _ := pool.Prepare("delete from certs where request=$1")
+						stmt.Exec("1313855")
+						issuer, _ := GetIssuer(pool, "cert-manager")
+						issuer.DeleteCertificate("apitest.example.com")
+					})
 				})
 			})
 		})

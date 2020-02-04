@@ -3,16 +3,13 @@ package vault
 import (
 	structs "region-api/structs"
 	"region-api/utils"
-
 	"bytes"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
 	"encoding/json"
-
 	"os"
-
+	"fmt"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/render"
 	. "github.com/smartystreets/goconvey/convey"
@@ -21,10 +18,7 @@ import (
 func Server() *martini.ClassicMartini {
 	m := martini.Classic()
 	m.Use(render.Renderer())
-
-	m.Get("/v1/service/vault/plans", GetVaultList)
-	m.Get("/v1/service/vault/credentials/**", GetVaultVariablesMasked)
-
+	AddToMartini(m)
 	return m
 }
 
@@ -33,6 +27,7 @@ func Init() *martini.ClassicMartini {
 	pool := utils.GetDB(pitdb)
 	utils.InitAuth()
 	m := Server()
+	GetVaultListPeriodic()
 	m.Map(pool)
 	return m
 }
@@ -48,18 +43,7 @@ func lookupCred(creds []structs.Creds, cred string) structs.Creds {
 	return r
 }
 
-func TestVaultPlans(t *testing.T) {
-	Convey("When getting vault paths from SECRETS", t, func() {
-		paths := getVaultPaths()
-
-		So(paths, ShouldContain, "secret/qa")
-
-		So(paths[0], ShouldContainSubstring, "dev")
-	})
-}
-
 func TestGetVaultVariables(t *testing.T) {
-	GetVaultListPeriodic()
 	testSecretQa := "secret/qa/db/perf"
 	testSecretStage := "secret/stage/db/perf"
 
@@ -119,5 +103,12 @@ func TestGetVaultVariables(t *testing.T) {
 		}
 
 		So(pass, ShouldContainSubstring, "redacted")
+	})
+	Convey("When getting vault paths from SECRETS", t, func() {
+		paths := GetVaultPaths()
+		fmt.Println(paths)
+		So(paths, ShouldContain, "secret/qa")
+
+		So(paths[0], ShouldContainSubstring, "dev")
 	})
 }

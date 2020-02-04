@@ -552,24 +552,20 @@ func homeDir() string {
 }
 
 func NewKubernetes(name string, imagePullSecret string) (r Runtime) {
-	// Check if we have a service account in cluster
-	config, err := rest.InClusterConfig()
+	// Check if we have a kubeconfig path.
+	var kubeconfig *string
+	home := homeDir()
+	defaultKubeConfig := filepath.Join(home, ".kube", "config")
+	kubeconfig = flag.String("kubeconfig", defaultKubeConfig, "absolute path to the kubeconfig file")
+	flag.Parse()
+	
+	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
 	if err != nil {
-		// Check if we have a kubeconfig path.
-		var kubeconfig *string
-		if home := homeDir(); home != "" {
-			kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
-		} else {
-			kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
-		}
-		flag.Parse()
-
-		// use the current context in kubeconfig
-		config, err = clientcmd.BuildConfigFromFlags("", *kubeconfig)
+		config, err = rest.InClusterConfig()
 		if err != nil {
 			panic(err.Error())
 		}
-	}
+	}	
 
 	var rt Kubernetes
 	if strings.HasPrefix(config.Host, "https://") {
@@ -581,6 +577,7 @@ func NewKubernetes(name string, imagePullSecret string) (r Runtime) {
 		if uri.Port() != "" {
 			rt.apiServer = rt.apiServer + ":" + uri.Port()
 		}
+		rt.apiServer = rt.apiServer + uri.Path
 	} else {
 		rt.apiServer = config.Host
 	}
@@ -606,7 +603,8 @@ func NewKubernetes(name string, imagePullSecret string) (r Runtime) {
 		rt.clientType = "token"
 		rt.clientToken = config.BearerToken
 	}
-
+	
+	fmt.Printf("Connecting to kubernetes cluster at %s\n", config.Host)
 	rt.client = &http.Client{Transport: &http.Transport{TLSClientConfig: tlsConfig}}
 	rt.defaultApiServerVersion = "v1"
 	rt.imagePullSecret = imagePullSecret
@@ -1058,7 +1056,7 @@ func (rt Kubernetes) CreateSpace(name string, internal bool, compliance string) 
 	if e != nil {
 		return e
 	}
-	if resp.StatusCode != 201 {
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		return errors.New("Unable to create space, invalid response code from kubernetes: " + strconv.Itoa(resp.StatusCode))
 	}
 	return e
@@ -1072,7 +1070,7 @@ func (rt Kubernetes) DeleteSpace(name string) (e error) {
 	if e != nil {
 		return e
 	}
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotFound {
 		return errors.New("Unable to delete space, invalid response code from kubernetes: " + resp.Status)
 	}
 	return nil
@@ -1319,11 +1317,35 @@ func (rt Kubernetes) GetService(space string, app string) (KubeService, error) {
 	if e != nil {
 		return response, e
 	}
+	if resp.StatusCode != http.StatusOK {
+		return response, errors.New("Unable to get service " + resp.Status)
+	}
 	e = json.Unmarshal(resp.Body, &response)
 	if e != nil {
 		return response, e
 	}
 	return response, nil
+}
+
+
+func (rt Kubernetes) ServiceExists(space string, app string) (bool, error) {
+	if space == "" {
+		return false, errors.New("FATAL ERROR: Unable to get service, space is blank.")
+	}
+	if app == "" {
+		return false, errors.New("FATAL ERROR: Unable to get service, the app is blank.")
+	}
+	resp, e := rt.k8sRequest("get", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+space+"/services/"+app, nil)
+	if e != nil {
+		return false, e
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		return false, nil
+	} else if resp.StatusCode == http.StatusOK {
+		return true, nil
+	} else {
+		return false, errors.New("Failed fetching status code: " + resp.Status)
+	}
 }
 
 func (rt Kubernetes) CreateService(space string, app string, port int, labels map[string]string, features structs.Features) (e error) {
@@ -1386,12 +1408,14 @@ func (rt Kubernetes) UpdateService(space string, app string, port int, labels ma
 	if e != nil {
 		return e
 	}
-	if features.Http2EndToEndService {
-		existingservice.Spec.Ports[0].Name = "http2"
-	} else {
-		existingservice.Spec.Ports[0].Name = "http"
+	if existingservice.Spec.Ports != nil && len(existingservice.Spec.Ports) > 0 {
+		if features.Http2EndToEndService {
+			existingservice.Spec.Ports[0].Name = "http2"
+		} else {
+			existingservice.Spec.Ports[0].Name = "http"
+		}
+		existingservice.Spec.Ports[0].TargetPort = port
 	}
-	existingservice.Spec.Ports[0].TargetPort = port
 	for k := range labels {
 		existingservice.Metadata.Labels[k] = labels[k]
 	}
@@ -1799,6 +1823,9 @@ func (rt Kubernetes) GetPodsBySpace(space string) (*PodStatus, error) {
 	resp, err := rt.k8sRequest("get", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+space+"/pods", nil)
 	if err != nil {
 		return nil, err
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, errors.New("space does not exist")
 	}
 	var podStatus PodStatus
 	err = json.Unmarshal(resp.Body, &podStatus)

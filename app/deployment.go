@@ -300,6 +300,18 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 		utils.ReportError(err, r)
 		return
 	}
+	serviceExists, err := rt.ServiceExists(space, appname)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+
+	// Do not write to cluster above this line, everything below should apply changes, 
+	// everything above should do sanity checks, this helps prevent "half" deployments 
+	// by minimizing resource after the first write
+
+
+
 	if !deploymentExists {
 		if err = rt.CreateDeployment(&deployment); err != nil {
 			utils.ReportError(err, r)
@@ -326,7 +338,7 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 
 	// Create/update service
 	if finalport != -1 {
-		if !deploymentExists {
+		if !serviceExists {
 			if err := rt.CreateService(space, appname, finalport, deploy1.Labels, deploy1.Features); err != nil {
 				utils.ReportError(err, r)
 				return

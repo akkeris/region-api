@@ -55,10 +55,6 @@ func Server() *martini.ClassicMartini {
 	m.Get("/v1/space/:space/app/:app/status", Spaceappstatus)          //status.go
 	m.Get("/v1/kube/podstatus/:space/:app", PodStatus)                 //status.go
 
-	m.Get("/v1/space/:space/app/:app/subscribers", GetSubscribersDB)                                             //subscriber.go
-	m.Delete("/v1/space/:space/app/:app/subscriber", binding.Json(structs.Subscriberspec{}), RemoveSubscriberDB) //subscriber.go
-	m.Post("/v1/space/:space/app/:app/subscriber", binding.Json(structs.Subscriberspec{}), AddSubscriberDB)      //subscriber.go
-
 	//Helper endpoints for creating an app in a space these are not tested here
 	m.Delete("/v1/space/:space/app/:app", space.DeleteApp)
 	m.Post("/v1/space", binding.Json(structs.Spacespec{}), space.Createspace)
@@ -435,17 +431,7 @@ func TestDeployments(t *testing.T) {
 							So(w.Code, ShouldEqual, http.StatusCreated)
 							So(w.Body.String(), ShouldContainSubstring, "Deployment Created")
 
-							Convey("it should have details", func() {
-								r, _ := http.NewRequest("GET", "/v1/space/"+testAppSpace+"/app/"+testAppName+"/deployments", nil)
-								w := httptest.NewRecorder()
-								m.ServeHTTP(w, r)
-								var response []structs.DeploymentsSpec
-								So(w.Code, ShouldEqual, http.StatusOK)
-								decoder := json.NewDecoder(w.Body)
-								if err := decoder.Decode(&response); err != nil {
-									panic(err)
-								}
-								So(response[0].Name, ShouldContainSubstring, testAppName)
+							
 
 								Convey("it should have an instance", func() {
 									r, _ := http.NewRequest("GET", "/v1/space/"+testAppSpace+"/app/"+testAppName+"/instance", nil)
@@ -540,7 +526,6 @@ func TestDeployments(t *testing.T) {
 										})
 									})
 								})
-							})
 						})
 
 						Reset(func() {
