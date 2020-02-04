@@ -18,6 +18,60 @@ import (
 	utils "region-api/utils"
 )
 
+type KafkaTopic struct {
+	Topic struct {
+		Name   string `json:"name"`
+		Config struct {
+			Name          string `json:"name"`
+			Cleanuppolicy string `json:"cleanup.policy,omitempty"`
+			Partitions    *int   `json:"partitions,omitempty"`
+			Retentionms   *int   `json:"retention.ms,omitempty"`
+			Replicas      *int   `json:"replicas,omitempty"`
+		} `json:"config"`
+	} `json:"topic"`
+}
+
+type KafkaAclCredentials struct {
+	AclCredentials struct {
+		Username string `json:"username"`
+	} `json:"aclCredentials"`
+}
+
+type Kafkaspec struct {
+	Spec string `json:"spec"`
+}
+
+type TopicSchemaMapping struct {
+	Topic  string `json:"topic"`
+	Schema struct {
+		Name string `json:"name"`
+	} `json:"schema"`
+}
+
+type TopicKeyMapping struct {
+	Topic   string `json:"topic"`
+	KeyType string `json:"keyType"`
+	Schema  *struct {
+		Name string `json:"name"`
+	} `json:"schema,omitempty"`
+}
+
+type AclRequest struct {
+	Topic             string `json:"topic"`
+	User              string `json:"user,omitempty"`
+	Space             string `json:"space"`
+	Appname           string `json:"app"`
+	Role              string `json:"role"`
+	ConsumerGroupName string `json:"consumerGroupName,omitempty"`
+}
+
+type KafkaConsumerGroupSeekRequest struct {
+	Topic         string `json:"topic"`
+	Partitions    []int  `json:"partitions,omitempty"`
+	SeekTo        string `json:"seekTo"`
+	AllPartitions bool   `json:"allPartitions,omitempty"`
+}
+
 type Acl struct {
 	Id      string `json:"id"`
 	Cluster string `json:"cluster"`
@@ -47,8 +101,8 @@ func ProvisionKafkaV1(spec structs.Provisionspec, berr binding.Errors, r render.
 	}
 	defer resp.Body.Close()
 
-	var kafka structs.Kafkaspec
-	var creds structs.KafkaAclCredentials
+	var kafka Kafkaspec
+	var creds KafkaAclCredentials
 
 	bodybytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
@@ -65,7 +119,7 @@ func ProvisionKafkaV1(spec structs.Provisionspec, berr binding.Errors, r render.
 	r.JSON(201, kafka)
 }
 
-func ProvisionTopicV1(spec structs.KafkaTopic, params martini.Params, berr binding.Errors, r render.Render) {
+func ProvisionTopicV1(spec KafkaTopic, params martini.Params, berr binding.Errors, r render.Render) {
 	cluster := params["cluster"]
 
 	if berr != nil {
@@ -191,7 +245,7 @@ func GetSchemaV1(params martini.Params, r render.Render) {
 	r.JSON(resp.StatusCode, bodyj)
 }
 
-func CreateTopicKeyMappingV1(spec structs.TopicKeyMapping, params martini.Params, berr binding.Errors, r render.Render) {
+func CreateTopicKeyMappingV1(spec TopicKeyMapping, params martini.Params, berr binding.Errors, r render.Render) {
 	cluster := params["cluster"]
 
 	if berr != nil {
@@ -221,7 +275,7 @@ func CreateTopicKeyMappingV1(spec structs.TopicKeyMapping, params martini.Params
 	r.JSON(resp.StatusCode, bodyj)
 }
 
-func CreateTopicSchemaMappingV1(spec structs.TopicSchemaMapping, params martini.Params, berr binding.Errors, r render.Render) {
+func CreateTopicSchemaMappingV1(spec TopicSchemaMapping, params martini.Params, berr binding.Errors, r render.Render) {
 	cluster := params["cluster"]
 	if berr != nil {
 		utils.ReportInvalidRequest(berr[0].Message, r)
@@ -250,7 +304,7 @@ func CreateTopicSchemaMappingV1(spec structs.TopicSchemaMapping, params martini.
 	r.JSON(resp.StatusCode, bodyj)
 }
 
-func CreateAclV1(db *sql.DB, request structs.AclRequest, params martini.Params, berr binding.Errors, r render.Render) {
+func CreateAclV1(db *sql.DB, request AclRequest, params martini.Params, berr binding.Errors, r render.Render) {
 	cluster := params["cluster"]
 
 	if berr != nil {
@@ -526,7 +580,7 @@ func GetConsumerGroupMembersV1(params martini.Params, r render.Render) {
 	r.JSON(resp.StatusCode, bodyj)
 }
 
-func SeekConsumerGroupV1(spec structs.KafkaConsumerGroupSeekRequest, params martini.Params, berr binding.Errors, r render.Render) {
+func SeekConsumerGroupV1(spec KafkaConsumerGroupSeekRequest, params martini.Params, berr binding.Errors, r render.Render) {
 	cluster := params["cluster"]
 	consumerGroup := params["consumerGroupName"]
 
@@ -572,4 +626,29 @@ func GetTopicPreviewV1(params martini.Params, r render.Render) {
 	defer resp.Body.Close()
 	bodyj, _ := simplejson.NewFromReader(resp.Body)
 	r.JSON(resp.StatusCode, bodyj)
+}
+
+func AddKafkaToMartini(m *martini.ClassicMartini) {
+
+	m.Get("/v1/service/kafka/plans", GetKafkaPlansV1)
+	m.Post("/v1/service/kafka/instance", binding.Json(structs.Provisionspec{}), ProvisionKafkaV1)
+	m.Delete("/v1/service/kafka/instance/:servicename", DeleteKafkaV1)
+	m.Post("/v1/service/kafka/cluster/:cluster/topic", binding.Json(KafkaTopic{}), ProvisionTopicV1)
+	m.Get("/v1/service/kafka/topics", GetTopicsV1)
+	m.Delete("/v1/service/kafka/cluster/:cluster/topics/:topic", DeleteTopicV1)
+	m.Get("/v1/service/kafka/topics/:topic", GetTopicV1)
+	m.Get("/v1/service/kafka/cluster/:cluster/configs", GetConfigsV1)
+	m.Get("/v1/service/kafka/cluster/:cluster/configs/:name", GetConfigV1)
+	m.Get("/v1/service/kafka/cluster/:cluster/schemas", GetSchemasV1)
+	m.Get("/v1/service/kafka/cluster/:cluster/schemas/:schema", GetSchemaV1)
+	m.Post("/v1/service/kafka/cluster/:cluster/topic-key-mapping", binding.Json(TopicKeyMapping{}), CreateTopicKeyMappingV1)
+	m.Post("/v1/service/kafka/cluster/:cluster/topic-schema-mapping", binding.Json(TopicSchemaMapping{}), CreateTopicSchemaMappingV1)
+	m.Get("/v1/service/kafka/cluster/:cluster/acls", GetAclsV1)
+	m.Post("/v1/service/kafka/cluster/:cluster/acls", binding.Json(AclRequest{}), CreateAclV1)
+	m.Delete("/v1/service/kafka/acls/:id", DeleteAclV1)
+	m.Get("/v1/service/kafka/cluster/:cluster/topics/:topic/preview", GetTopicPreviewV1)
+	m.Get("/v1/service/kafka/cluster/:cluster/consumer-groups", GetConsumerGroupsV1)
+	m.Get("/v1/service/kafka/cluster/:cluster/consumer-groups/:consumerGroupName/offsets", GetConsumerGroupOffsetsV1)
+	m.Get("/v1/service/kafka/cluster/:cluster/consumer-groups/:consumerGroupName/members", GetConsumerGroupMembersV1)
+	m.Post("/v1/service/kafka/cluster/:cluster/consumer-groups/:consumerGroupName/seek", binding.Json(KafkaConsumerGroupSeekRequest{}), SeekConsumerGroupV1)
 }

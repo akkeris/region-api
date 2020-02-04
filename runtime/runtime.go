@@ -2,19 +2,20 @@ package runtime
 
 import (
 	"database/sql"
-	structs "region-api/structs"
 	"os"
+	structs "region-api/structs"
+	corev1 "k8s.io/api/core/v1" // TODO: get rid of this.
 )
 
 type Runtime interface {
 	GenericRequest(method string, path string, payload interface{}) ([]byte, int, error)
-	Scale(space string, app string, amount int) (e error)
-	GetService(space string, app string) (service KubeService, e error)
+	Scale(space string, app string, amount int32) (e error)
+	GetService(space string, app string) (service *corev1.Service, e error)
 	ServiceExists(space string, app string) (bool, error)
 	CreateService(space string, app string, port int, labels map[string]string, features structs.Features) (e error)
 	UpdateService(space string, app string, port int, labels map[string]string, features structs.Features) (e error)
 	DeleteService(space string, app string) (e error)
-	GetServices() (*ServiceCollectionspec, error)
+	GetServices() (*corev1.ServiceList, error)
 	CreateDeployment(deployment *structs.Deployment) (err error)
 	UpdateDeployment(deployment *structs.Deployment) (err error)
 	DeleteDeployment(space string, app string) (e error)
@@ -27,7 +28,6 @@ type Runtime interface {
 	GetPods(space string, app string) (rs []string, e error)
 	CreateSpace(name string, internal bool, compliance string) (e error)
 	DeleteSpace(name string) (e error)
-	CreateSecret(space string, name string, data string, mimetype string) (s *Secretspec, e error)
 	AddImagePullSecretToSpace(space string) (e error)
 	UpdateSpaceTags(space string, compliance string) (e error)
 	RestartDeployment(space string, app string) (e error)
@@ -49,8 +49,8 @@ type Runtime interface {
 	ScaleJob(space string, jobName string, replicas int, timeout int) (e error)
 	JobExists(space string, jobName string) bool
 	CreateJob(deployment *structs.Deployment) (*structs.JobStatus, error)
-	GetPodsBySpace(space string) (*PodStatus, error)
-	GetNodes() (*structs.KubeNodes, error)
+	GetPodsBySpace(space string) (*corev1.PodList, error)
+	GetNodes() (*corev1.NodeList, error)
 	CopySecret(secretName string, fromNamespace string, toNamespace string) (error)
 }
 

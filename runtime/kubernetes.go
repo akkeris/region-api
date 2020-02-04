@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"reflect"
 	structs "region-api/structs"
 	"strconv"
 	"strings"
@@ -20,10 +19,28 @@ import (
 	"time"
 	"flag"
 	"path/filepath"
-	kube "k8s.io/api/core/v1"
+	intstr "k8s.io/apimachinery/pkg/util/intstr"
+	resource "k8s.io/apimachinery/pkg/api/resource"
+	v1beta1_batch "k8s.io/api/batch/v1beta1"
+	v1batch "k8s.io/api/batch/v1"
+	v1beta1 "k8s.io/api/apps/v1beta1"
+	v1beta2 "k8s.io/api/apps/v1beta2"
+	v1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	//metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/rest"
 )
+
+/**
+ * For various types see:
+ * https://github.com/kubernetes/api/blob/master/core/v1/types.go
+ * https://github.com/kubernetes/api/blob/master/apps/v1/types.go
+ * https://github.com/kubernetes/api/blob/master/apps/v1beta2/types.go
+ * https://github.com/kubernetes/api/blob/master/apps/v1beta1/types.go
+ * https://github.com/kubernetes/apimachinery/tree/master/pkg/apis/meta/v1
+ * https://github.com/kubernetes/apimachinery/blob/master/pkg/api/resource/quantity.go
+ */
 
 type KubeRequest struct {
 	Status     string
@@ -43,506 +60,6 @@ type Kubernetes struct {
 	mutex                   *sync.Mutex
 	debug                   bool
 }
-
-type Specspec struct {
-	Replicas int `json:"replicas"`
-}
-
-type Metadataspec struct {
-	Name      string `json:"name"`
-	Namespace string `json:"namespace"`
-}
-
-type Itemspec struct {
-	Metadata struct {
-		Name string `json:"name"`
-	} `json:"metadata"`
-}
-
-type Scalespec struct {
-	Metadata Metadataspec `json:"metadata"`
-	Spec     Specspec     `json:"spec"`
-}
-
-type Statusspec struct {
-	Status string `json:"status"`
-}
-
-type Dataspec struct {
-	Dockercfg string `json:".dockerconfigjson"`
-}
-
-type Secretspec struct {
-	Metadata struct {
-		Name string `json:"name"`
-	} `json:"metadata"`
-	Data Dataspec `json:"data"`
-	Type string   `json:"type"`
-}
-
-type Itemsspec struct {
-	Items []Itemspec `json:"items"`
-}
-
-type Serviceaccountspec struct {
-	Metadata         structs.Namespec   `json:"metadata"`
-	ImagePullSecrets []structs.Namespec `json:"imagePullSecrets,omitempty"`
-}
-
-type Namespacespec struct {
-	Metadata struct {
-		Name   string `json:"name"`
-		Labels struct {
-			Internal string `json:"akkeris.io/internal,omitempty"`
-		} `json:"labels,omitempty"`
-		Annotations struct {
-			ComplianceTags string `json:"akkeris.io/compliancetags,omitempty"`
-		}
-	} `json:"metadata"`
-}
-
-type ContainerPort struct {
-	ContainerPort int `json:"containerPort"`
-}
-
-type TcpCheck struct {
-	Port int `json:"port,omitempty"`
-}
-
-type HttpCheck struct {
-	Port int    `json:"port,omitempty"`
-	Path string `json:"path,omitempty"`
-}
-
-type ReadinessProbe struct {
-	TCPSocket      *TcpCheck  `json:"tcpSocket,omitempty"`
-	HTTPGET        *HttpCheck `json:"httpGet,omitempty"`
-	TimeoutSeconds int        `json:"timeoutSeconds,omitempty"`
-	PeriodSeconds  int        `json:"periodSeconds,omitEmpty"`
-}
-
-type ContainerItem struct {
-	Name             string                  `json:"name"`
-	Image            string                  `json:"image"`
-	Args             []string                `json:"args,omitempty"`
-	Command          []string                `json:"command,omitempty"`
-	Env              []structs.EnvVar        `json:"env,omitempty"`
-	Ports            []ContainerPort         `json:"ports,omitempty"`
-	ImagePullPolicy  string                  `json:"imagePullPolicy,omitempty"`
-	ImagePullSecrets []structs.Namespec      `json:"imagePullSecrets,omitempty"`
-	Resources        structs.ResourceSpec    `json:"resources,omitempty"`
-	ReadinessProbe   *ReadinessProbe         `json:"readinessProbe,omitempty"`
-	SecurityContext  structs.SecurityContext `json:"securityContext,omitempty"`
-	VolumeMounts     []structs.VolumeMounts  `json:"volumeMounts",omitempty`
-}
-
-type Createspec struct {
-	Message  string `json:"name"`
-	Metadata struct {
-		Uid string `json:"uid"`
-	} `json:"metadata"`
-}
-
-type PortItem struct {
-	Name       string `json:"name,omitempty"`
-	Protocol   string `json:"protocol"`
-	Port       int    `json:"port"`
-	TargetPort int    `json:"targetPort"`
-	NodePort   int    `json:"nodePort"`
-}
-
-type Service struct {
-	Kind     string `json:"kind"`
-	Metadata struct {
-		Annotations struct {
-			ServiceBetaKubernetesIoAwsLoadBalancerInternal string `json:"service.beta.kubernetes.io/aws-load-balancer-internal"`
-		} `json:"annotations"`
-		Name      string            `json:"name"`
-		Namespace string            `json:"namespace"`
-		Labels    map[string]string `json:"labels"`
-	} `json:"metadata"`
-	Spec struct {
-		Selector struct {
-			Name string `json:"name"`
-		} `json:"selector"`
-		Ports []PortItem `json:"ports"`
-		Type  string     `json:"type"`
-	} `json:"spec"`
-}
-
-type KubeService struct {
-	Kind       string `json:"kind"`
-	APIVersion string `json:"apiVersion"`
-	Metadata   struct {
-		Name              string            `json:"name"`
-		Namespace         string            `json:"namespace"`
-		SelfLink          string            `json:"selfLink"`
-		UID               string            `json:"uid"`
-		ResourceVersion   string            `json:"resourceVersion"`
-		CreationTimestamp time.Time         `json:"creationTimestamp"`
-		Labels            map[string]string `json:"labels"`
-		Annotations       struct {
-			ServiceBetaKubernetesIoAwsLoadBalancerInternal string `json:"service.beta.kubernetes.io/aws-load-balancer-internal"`
-		} `json:"annotations"`
-	} `json:"metadata"`
-	Spec struct {
-		Ports []struct {
-			Name       string `json:"name,omitempty"`
-			Protocol   string `json:"protocol"`
-			Port       int    `json:"port"`
-			TargetPort int    `json:"targetPort"`
-			NodePort   int    `json:"nodePort"`
-		} `json:"ports"`
-		Selector struct {
-			Name string `json:"name"`
-		} `json:"selector"`
-		ClusterIP       string `json:"clusterIP"`
-		Type            string `json:"type"`
-		SessionAffinity string `json:"sessionAffinity"`
-	} `json:"spec"`
-}
-
-type ServiceCollectionspec struct {
-	Items []Service `json:"items"`
-}
-
-type Deploymentspec struct {
-	Metadata struct {
-		Name      string            `json:"name"`
-		Namespace string            `json:"namespace"`
-		Labels    map[string]string `json:"labels,omitempty"`
-	} `json:"metadata"`
-	Spec struct {
-		RevisionHistoryLimit int `json:"revisionHistoryLimit"`
-		Metadata             struct {
-			Annotations struct {
-				SidecarIstioIOStatus string `json:"sidecar.istio.io/status"`
-			} `json:"annotations,omitempty"`
-		} `json:"metadata",omitempty`
-		Replicas int `json:"replicas"`
-		Strategy struct {
-			Type          string `json:"type,omitempty"`
-			RollingUpdate struct {
-				MaxUnavailable interface{} `json:"maxUnavailable"`
-				MaxSurge       interface{} `json:"maxSurge,omitempty"`
-			} `json:"rollingUpdate"`
-		} `json:"strategy"`
-		Selector struct {
-			MatchLabels struct {
-				Name    string `json:"name"`
-				App     string `json:"app,omitempty"`
-				Version string `json:"version,omitempty"`
-			} `json:"matchLabels"`
-		} `json:"selector"`
-		Template struct {
-			Metadata struct {
-				Name        string            `json:"name"`
-				Labels      map[string]string `json:"labels,omitempty"`
-				Annotations struct {
-					SidecarIstioIoInject string `json:"sidecar.istio.io/inject"`
-					AkkerisIORestartTime string `json:"akkeris.io/restartTime,omitempty"`
-				} `json:"annotations,omitempty"`
-			} `json:"metadata"`
-			Spec struct {
-				Containers                    []ContainerItem    `json:"containers"`
-				ImagePullPolicy               string             `json:"imagePullPolicy,omitempty"`
-				ImagePullSecrets              []structs.Namespec `json:"imagePullSecrets,omitempty"`
-				DnsPolicy                     string             `json:"dnsPolicy,omitempty"`
-				InitContainers                *[]ContainerItem   `json:"initContainers,omitempty"`
-				Volumes                       *[]structs.Volumes `json:"volumes,omitempty"`
-				TerminationGracePeriodSeconds int                `json:"terminationGracePeriodSeconds,omitempty"`
-			} `json:"spec"`
-		} `json:"template"`
-	} `json:"spec"`
-}
-
-type DeploymentCollectionspec struct {
-	Items []Deploymentspec `json:"items"`
-}
-
-type ReplicationController struct {
-	Metadata struct {
-		Name      string `json:"name"`
-		Namespace string `json:"namespace"`
-	} `json:"metadata"`
-	Spec struct {
-		Replicas int `json:"replicas"`
-		Selector struct {
-			Name string `json:"name"`
-		} `json:"selector"`
-		Template struct {
-			Metadata struct {
-				Name   string `json:"name"`
-				Labels struct {
-					Name string `json:"name"`
-				} `json:"labels"`
-			} `json:"metadata"`
-			Spec struct {
-				Containers      []ContainerItem `json:"containers"`
-				ImagePullPolicy string          `json:"imagePullPolicy,omitempty"`
-			} `json:"spec"`
-		} `json:"template"`
-	} `json:"spec"`
-}
-
-type OneOffPod struct {
-	APIVersion string `json:"apiVersion"`
-	Kind       string `json:"kind"`
-	Metadata   struct {
-		Name   string `json:"name"`
-		Labels struct {
-			Name  string `json:"name"`
-			Space string `json:"space"`
-		} `json:"labels"`
-		Namespace string `json:"namespace"`
-	} `json:"metadata"`
-	Spec struct {
-		Containers                    []ContainerItem    `json:"containers"`
-		ImagePullPolicy               string             `json:"imagePullPolicy,omitempty"`
-		ImagePullSecrets              []structs.Namespec `json:"imagePullSecrets,omitempty"`
-		RestartPolicy                 string             `json:"restartPolicy"`
-		TerminationGracePeriodSeconds int                `json:"terminationGracePeriodSeconds"`
-		DnsPolicy                     string             `json:"dnsPolicy,omitempty"`
-	} `json:"spec"`
-}
-
-type CronJob struct {
-	Metadata struct {
-		Name      string `json:"name"`
-		Namespace string `json:"namespace"`
-		Labels    struct {
-			Name  string `json:"name"`
-			Space string `json:"space"`
-		} `json:"labels"`
-	} `json:"metadata"`
-	Spec struct {
-		Schedule                string `json:"schedule"`
-		StartingDeadlineSeconds int    `json:"startingDeadlineSeconds"`
-		ConcurrencyPolicy       string `json:"concurrencyPolicy"`
-		Suspend                 bool   `json:"suspend"`
-		JobTemplate             Job    `json:"jobTemplate"`
-	} `json:"spec"`
-}
-
-type Job struct {
-	Metadata struct {
-		Name                       string `json:"name"`
-		Namespace                  string `json:"namespace"`
-		DeletionGracePeriodSeconds int    `json:"deletionGracePeriodSeconds,omitempty"`
-		Labels                     struct {
-			Name  string `json:"name"`
-			Space string `json:"space"`
-		} `json:"labels"`
-	} `json:"metadata"`
-	Spec struct {
-		Parallelism           int `json:"parallelism,omitempty"`
-		Completions           int `json:"completions,omitempty"`
-		ActiveDeadlineSeconds int `json:"activeDeadlineSeconds,omitempty"`
-		Template              struct {
-			Metadata struct {
-				Name      string `json:"name"`
-				Namespace string `json:"namespace"`
-				Labels    struct {
-					Name  string `json:"name"`
-					Space string `json:"space"`
-				} `json:"labels"`
-			} `json:"metadata"`
-			Spec struct {
-				Containers       []ContainerItem    `json:"containers"`
-				NodeSelector     string             `json:"nodeSelector,omitempty"`
-				ImagePullSecrets []structs.Namespec `json:"imagePullSecrets,omitempty"`
-				RestartPolicy    string             `json:"restartPolicy"`
-				DnsPolicy        string             `json:"dnsPolicy,omitempty"`
-			} `json:"spec"`
-		} `json:"template"`
-	} `json:"spec"`
-}
-
-type PodStatusspec struct {
-	HostIP     string `json:"hostIP"`
-	Phase      string `json:"phase"`
-	Reason     string `json:"reason"`
-	Message    string `json:"message"`
-	Conditions []struct {
-		Type               string      `json:"type"`
-		Status             string      `json:"status"`
-		LastProbeTime      interface{} `json:"lastProbeTime"`
-		LastTransitionTime time.Time   `json:"lastTransitionTime"`
-	} `json:"conditions"`
-	StartTime         time.Time `json:"startTime"`
-	ContainerStatuses []struct {
-		Name      string                 `json:"name"`
-		State     map[string]interface{} `json:"state"`
-		LastState struct {
-		} `json:"lastState"`
-		Ready        bool `json:"ready"`
-		RestartCount int  `json:"restartCount"`
-	} `json:"containerStatuses"`
-}
-
-type PodStatusItems struct {
-	Metadata struct {
-		Name      string `json:"name"`
-		Namespace string `json:"namespace"`
-	} `json:"metadata"`
-	Status PodStatusspec `json:"status"`
-}
-
-type PodStatus struct {
-	Items []PodStatusItems `json:"items"`
-}
-
-type ReplicaSetList struct {
-	Kind       string `json:"kind"`
-	APIVersion string `json:"apiVersion"`
-	Metadata   struct {
-		SelfLink        string `json:"selfLink"`
-		ResourceVersion string `json:"resourceVersion"`
-	} `json:"metadata"`
-	Items []ReplicaSetSpec `json:"items"`
-}
-
-type ReplicaSetSpec struct {
-	Metadata struct {
-		Name              string    `json:"name"`
-		Namespace         string    `json:"namespace"`
-		SelfLink          string    `json:"selfLink"`
-		UID               string    `json:"uid"`
-		ResourceVersion   string    `json:"resourceVersion"`
-		Generation        int       `json:"generation"`
-		CreationTimestamp time.Time `json:"creationTimestamp"`
-		Labels            struct {
-			Name            string `json:"name"`
-			PodTemplateHash string `json:"pod-template-hash"`
-		} `json:"labels"`
-		Annotations struct {
-			DeploymentKubernetesIoRevision string `json:"deployment.kubernetes.io/revision"`
-		} `json:"annotations"`
-	} `json:"metadata"`
-	Spec struct {
-		Replicas int `json:"replicas"`
-		Selector struct {
-			MatchLabels struct {
-				Name            string `json:"name"`
-				PodTemplateHash string `json:"pod-template-hash"`
-			} `json:"matchLabels"`
-		} `json:"selector"`
-		Template struct {
-			Metadata struct {
-				Name              string      `json:"name"`
-				CreationTimestamp interface{} `json:"creationTimestamp"`
-				Labels            struct {
-					Name            string `json:"name"`
-					PodTemplateHash string `json:"pod-template-hash"`
-				} `json:"labels"`
-			} `json:"metadata"`
-			Spec struct {
-				Containers []struct {
-					Name  string `json:"name"`
-					Image string `json:"image"`
-					Ports []struct {
-						ContainerPort int    `json:"containerPort"`
-						Protocol      string `json:"protocol"`
-					} `json:"ports"`
-					Env []struct {
-						Name  string `json:"name"`
-						Value string `json:"value"`
-					} `json:"env"`
-					Resources struct {
-					} `json:"resources"`
-					TerminationMessagePath string `json:"terminationMessagePath"`
-					ImagePullPolicy        string `json:"imagePullPolicy,omitempty"`
-				} `json:"containers"`
-				RestartPolicy                 string `json:"restartPolicy"`
-				TerminationGracePeriodSeconds int    `json:"terminationGracePeriodSeconds"`
-				DNSPolicy                     string `json:"dnsPolicy"`
-				SecurityContext               struct {
-				} `json:"securityContext"`
-				ImagePullSecrets []struct {
-					Name string `json:"name"`
-				} `json:"imagePullSecrets,omitempty"`
-			} `json:"spec"`
-		} `json:"template"`
-	} `json:"spec"`
-	Status struct {
-		Replicas           int `json:"replicas"`
-		ObservedGeneration int `json:"observedGeneration"`
-	} `json:"status"`
-}
-
-type Revisionspec struct {
-	Revision int `json:"revision"`
-}
-
-type Rollbackspec struct {
-	ApiVersion         string            `json:"apiVersion"`
-	Name               string            `json:"name"`
-	UpdatedAnnotations map[string]string `json:"updatedAnnotations,omitempty"`
-	RollbackTo         Revisionspec      `json:"rollbackTo"`
-}
-
-type JobScaleGet struct {
-	Kind       string `json:"kind"`
-	APIVersion string `json:"apiVersion"`
-	Metadata   struct {
-		Name              string    `json:"name"`
-		Namespace         string    `json:"namespace"`
-		SelfLink          string    `json:"selfLink"`
-		UID               string    `json:"uid"`
-		ResourceVersion   string    `json:"resourceVersion"`
-		CreationTimestamp time.Time `json:"creationTimestamp"`
-		Labels            struct {
-			Name  string `json:"name"`
-			Space string `json:"space"`
-		} `json:"labels"`
-	} `json:"metadata"`
-	Spec struct {
-		Parallelism           int `json:"parallelism"`
-		Completions           int `json:"completions"`
-		ActiveDeadlineSeconds int `json:"activeDeadlineSeconds"`
-		Selector              struct {
-			MatchLabels struct {
-				ControllerUID string `json:"controller-uid"`
-			} `json:"matchLabels"`
-		} `json:"selector"`
-		Template struct {
-			Metadata struct {
-				Name              string      `json:"name"`
-				Namespace         string      `json:"namespace"`
-				CreationTimestamp interface{} `json:"creationTimestamp"`
-				Labels            struct {
-					ControllerUID string `json:"controller-uid"`
-					JobName       string `json:"job-name"`
-					Name          string `json:"name"`
-					Space         string `json:"space"`
-				} `json:"labels"`
-			} `json:"metadata"`
-			Spec struct {
-				Containers []struct {
-					Name  string `json:"name"`
-					Image string `json:"image"`
-					Env   []struct {
-						Name  string `json:"name"`
-						Value string `json:"value"`
-					} `json:"env"`
-					TerminationMessagePath   string `json:"terminationMessagePath"`
-					TerminationMessagePolicy string `json:"terminationMessagePolicy"`
-					ImagePullPolicy          string `json:"imagePullPolicy,omitempty"`
-				} `json:"containers"`
-				RestartPolicy                 string `json:"restartPolicy"`
-				TerminationGracePeriodSeconds int    `json:"terminationGracePeriodSeconds"`
-				DNSPolicy                     string `json:"dnsPolicy"`
-				SecurityContext               struct {
-				} `json:"securityContext"`
-				ImagePullSecrets []struct {
-					Name string `json:"name"`
-				} `json:"imagePullSecrets,omitempty"`
-				SchedulerName string `json:"schedulerName"`
-			} `json:"spec"`
-		} `json:"template"`
-	} `json:"spec"`
-}
-
 
 func homeDir() string {
 	if h := os.Getenv("HOME"); h != "" {
@@ -655,7 +172,7 @@ func (rt Kubernetes) GenericRequest(method string, path string, payload interfac
 	return req.Body, req.StatusCode, nil
 }
 
-func (rt Kubernetes) Scale(space string, app string, amount int) (e error) {
+func (rt Kubernetes) Scale(space string, app string, amount int32) (e error) {
 	if space == "" {
 		return errors.New("FATAL ERROR: Unable to scale app, space is blank.")
 	}
@@ -665,35 +182,39 @@ func (rt Kubernetes) Scale(space string, app string, amount int) (e error) {
 	if amount < 0 {
 		return errors.New("FATAL ERROR: Unable to scale app, amount is not a whole positive number.")
 	}
-	_, err := rt.k8sRequest("put", "/apis/apps/v1/namespaces/"+space+"/deployments/"+app+"/scale",
-		Scalespec{Metadata: Metadataspec{Name: app, Namespace: space}, Spec: Specspec{Replicas: amount}})
+	scale := v1beta2.Scale{Spec: v1beta2.ScaleSpec{Replicas: amount}}
+	scale.SetNamespace(space)
+	scale.SetName(app)
+	_, err := rt.k8sRequest("put", "/apis/apps/v1/namespaces/"+space+"/deployments/"+app+"/scale", scale)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func deploymentToDeploymentSpec(deployment *structs.Deployment) (dp Deploymentspec) {
-	var c1 ContainerItem
+func deploymentToDeploymentSpec(deployment *structs.Deployment) (dp v1.Deployment) {
+	var c1 corev1.Container
 	// assign environment variables
-	c1.Env = deployment.ConfigVars
-	clist := []ContainerItem{}
+	c1.Env = make([]corev1.EnvVar, 0)
+	for _, env := range deployment.ConfigVars {
+		c1.Env = append(c1.Env, corev1.EnvVar{Name: env.Name, Value:env.Value})
+	}
+	clist := []corev1.Container{}
 
 	// assemble readiness probe
-	var probe ReadinessProbe
+	var probe corev1.Probe
 	if deployment.Port != -1 {
-		var cp1 ContainerPort
+		var cp1 corev1.ContainerPort
 		if deployment.HealthCheck != "tcp" {
-			probe.HTTPGET = &HttpCheck{Port: deployment.Port, Path: deployment.HealthCheck}
+			probe.HTTPGet = &corev1.HTTPGetAction{Port: intstr.FromInt(deployment.Port), Path: deployment.HealthCheck}
 		} else {
-			probe.TCPSocket = &TcpCheck{Port: deployment.Port}
+			probe.TCPSocket = &corev1.TCPSocketAction{Port: intstr.FromInt(deployment.Port)}
 		}
-		cp1.ContainerPort = deployment.Port
+		cp1.ContainerPort = int32(deployment.Port)
 		probe.PeriodSeconds = 20
 		probe.TimeoutSeconds = 15
 		c1.ReadinessProbe = &probe
-		cportlist := []ContainerPort{}
-		c1.Ports = append(cportlist, cp1)
+		c1.Ports = []corev1.ContainerPort{cp1}
 	}
 
 	// assemble image
@@ -705,44 +226,54 @@ func deploymentToDeploymentSpec(deployment *structs.Deployment) (dp Deploymentsp
 	c1.ImagePullPolicy = "Always"
 
 	// assemble memory constraints
-	var resources structs.ResourceSpec
-	resources.Requests.Memory = deployment.MemoryRequest
-	resources.Limits.Memory = deployment.MemoryLimit
+	var resources corev1.ResourceRequirements
+	memRequest, err := resource.ParseQuantity(deployment.MemoryRequest)
+	if err != nil {
+		panic(err)
+	}
+	memLimit, err := resource.ParseQuantity(deployment.MemoryLimit)
+	if err != nil {
+		panic(err)
+	}
+	resources.Requests[corev1.ResourceMemory] = memRequest
+	resources.Limits[corev1.ResourceMemory] = memLimit
 	c1.Resources = resources
-
-	// assemble secrets
-	c1.ImagePullSecrets = deployment.Secrets
 
 	clist = append(clist, c1)
 
-	var krc Deploymentspec
+	var krc v1.Deployment
 
-	krc.Metadata.Name = deployment.App
-	krc.Metadata.Namespace = deployment.Space
-	krc.Metadata.Labels = deployment.Labels
-	krc.Spec.Replicas = deployment.Amount
-	krc.Spec.RevisionHistoryLimit = deployment.RevisionHistoryLimit
-	krc.Spec.Selector.MatchLabels.Name = deployment.App
-	krc.Spec.Template.Metadata.Name = deployment.App
+	krc.SetName(deployment.App)
+	krc.SetNamespace(deployment.Space)
+	krc.SetLabels(deployment.Labels)
+	var replicas int32 = int32(deployment.Amount)
+	var revision int32 = int32(deployment.RevisionHistoryLimit)
+	krc.Spec.Replicas = &replicas
+	krc.Spec.RevisionHistoryLimit = &revision
+	krc.Spec.Selector.MatchLabels = map[string]string{"name": deployment.App}
+	krc.Spec.Template.SetName(deployment.App)
 
 	// copy labels to pod spec, add name app and version as well.
-	krc.Spec.Template.Metadata.Labels = make(map[string]string)
+	krc.Spec.Template.SetLabels(make(map[string]string))
 	for key, val := range deployment.Labels {
-		krc.Spec.Template.Metadata.Labels[key] = val
+		krc.Spec.Template.GetLabels()[key] = val
 	}
-	krc.Spec.Template.Metadata.Labels["name"] = deployment.App // unsure what this is used for.
-	krc.Spec.Template.Metadata.Labels["app"] = deployment.App  // unsure what this is used for.
-	krc.Spec.Template.Metadata.Labels["version"] = "v1"        // unsure what this is used for.
-
+	krc.Spec.Template.GetLabels()["name"] = deployment.App // unsure what this is used for.
+	krc.Spec.Template.GetLabels()["app"] = deployment.App  // unsure what this is used for.
+	krc.Spec.Template.GetLabels()["version"] = "v1"        // unsure what this is used for.
+	krc.Spec.Template.SetAnnotations(make(map[string]string))
 	if os.Getenv("FF_ISTIOINJECT") == "true" || deployment.Features.IstioInject || deployment.Features.ServiceMesh {
-		krc.Spec.Template.Metadata.Annotations.SidecarIstioIoInject = "true"
+		krc.Spec.Template.GetAnnotations()["sidecar.istio.io/inject"] = "true"
 	}
-
-	krc.Spec.Strategy.RollingUpdate.MaxUnavailable = 0
-	krc.Spec.Template.Spec.ImagePullSecrets = deployment.Secrets
+	maxUnavailable := intstr.FromInt(0)
+	krc.Spec.Strategy.RollingUpdate.MaxUnavailable = &maxUnavailable
+	krc.Spec.Template.Spec.ImagePullSecrets = make([]corev1.LocalObjectReference, 0)
+	for _, item := range deployment.Secrets {
+		krc.Spec.Template.Spec.ImagePullSecrets = append(krc.Spec.Template.Spec.ImagePullSecrets, corev1.LocalObjectReference{Name:item.Name})
+	}
 	krc.Spec.Template.Spec.Containers = clist
-	krc.Spec.Template.Spec.ImagePullPolicy = "Always"
-	krc.Spec.Template.Spec.TerminationGracePeriodSeconds = 60
+	var terminationGracePeriodSeconds int64 = 60
+	krc.Spec.Template.Spec.TerminationGracePeriodSeconds = &terminationGracePeriodSeconds
 
 	return krc
 }
@@ -787,7 +318,7 @@ func (rt Kubernetes) CreateDeployment(deployment *structs.Deployment) (err error
 	return nil
 }
 
-func (rt Kubernetes) getDeployment(space string, app string) (*Deploymentspec, error) {
+func (rt Kubernetes) getDeployment(space string, app string) (*v1.Deployment, error) {
 	if space == "" {
 		return nil, errors.New("FATAL ERROR: Unable to get deployment, space is blank.")
 	}
@@ -801,7 +332,7 @@ func (rt Kubernetes) getDeployment(space string, app string) (*Deploymentspec, e
 	if resp.StatusCode != http.StatusOK {
 		return nil, errors.New("deployment not found")
 	}
-	var deployment Deploymentspec
+	var deployment v1.Deployment
 	e = json.Unmarshal(resp.Body, &deployment)
 	if e != nil {
 		return nil, e
@@ -855,7 +386,7 @@ func (rt Kubernetes) RestartDeployment(space string, app string) (e error) {
 	}
 
 	currentTime := strconv.FormatInt(time.Now().UTC().Unix(), 10)
-	deployment.Spec.Template.Metadata.Annotations.AkkerisIORestartTime = currentTime
+	deployment.Spec.Template.GetAnnotations()["akkeris.io/restartTime,omitempty"] = currentTime
 
 	_, e = rt.k8sRequest("put", "/apis/apps/v1/namespaces/"+space+"/deployments/"+app, deployment)
 	return e
@@ -866,27 +397,31 @@ func (rt Kubernetes) GetDeploymentHistory(space string, app string) (dslist []st
 	if err != nil {
 		log.Println(err)
 	}
-	var rsl ReplicaSetList
+	var rsl v1.ReplicaSetList
 	e = json.Unmarshal(resp.Body, &rsl)
 	if e != nil {
 		return nil, e
 	}
 	for _, element := range rsl.Items {
 		var ds structs.DeploymentsSpec
-		ds.Name = element.Metadata.Name
-		ds.Space = element.Metadata.Namespace
-		ds.CreationTimestamp = element.Metadata.CreationTimestamp
+		ds.Name = element.GetName()
+		ds.Space = element.GetNamespace()
+		ds.CreationTimestamp = element.GetCreationTimestamp().UTC()
 		ds.Image = element.Spec.Template.Spec.Containers[0].Image
-		ds.Revision = element.Metadata.Annotations.DeploymentKubernetesIoRevision
+		ds.Revision = element.GetAnnotations()["deployment.kubernetes.io/revision"]
 		dslist = append(dslist, ds)
 	}
 	return dslist, nil
 }
 
 func (rt Kubernetes) RollbackDeployment(space string, app string, revision int) (e error) {
-	var rollbackspec Rollbackspec = Rollbackspec{ApiVersion: "apps/v1", Name: app, RollbackTo: Revisionspec{Revision: revision}}
-	rollbackspec.RollbackTo.Revision = revision
-	_, e = rt.k8sRequest("post", "/apis/apps/v1/namespaces/"+space+"/deployments/"+app+"/rollback", rollbackspec)
+	//var rollbackspec Rollbackspec = Rollbackspec{ApiVersion: "apps/v1", Name: app, RollbackTo: Revisionspec{Revision: revision}}
+	//rollbackspec.RollbackTo.Revision = revision
+	// According to kubernetes docs this has been deprecated,
+	// may consider removing https://github.com/kubernetes/api/blob/master/apps/v1beta1/types.go#L361
+
+	rollback := v1beta1.DeploymentRollback{Name: app, RollbackTo:v1beta1.RollbackConfig{Revision: int64(revision)}}
+	_, e = rt.k8sRequest("post", "/apis/apps/v1beta1/namespaces/"+space+"/deployments/"+app+"/rollback", rollback)
 	if e != nil {
 		return e
 	}
@@ -898,13 +433,13 @@ func (rt Kubernetes) GetReplicas(space string, app string) (rs []string, e error
 	if err != nil {
 		return nil, err
 	}
-	var response Itemsspec
+	var response v1.ReplicaSetList
 	e = json.Unmarshal(resp.Body, &response)
 	if e != nil {
 		return nil, e
 	}
 	for _, item := range response.Items {
-		rs = append(rs, item.Metadata.Name)
+		rs = append(rs, item.GetName())
 	}
 	return rs, nil
 }
@@ -925,13 +460,13 @@ func (rt Kubernetes) GetPods(space string, app string) (rs []string, e error) {
 	if err != nil {
 		return nil, err
 	}
-	var response Itemsspec
+	var response corev1.PodList
 	e = json.Unmarshal(resp.Body, &response)
 	if e != nil {
 		return nil, e
 	}
 	for _, item := range response.Items {
-		rs = append(rs, item.Metadata.Name)
+		rs = append(rs, item.GetName())
 	}
 	return rs, nil
 }
@@ -967,37 +502,48 @@ func (rt Kubernetes) CreateOneOffPod(deployment *structs.Deployment) (e error) {
 		deployment.Secrets = append(deployment.Secrets, structs.Namespec{Name: rt.imagePullSecret})
 	}
 
-	var koneoff OneOffPod
-	koneoff.Metadata.Name = deployment.App
-	koneoff.Metadata.Namespace = deployment.Space
-	koneoff.APIVersion = "v1"
-	koneoff.Kind = "Pod"
-	koneoff.Metadata.Labels.Name = deployment.App
-	koneoff.Metadata.Labels.Space = deployment.Space
+	var koneoff corev1.Pod
+	koneoff.SetName(deployment.App)
+	koneoff.SetNamespace(deployment.Space)
+	koneoff.SetLabels(map[string]string{"name":deployment.App, "space":deployment.Space})
 	koneoff.Spec.RestartPolicy = "Never"
-	koneoff.Spec.ImagePullPolicy = "Always"
-	koneoff.Spec.DnsPolicy = "Default"
+	koneoff.Spec.DNSPolicy = "Default"
 
-	var container ContainerItem
+	var container corev1.Container
 	container.ImagePullPolicy = "Always"
 	container.Name = deployment.App
 	container.Image = deployment.Image + ":" + deployment.Tag
-	container.ImagePullSecrets = deployment.Secrets
-	container.Env = deployment.ConfigVars
+	//container.ImagePullSecrets = deployment.Secrets
+	container.Env = make([]corev1.EnvVar, 0)
+	for _, env := range deployment.ConfigVars {
+		container.Env = append(container.Env, corev1.EnvVar{Name: env.Name, Value:env.Value})
+	}
 
 	if len(deployment.Command) > 0 {
 		container.Command = deployment.Command
 	}
 
-	var resources structs.ResourceSpec
-	resources.Requests.Memory = deployment.MemoryRequest
-	resources.Limits.Memory = deployment.MemoryLimit
+	// assemble memory constraints
+	var resources corev1.ResourceRequirements
+	memRequest, err := resource.ParseQuantity(deployment.MemoryRequest)
+	if err != nil {
+		panic(err)
+	}
+	memLimit, err := resource.ParseQuantity(deployment.MemoryLimit)
+	if err != nil {
+		panic(err)
+	}
+	resources.Requests[corev1.ResourceMemory] = memRequest
+	resources.Limits[corev1.ResourceMemory] = memLimit
 	container.Resources = resources
 
-	clist := []ContainerItem{}
+	clist := []corev1.Container{}
 	clist = append(clist, container)
 
-	koneoff.Spec.ImagePullSecrets = deployment.Secrets
+	koneoff.Spec.ImagePullSecrets = make([]corev1.LocalObjectReference, 0)
+	for _, item := range deployment.Secrets {
+		koneoff.Spec.ImagePullSecrets = append(koneoff.Spec.ImagePullSecrets, corev1.LocalObjectReference{Name:item.Name})
+	}
 	koneoff.Spec.Containers = clist
 
 	_, e = rt.k8sRequest("post", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+deployment.Space+"/pods", koneoff)
@@ -1042,22 +588,22 @@ func (rt Kubernetes) CreateSpace(name string, internal bool, compliance string) 
 	if name == "" {
 		return errors.New("FATAL ERROR: Unable to create space, space is blank.")
 	}
-	var namespace Namespacespec
-	namespace.Metadata.Name = name
+	var namespace corev1.Namespace
+	namespace.SetName(name)
 	if len(compliance) > 0 {
-		namespace.Metadata.Annotations.ComplianceTags = compliance
+		namespace.SetAnnotations(map[string]string{"akkeris.io/compliancetags": compliance})
 	}
-	namespace.Metadata.Labels.Internal = "false"
 	if internal {
-		namespace.Metadata.Labels.Internal = "true"
+		namespace.SetLabels(map[string]string{"akkeris.io/internal": "true"})
+	} else {
+		namespace.SetLabels(map[string]string{"akkeris.io/internal": "false"})
 	}
 	resp, e := rt.k8sRequest("post", "/api/"+rt.defaultApiServerVersion+"/namespaces", namespace)
-
 	if e != nil {
 		return e
 	}
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		return errors.New("Unable to create space, invalid response code from kubernetes: " + strconv.Itoa(resp.StatusCode))
+		return errors.New("Unable to create space, invalid response code from kubernetes: " + resp.Status)
 	}
 	return e
 }
@@ -1080,26 +626,11 @@ func (rt Kubernetes) UpdateSpaceTags(space string, compliance string) (e error) 
 	if space == "" {
 		return errors.New("FATAL ERROR: Unable to update space tags, space is blank.")
 	}
-	var namespace Namespacespec
-	namespace.Metadata.Name = space
-	namespace.Metadata.Annotations.ComplianceTags = compliance
+	var namespace corev1.Namespace
+	namespace.SetName(space)
+	namespace.SetAnnotations(map[string]string{"akkeris.io/compliancetags": compliance})
 	_, e = rt.k8sRequest("patch", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+space, namespace)
 	return e
-}
-
-func (rt Kubernetes) CreateSecret(space string, name string, data string, mimetype string) (*Secretspec, error) {
-	var secret Secretspec
-	secret.Metadata.Name = name
-	secret.Data.Dockercfg = data
-	secret.Type = mimetype
-	resp, err := rt.k8sRequest("post", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+space+"/secrets", secret)
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode != 201 && resp.StatusCode != 200 {
-		return nil, errors.New("Unable to create secret, invalid response code from kubernetes: " + resp.Status)
-	}
-	return &secret, nil
 }
 
 func (rt Kubernetes)  CopySecret(secretName string, fromNamespace string, toNamespace string) (error) {
@@ -1110,7 +641,7 @@ func (rt Kubernetes)  CopySecret(secretName string, fromNamespace string, toName
 		return errors.New("FATAL ERROR: Unable to get service, the app is blank.")
 	}
 	
-	var secret kube.Secret
+	var secret corev1.Secret
 	resp, err := rt.k8sRequest("get", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+fromNamespace+"/secrets/" + secretName, nil)
 	if err != nil {
 		return err
@@ -1136,10 +667,9 @@ func (rt Kubernetes)  CopySecret(secretName string, fromNamespace string, toName
 }
 
 func (rt Kubernetes) AddImagePullSecretToSpace(space string) (e error) {
-	var sa Serviceaccountspec = Serviceaccountspec{Metadata: structs.Namespec{Name: "default"}}
-	var ipss []structs.Namespec
-	ipss = append(ipss, structs.Namespec{Name: rt.imagePullSecret})
-	sa.ImagePullSecrets = ipss
+	var sa corev1.ServiceAccount
+	sa.SetName("default")
+	sa.ImagePullSecrets = []corev1.LocalObjectReference{corev1.LocalObjectReference{Name: rt.imagePullSecret}}
 	resp, err := rt.k8sRequest("put", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+space+"/serviceaccounts/default", sa)
 	if resp.StatusCode != 201 && resp.StatusCode != 200 {
 		return errors.New("Unable to add secret to space, invalid response code from kubernetes: " + resp.Status)
@@ -1167,33 +697,41 @@ func (rt Kubernetes) GetPodStatus(space string, app string) []structs.SpaceAppSt
 		log.Println("Cannot get pod from kuberenetes:")
 		log.Println(err)
 	}
-	var podstatus PodStatus
-	err = json.Unmarshal(resp.Body, &podstatus)
+	var pods corev1.PodList
+	err = json.Unmarshal(resp.Body, &pods)
 	if err != nil {
 		log.Println("Failed to decode pod details:")
 		log.Println(err)
 	}
 
 	var statuses []structs.SpaceAppStatus
-	for _, element := range podstatus.Items {
+	for _, element := range pods.Items {
 		var s structs.SpaceAppStatus
 		s.App = app
 		s.Space = space
 		if element.Status.Phase == "Running" {
 			s.Status = 0
-			s.Output = element.Metadata.Name + "=" + element.Status.Phase
+			s.Output = element.GetName() + "=" + string(element.Status.Phase)
 		}
 		if element.Status.Phase != "Running" {
 			s.Status = 2
-			s.Output = element.Status.Phase
+			s.Output = string(element.Status.Phase)
 		}
 		s.Reason = element.Status.Reason
 		s.ExtendedOutput = element.Status.Message
 		s.Ready = false
 		if len(element.Status.ContainerStatuses) > 0 {
 			s.Ready = element.Status.ContainerStatuses[0].Ready
-			s.Restarted = element.Status.ContainerStatuses[0].RestartCount
-			s.State = element.Status.ContainerStatuses[0].State
+			s.Restarted = int(element.Status.ContainerStatuses[0].RestartCount)
+			if element.Status.ContainerStatuses[0].State.Waiting != nil {
+				s.State["waiting"] = map[string]interface{}{"reason":element.Status.ContainerStatuses[0].State.Waiting.Reason, "message":element.Status.ContainerStatuses[0].State.Waiting.Message,}
+			}
+			if element.Status.ContainerStatuses[0].State.Running != nil {
+				s.State["running"] = map[string]interface{}{"startedAt":element.Status.ContainerStatuses[0].State.Running.StartedAt,}
+			}
+			if element.Status.ContainerStatuses[0].State.Terminated != nil {
+				s.State["terminated"] = map[string]interface{}{"exitCode":element.Status.ContainerStatuses[0].State.Terminated.ExitCode, "signal":element.Status.ContainerStatuses[0].State.Terminated.Signal, "reason":element.Status.ContainerStatuses[0].State.Terminated.Reason, "message":element.Status.ContainerStatuses[0].State.Terminated.Message, "startedAt":element.Status.ContainerStatuses[0].State.Terminated.StartedAt, "finishedAt":element.Status.ContainerStatuses[0].State.Terminated.FinishedAt, "containerID":element.Status.ContainerStatuses[0].State.Terminated.ContainerID,}
+			}
 		}
 		statuses = append(statuses, s)
 	}
@@ -1202,7 +740,6 @@ func (rt Kubernetes) GetPodStatus(space string, app string) []structs.SpaceAppSt
 
 func (rt Kubernetes) GetPodDetails(space string, app string) []structs.Instance {
 	var instances []structs.Instance
-
 	if space == "" {
 		log.Println("FATAL ERROR: Unable to get pod details, space is blank.")
 		return instances
@@ -1216,7 +753,7 @@ func (rt Kubernetes) GetPodDetails(space string, app string) []structs.Instance 
 		log.Println("Cannot get pod from kuberenetes:")
 		log.Println(err)
 	}
-	var podstatus PodStatus
+	var podstatus corev1.PodList
 	err = json.Unmarshal(resp.Body, &podstatus)
 	if err != nil {
 		log.Println("Failed to decode pod details:")
@@ -1225,65 +762,33 @@ func (rt Kubernetes) GetPodDetails(space string, app string) []structs.Instance 
 
 	for _, element := range podstatus.Items {
 		var instance structs.Instance
-		instance.InstanceID = element.Metadata.Name
-		instance.Phase = element.Status.Phase
-		instance.StartTime = element.Status.StartTime
+		instance.InstanceID = element.GetName()
+		instance.Phase = string(element.Status.Phase)
+		instance.StartTime = element.Status.StartTime.UTC()
 		var appstatus []structs.Appstatus
-		for _, containerelement := range element.Status.ContainerStatuses {
+		for _, containerStatus := range element.Status.ContainerStatuses {
 			var as structs.Appstatus
-			state := containerelement.State
-			var keys []string
-			for k := range state {
-				keys = append(keys, k)
+			var state = "waiting"
+			if containerStatus.State.Waiting != nil { //containerstate == "waiting" {
+				as.StartedAt = element.Status.StartTime.UTC()
+				instance.Reason = containerStatus.State.Waiting.Reason
 			}
-			containerstate := keys[0]
-			details := make(map[string]string)
-			for _, v := range state {
-				for k2, v2 := range v.(map[string]interface{}) {
-					if v2 != nil {
-						v2type := reflect.TypeOf(v2).String()
-						if v2type == "string" {
-							details[k2] = v2.(string)
-						}
-						if v2type == "float64" {
-							details[k2] = strconv.FormatFloat(v2.(float64), 'f', -1, 64)
-						}
-					} else {
-						details[k2] = ""
-					}
-
-				}
+			if containerStatus.State.Running != nil { //containerstate == "running" {
+				state = "running"
+				instance.Reason = ""
+				as.StartedAt = containerStatus.State.Running.StartedAt.UTC()
 			}
-			if containerstate == "waiting" {
-				as.StartedAt = element.Status.StartTime
-				instance.Reason = details["reason"]
-			}
-			if containerstate == "running" {
-				instance.Reason = details["reason"]
-				layout := "2006-01-02T15:04:05Z"
-				str := details["startedAt"]
-				t, err := time.Parse(layout, str)
-				if err != nil {
-					log.Println("Failed to parse startedAt time on GetPodDetails")
-					log.Println(err)
-				}
-				as.StartedAt = t
-			}
-			if containerstate == "terminated" {
-				instance.Reason = details["reason"]
-				layout := "2006-01-02T15:04:05Z"
-				str := details["finishedAt"]
-				t, err := time.Parse(layout, str)
-				if err != nil {
-					log.Println("Failed to parse finishedAt time on GetPodDetails")
-					log.Println(err)
-				}
-				as.StartedAt = t
+			if containerStatus.State.Terminated != nil { //if containerstate == "terminated" {
+				state = "terminated"
+				instance.Reason = containerStatus.State.Terminated.Reason
+				// no idea why this is started at, but when we moved
+				// to kube strucutres it was this way, so we'll keep it
+				as.StartedAt = containerStatus.State.Terminated.FinishedAt.UTC()
 			}
 
-			instance.Phase = instance.Phase + "/" + containerstate
-			as.App = containerelement.Name
-			as.ReadyStatus = containerelement.Ready
+			instance.Phase = instance.Phase + "/" + state
+			as.App = containerStatus.Name
+			as.ReadyStatus = containerStatus.Ready
 			appstatus = append(appstatus, as)
 		}
 		instance.Appstatus = appstatus
@@ -1305,28 +810,27 @@ func (rt Kubernetes) GetPodLogs(space string, app string, pod string) (log strin
 	return string(body), nil
 }
 
-func (rt Kubernetes) GetService(space string, app string) (KubeService, error) {
-	var response KubeService
+func (rt Kubernetes) GetService(space string, app string) (*corev1.Service, error) {
+	var response corev1.Service
 	if space == "" {
-		return response, errors.New("FATAL ERROR: Unable to get service, space is blank.")
+		return nil, errors.New("FATAL ERROR: Unable to get service, space is blank.")
 	}
 	if app == "" {
-		return response, errors.New("FATAL ERROR: Unable to get service, the app is blank.")
+		return nil, errors.New("FATAL ERROR: Unable to get service, the app is blank.")
 	}
 	resp, e := rt.k8sRequest("get", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+space+"/services/"+app, nil)
 	if e != nil {
-		return response, e
+		return nil, e
 	}
 	if resp.StatusCode != http.StatusOK {
-		return response, errors.New("Unable to get service " + resp.Status)
+		return nil, errors.New("Unable to get service " + resp.Status)
 	}
 	e = json.Unmarshal(resp.Body, &response)
 	if e != nil {
-		return response, e
+		return &response, e
 	}
-	return response, nil
+	return &response, nil
 }
-
 
 func (rt Kubernetes) ServiceExists(space string, app string) (bool, error) {
 	if space == "" {
@@ -1359,37 +863,32 @@ func (rt Kubernetes) CreateService(space string, app string, port int, labels ma
 		return errors.New("Invalid port range on CreateService: " + strconv.Itoa(port))
 	}
 
-	var service Service
-	service.Kind = "Service"
-	service.Metadata.Annotations.ServiceBetaKubernetesIoAwsLoadBalancerInternal = "0.0.0.0/0"
-	service.Metadata.Name = app
+	var service corev1.Service
+	service.SetAnnotations(map[string]string{"service.beta.kubernetes.io/aws-load-balancer-internal":"0.0.0.0/0"})
+	service.SetName(app)
 	labels["app"] = app
 	labels["name"] = app
-	service.Metadata.Labels = labels
-	service.Spec.Selector.Name = app
+	service.SetLabels(labels)
+	service.Spec.Selector["name"] = app
 
-	var portitem PortItem
+	var portitem corev1.ServicePort
 	portitem.Protocol = "TCP"
 	portitem.Port = 80
-	portitem.TargetPort = port
+	portitem.TargetPort = intstr.FromInt(port)
 	if features.Http2EndToEndService {
 		portitem.Name = "http2"
 	} else {
 		portitem.Name = "http"
 	}
-	portlist := []PortItem{}
-	portlist = append(portlist, portitem)
-	service.Spec.Ports = portlist
+	service.Spec.Ports = []corev1.ServicePort{portitem}
 	service.Spec.Type = "NodePort"
 
 	resp, e := rt.k8sRequest("post", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+space+"/services", service)
 	if e != nil {
 		return e
 	}
-	var response Createspec
-	e = json.Unmarshal(resp.Body, &response)
-	if e != nil {
-		return e
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		return errors.New("Unable to create service: " + resp.Status)
 	}
 	return nil
 }
@@ -1414,20 +913,18 @@ func (rt Kubernetes) UpdateService(space string, app string, port int, labels ma
 		} else {
 			existingservice.Spec.Ports[0].Name = "http"
 		}
-		existingservice.Spec.Ports[0].TargetPort = port
+		existingservice.Spec.Ports[0].TargetPort = intstr.FromInt(port)
 	}
 	for k := range labels {
-		existingservice.Metadata.Labels[k] = labels[k]
+		existingservice.GetLabels()[k] = labels[k]
 	}
 
 	resp, e := rt.k8sRequest("put", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+space+"/services/"+app, existingservice)
 	if e != nil {
 		return e
 	}
-	var response Createspec
-	e = json.Unmarshal(resp.Body, &response)
-	if e != nil {
-		return e
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		return errors.New("Unable to update service: " + resp.Status)
 	}
 	return nil
 }
@@ -1443,20 +940,18 @@ func (rt Kubernetes) DeleteService(space string, app string) (e error) {
 	if err != nil {
 		return err
 	}
-	var response Statusspec
-	err = json.Unmarshal(resp.Body, &response)
-	if err != nil {
-		return err
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusConflict {
+		return errors.New("Unable to delete service: " + resp.Status)
 	}
 	return nil
 }
 
-func (rt Kubernetes) GetServices() (*ServiceCollectionspec, error) {
+func (rt Kubernetes) GetServices() (*corev1.ServiceList, error) {
 	resp, e := rt.k8sRequest("get", "/api/"+rt.defaultApiServerVersion+"/services", nil)
 	if e != nil {
 		return nil, e
 	}
-	var services ServiceCollectionspec
+	var services corev1.ServiceList
 	e = json.Unmarshal(resp.Body, &services)
 	if e != nil {
 		return nil, e
@@ -1465,53 +960,64 @@ func (rt Kubernetes) GetServices() (*ServiceCollectionspec, error) {
 }
 
 func (rt Kubernetes) CronJobExists(space string, job string) bool {
-	resp, err := rt.k8sRequest("get", "/apis/batch/v2alpha1/namespaces/"+space+"/cronjobs/"+job, nil)
+	resp, err := rt.k8sRequest("get", "/apis/batch/v1beta1/namespaces/"+space+"/cronjobs/"+job, nil)
 	if err != nil {
 		return false
 	}
-	if resp.StatusCode == 200 {
+	if resp.StatusCode == http.StatusOK {
 		return true
 	}
 	return false
 }
 
-func deploymentToCronJob(deployment *structs.Deployment) (cronJob *CronJob) {
-	// Limits
-	var resources structs.ResourceSpec
-	resources.Requests.Memory = deployment.MemoryRequest
-	resources.Limits.Memory = deployment.MemoryLimit
+func deploymentToCronJob(deployment *structs.Deployment) (cronJob *v1beta1_batch.CronJob) {
+	var resources corev1.ResourceRequirements
+	memRequest, err := resource.ParseQuantity(deployment.MemoryRequest)
+	if err != nil {
+		panic(err)
+	}
+	memLimit, err := resource.ParseQuantity(deployment.MemoryLimit)
+	if err != nil {
+		panic(err)
+	}
+	resources.Requests[corev1.ResourceMemory] = memRequest
+	resources.Limits[corev1.ResourceMemory] = memLimit
 
 	// Image and config
-	var container ContainerItem
+	var container corev1.Container
 	container.Name = deployment.App
 	container.Image = deployment.Image
-	container.ImagePullSecrets = deployment.Secrets
-	container.Env = deployment.ConfigVars
+	container.Env = make([]corev1.EnvVar, 0)
+	for _, env := range deployment.ConfigVars {
+		container.Env = append(container.Env, corev1.EnvVar{Name: env.Name, Value:env.Value})
+	}
 	container.Resources = resources
 
-	var clist []ContainerItem
-	clist = append(clist, container)
+	clist := []corev1.Container{container}
 
-	var job Job
-	job.Metadata.Name = deployment.App
-	job.Metadata.Namespace = deployment.Space
-	job.Metadata.Labels.Name = deployment.App
-	job.Metadata.Labels.Space = deployment.Space
-	job.Spec.Template.Metadata.Name = deployment.App
-	job.Spec.Template.Metadata.Namespace = deployment.Space
-	job.Spec.Template.Metadata.Labels.Name = deployment.App
-	job.Spec.Template.Metadata.Labels.Space = deployment.Space
-	job.Spec.Template.Spec.ImagePullSecrets = deployment.Secrets
+	var job v1beta1_batch.JobTemplateSpec
+	job.SetName(deployment.App)
+	job.SetNamespace(deployment.Space)
+	job.SetLabels(map[string]string{"name":deployment.App, "space":deployment.Space})
+	job.Spec.Template.SetName(deployment.App)
+	job.Spec.Template.SetNamespace(deployment.Space)
+	job.Spec.Template.SetLabels(map[string]string{"name":deployment.App, "space":deployment.Space})
+	job.Spec.Template.Spec.ImagePullSecrets = make([]corev1.LocalObjectReference, 0)
+	for _, item := range deployment.Secrets {
+		job.Spec.Template.Spec.ImagePullSecrets = append(job.Spec.Template.Spec.ImagePullSecrets, corev1.LocalObjectReference{Name:item.Name})
+	}
+
 	job.Spec.Template.Spec.Containers = clist
+	job.Spec.Template.Spec.DNSPolicy = "Default"
 	job.Spec.Template.Spec.RestartPolicy = "OnFailure"
 
 	// Template for CronJob
-	cronJob.Metadata.Name = deployment.App
-	cronJob.Metadata.Namespace = deployment.Space
-	cronJob.Metadata.Labels.Name = deployment.App
-	cronJob.Metadata.Labels.Space = deployment.Space
+	cronJob.SetName(deployment.App)
+	cronJob.SetNamespace(deployment.Space)
+	cronJob.SetLabels(map[string]string{"name":deployment.App, "space":deployment.Space})
 	cronJob.Spec.Schedule = deployment.Schedule
-	cronJob.Spec.StartingDeadlineSeconds = 60
+	var startingDeadlineSeconds = int64(60)
+	cronJob.Spec.StartingDeadlineSeconds = &startingDeadlineSeconds 
 	cronJob.Spec.JobTemplate = job
 
 	return cronJob
@@ -1527,7 +1033,7 @@ func (rt Kubernetes) CreateCronJob(deployment *structs.Deployment) (*structs.Cro
 	}
 
 	// Update or Create Job
-	resp, err := rt.k8sRequest("post", "/apis/batch/v2alpha1/namespaces/"+deployment.Space+"/cronjobs", deploymentToCronJob(deployment))
+	resp, err := rt.k8sRequest("post", "/apis/batch/v1beta1/namespaces/"+deployment.Space+"/cronjobs", deploymentToCronJob(deployment))
 	if err != nil {
 		return nil, err
 	}
@@ -1542,6 +1048,53 @@ func (rt Kubernetes) CreateCronJob(deployment *structs.Deployment) (*structs.Cro
 	return &status, nil
 }
 
+func (rt Kubernetes) GetCronJob(space string, jobName string) (*structs.CronJobStatus, error) {
+	if space == "" {
+		return nil, errors.New("FATAL ERROR: Unable to get cron job, space is blank.")
+	}
+	if jobName == "" {
+		return nil, errors.New("FATAL ERROR: Unable to get cron job, the jobName is blank.")
+	}
+	resp, err := rt.k8sRequest("get", "/apis/batch/v1beta1/namespaces/"+space+"/cronjobs/"+jobName, nil)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.New("Unable to get cron job, kubernetes returned: " + resp.Status)
+	}
+
+	var status structs.CronJobStatus
+	err = json.Unmarshal(resp.Body, &status)
+	if err != nil {
+		return nil, err
+	}
+	return &status, nil
+}
+
+func (rt Kubernetes) GetCronJobs(space string) (sjobs []structs.CronJobStatus, e error) {
+	if space == "" {
+		return nil, errors.New("FATAL ERROR: Unable to get cron jobs, space is blank.")
+	}
+	resp, err := rt.k8sRequest("get", "/apis/batch/v1beta1/namespaces/"+space+"/cronjobs", nil)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.New("Unable to get cron jobs, kubernetes returned: " + resp.Status)
+	}
+
+	var status []structs.CronJobStatus
+	var jobList structs.CronJobList
+	err = json.Unmarshal(resp.Body, &jobList)
+	if err != nil {
+		return nil, err
+	}
+	for _, element := range jobList.Items {
+		status = append(status, element)
+	}
+	return status, nil
+}
+
 func (rt Kubernetes) UpdateCronJob(deployment *structs.Deployment) (*structs.CronJobStatus, error) {
 	if deployment.Space == "" {
 		return nil, errors.New("FATAL ERROR: Unable to update cron job, space is blank.")
@@ -1554,7 +1107,7 @@ func (rt Kubernetes) UpdateCronJob(deployment *structs.Deployment) (*structs.Cro
 		deployment.Secrets = append(deployment.Secrets, structs.Namespec{Name: rt.imagePullSecret})
 	}
 
-	resp, err := rt.k8sRequest("put", "/apis/batch/v2alpha1/namespaces/"+deployment.Space+"/cronjobs/"+deployment.App, deploymentToCronJob(deployment))
+	resp, err := rt.k8sRequest("put", "/apis/batch/v1beta1/namespaces/"+deployment.Space+"/cronjobs/"+deployment.App, deploymentToCronJob(deployment))
 	if err != nil {
 		return nil, err
 	}
@@ -1582,33 +1135,42 @@ func (rt Kubernetes) CreateJob(deployment *structs.Deployment) (*structs.JobStat
 		deployment.Secrets = append(deployment.Secrets, structs.Namespec{Name: rt.imagePullSecret})
 	}
 
-	var resources structs.ResourceSpec
-	resources.Requests.Memory = deployment.MemoryRequest
-	resources.Limits.Memory = deployment.MemoryLimit
+	var container corev1.Container
+	var resources corev1.ResourceRequirements
+	memRequest, err := resource.ParseQuantity(deployment.MemoryRequest)
+	if err != nil {
+		panic(err)
+	}
+	memLimit, err := resource.ParseQuantity(deployment.MemoryLimit)
+	if err != nil {
+		panic(err)
+	}
+	resources.Requests[corev1.ResourceMemory] = memRequest
+	resources.Limits[corev1.ResourceMemory] = memLimit
+	container.Resources = resources
 
-	var container ContainerItem
 	container.Name = deployment.App
 	container.Image = deployment.Image + ":" + deployment.Tag
 	container.ImagePullPolicy = "Always"
-	container.ImagePullSecrets = deployment.Secrets
-	container.Env = deployment.ConfigVars
-	container.Resources = resources
 
-	var clist []ContainerItem
-	clist = append(clist, container)
+	container.Env = make([]corev1.EnvVar, 0)
+	for _, env := range deployment.ConfigVars {
+		container.Env = append(container.Env, corev1.EnvVar{Name: env.Name, Value:env.Value})
+	}
 
-	var job Job
-	job.Metadata.Name = deployment.App
-	job.Metadata.Namespace = deployment.Space
-	job.Metadata.Labels.Name = deployment.App
-	job.Metadata.Labels.Space = deployment.Space
-	job.Spec.Template.Metadata.Name = deployment.App
-	job.Spec.Template.Metadata.Namespace = deployment.Space
-	job.Spec.Template.Metadata.Labels.Name = deployment.App
-	job.Spec.Template.Metadata.Labels.Space = deployment.Space
-	job.Spec.Template.Spec.ImagePullSecrets = deployment.Secrets
-	job.Spec.Template.Spec.DnsPolicy = "Default"
-	job.Spec.Template.Spec.Containers = clist
+	var job v1batch.Job
+	job.SetName(deployment.App)
+	job.SetNamespace(deployment.Space)
+	job.SetLabels(map[string]string{"name":deployment.App,"space":deployment.Space})
+	job.Spec.Template.SetName(deployment.App)
+	job.Spec.Template.SetNamespace(deployment.Space)
+	job.Spec.Template.SetLabels(map[string]string{"name":deployment.App,"space":deployment.Space})
+	job.Spec.Template.Spec.ImagePullSecrets = make([]corev1.LocalObjectReference, 0)
+	for _, item := range deployment.Secrets {
+		job.Spec.Template.Spec.ImagePullSecrets = append(job.Spec.Template.Spec.ImagePullSecrets, corev1.LocalObjectReference{Name:item.Name})
+	}
+	job.Spec.Template.Spec.DNSPolicy = "Default"
+	job.Spec.Template.Spec.Containers = []corev1.Container{container}
 	job.Spec.Template.Spec.RestartPolicy = "OnFailure"
 
 	resp, err := rt.k8sRequest("post", "/apis/batch/v1/namespaces/"+deployment.Space+"/jobs", job)
@@ -1718,53 +1280,6 @@ func (rt Kubernetes) GetJobs(space string) ([]structs.JobStatus, error) {
 	return status, nil
 }
 
-func (rt Kubernetes) GetCronJob(space string, jobName string) (*structs.CronJobStatus, error) {
-	if space == "" {
-		return nil, errors.New("FATAL ERROR: Unable to get cron job, space is blank.")
-	}
-	if jobName == "" {
-		return nil, errors.New("FATAL ERROR: Unable to get cron job, the jobName is blank.")
-	}
-	resp, err := rt.k8sRequest("get", "/apis/batch/v2alpha1/namespaces/"+space+"/cronjobs/"+jobName, nil)
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, errors.New("Unable to get cron job, kubernetes returned: " + resp.Status)
-	}
-
-	var status structs.CronJobStatus
-	err = json.Unmarshal(resp.Body, &status)
-	if err != nil {
-		return nil, err
-	}
-	return &status, nil
-}
-
-func (rt Kubernetes) GetCronJobs(space string) (sjobs []structs.CronJobStatus, e error) {
-	if space == "" {
-		return nil, errors.New("FATAL ERROR: Unable to get cron jobs, space is blank.")
-	}
-	resp, err := rt.k8sRequest("get", "/apis/batch/v2alpha1/namespaces/"+space+"/cronjobs", nil)
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, errors.New("Unable to get cron jobs, kubernetes returned: " + resp.Status)
-	}
-
-	var status []structs.CronJobStatus
-	var jobList structs.CronJobList
-	err = json.Unmarshal(resp.Body, &jobList)
-	if err != nil {
-		return nil, err
-	}
-	for _, element := range jobList.Items {
-		status = append(status, element)
-	}
-	return status, nil
-}
-
 func (rt Kubernetes) ScaleJob(space string, jobName string, replicas int, timeout int) (e error) {
 	if space == "" {
 		return errors.New("FATAL ERROR: Unable to scale job, space is blank.")
@@ -1780,14 +1295,15 @@ func (rt Kubernetes) ScaleJob(space string, jobName string, replicas int, timeou
 		return errors.New("Unable to get job on scale, kubernetes returned: " + resp.Status)
 	}
 
-	var job JobScaleGet
+	var job v1batch.Job
 	e = json.Unmarshal(resp.Body, &job)
 	if e != nil {
 		return e
 	}
-
-	job.Spec.Parallelism = replicas
-	job.Spec.ActiveDeadlineSeconds = timeout
+	var r int32 = int32(replicas)
+	var t int64 = int64(timeout)
+	job.Spec.Parallelism = &r
+	job.Spec.ActiveDeadlineSeconds = &t
 	resp, e = rt.k8sRequest("put", "/apis/batch/v1/namespaces/"+space+"/jobs/"+jobName, job)
 	if e != nil {
 		return e
@@ -1816,7 +1332,7 @@ func (rt Kubernetes) JobExists(space string, jobName string) bool {
 	return false
 }
 
-func (rt Kubernetes) GetPodsBySpace(space string) (*PodStatus, error) {
+func (rt Kubernetes) GetPodsBySpace(space string) (*corev1.PodList, error) {
 	if space == "" {
 		return nil, errors.New("FATAL ERROR: Unable to get pods by space, space is blank.")
 	}
@@ -1827,7 +1343,10 @@ func (rt Kubernetes) GetPodsBySpace(space string) (*PodStatus, error) {
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, errors.New("space does not exist")
 	}
-	var podStatus PodStatus
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.New("Unable to get pods by space: " + resp.Status)
+	}
+	var podStatus corev1.PodList
 	err = json.Unmarshal(resp.Body, &podStatus)
 	if err != nil {
 		return nil, err
@@ -1835,15 +1354,18 @@ func (rt Kubernetes) GetPodsBySpace(space string) (*PodStatus, error) {
 	return &podStatus, nil
 }
 
-func (rt Kubernetes) GetNodes() (*structs.KubeNodes, error) {
+func (rt Kubernetes) GetNodes() (*corev1.NodeList, error) {
 	resp, err := rt.k8sRequest("get", "/api/"+rt.defaultApiServerVersion+"/nodes", nil)
 	if err != nil {
 		return nil, err
 	}
-	var nodes structs.KubeNodes
+	var nodes corev1.NodeList
 	err = json.Unmarshal(resp.Body, &nodes)
 	if err != nil {
 		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.New("Unable to get list of nodes: " + resp.Status)
 	}
 	return &nodes, nil
 }

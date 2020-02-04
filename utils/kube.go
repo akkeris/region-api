@@ -5,6 +5,7 @@ import (
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/render"
 	"net/http"
+	corev1 "k8s.io/api/core/v1" // todo, get rid of this.
 	runtime "region-api/runtime"
 	structs "region-api/structs"
 )
@@ -54,7 +55,7 @@ func GetKubeSystemPods(db *sql.DB, params martini.Params, r render.Render) {
 		return
 	}
 
-	list := []runtime.PodStatusItems{}
+	list := []corev1.Pod{}
 	for _, rt := range rts {
 		podStatus, err := rt.GetPodsBySpace("kube-system")
 		if err != nil {
@@ -66,22 +67,16 @@ func GetKubeSystemPods(db *sql.DB, params martini.Params, r render.Render) {
 
 	var msg structs.Messagespec
 	for _, element := range list {
-		for _, containerelement := range element.Status.ContainerStatuses {
-			state := containerelement.State
-			var keys []string
-			for k := range state {
-				keys = append(keys, k)
-			}
-			containerstate := keys[0]
-			if containerstate != "running" {
-				msg.Status = 500
-				msg.Message = containerelement.Name + " is not running"
+		for _, containerElement := range element.Status.ContainerStatuses {
+			if containerElement.State.Running == nil {
+				msg.Status = http.StatusInternalServerError
+				msg.Message = containerElement.Name + " is not running"
 				r.JSON(msg.Status, msg)
 				return
 			}
 		}
 	}
-	msg.Status = 200
+	msg.Status = http.StatusOK
 	msg.Message = "OK"
 	r.JSON(msg.Status, msg)
 }
@@ -92,7 +87,7 @@ func GetNodes(db *sql.DB, params martini.Params, r render.Render) {
 		ReportError(err, r)
 		return
 	}
-	list := []structs.KubeNodeItems{}
+	list := []corev1.Node{}
 	for _, rt := range rts {
 		nodes, err := rt.GetNodes()
 		if err != nil {
@@ -101,6 +96,5 @@ func GetNodes(db *sql.DB, params martini.Params, r render.Render) {
 		}
 		list = append(list, nodes.Items...)
 	}
-
-	r.JSON(200, structs.KubeNodes{Kind: "NodeList", APIVersion: "v1", Items: list})
+	r.JSON(200, corev1.NodeList{Items: list})
 }

@@ -1,16 +1,37 @@
 package app
 
 import (
+	"gopkg.in/guregu/null.v3/zero"
 	"database/sql"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/render"
 	"net/http"
-	structs "region-api/structs"
 	utils "region-api/utils"
 )
 
+
+type resourceSpec struct {
+	Requests struct {
+		Memory string `json:"memory,omitempty"`
+		CPU    string `json:"cpu,omitempty"`
+	} `json:"requests"`
+	Limits struct {
+		Memory string `json:"memory,omitempty"`
+		CPU    string `json:"cpu,omitempty"`
+	} `json:"limits"`
+}
+
+type qos struct {
+	Name        string       `json:"name"`
+	Resources   resourceSpec `json:"resources"`
+	Price       int          `json:"price"`
+	Description zero.String  `json:"description"`
+	Deprecated  bool         `json:"deprecated"`
+	Type        zero.String  `json:"type"`
+}
+
 func GetPlans(db *sql.DB, params martini.Params, r render.Render) {
-	var plan structs.QoS
+	var plan qos
 
 	rows, err := db.Query("select name, memrequest, memlimit, price, deprecated, description, type from plans")
 	if err != nil {

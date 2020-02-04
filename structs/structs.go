@@ -2,7 +2,6 @@ package structs
 
 import (
 	"time"
-	"gopkg.in/guregu/null.v3/zero"
 )
 
 type Namespec struct {
@@ -90,7 +89,7 @@ type Spacelist struct {
 type Spaceappspec struct {
 	Appname     string     `json:"appname"`
 	Space       string     `json:"space"`
-	Instances   int        `json:"instances"`
+	Instances   int32      `json:"instances"`
 	Bindings    []Bindspec `json:"bindings"`
 	Plan        string     `json:"plan"`
 	Healthcheck string     `json:"healthcheck,omitempty"`
@@ -130,32 +129,10 @@ type Rabbitmqspec struct {
 	Spec          string `json:"spec"`
 }
 
-//Postgresspec Postgres spec
-type Postgresspec struct {
-	DatabaseUrl string `json:"DATABASE_URL"`
-	Spec        string `json:"spec"`
-}
-
 //Mongodbspec Postgres spec
 type Mongodbspec struct {
 	MongodbUrl string `json:"MONGODB_URL"`
 	Spec       string `json:"spec"`
-}
-
-//Auroramysqlspec mysql spec
-type Auroramysqlspec struct {
-	DatabaseUrl         string `json:"DATABASE_URL"`
-	DatabaseReadonlyUrl string `json:"DATABASE_READONLY_URL"`
-	Spec                string `json:"spec"`
-}
-
-//Neptunespec Neptune db spec
-type Neptunespec struct {
-	NeptuneDatabaseURL string `json:"NEPTUNE_DATABASE_URL"`
-	NeptuneAccessKey   string `json:"NEPTUNE_ACCESS_KEY"`
-	NeptuneSecretKey   string `json:"NEPTUNE_SECRET_KEY"`
-	NeptuneRegion      string `json:"NEPTUNE_REGION"`
-	Spec               string `json:"spec"`
 }
 
 type Influxdbspec struct {
@@ -244,16 +221,6 @@ type SpaceAppStatus struct {
 	Restarted      int                    `json:"restarted"`
 }
 
-type Subscriber struct {
-	Subscriber   string
-	Servicegroup string
-}
-type Subscriberspec struct {
-	Appname string `json:"appname"`
-	Space   string `json:"space"`
-	Email   string `json:"email"`
-}
-
 type NagiosAlert struct {
 	Servicegroup     string `json:"servicegroup"`
 	CheckType        string `json:"checktype"`
@@ -266,14 +233,6 @@ type NagiosAlert struct {
 	Output           string `json:"output"`
 	Appname          string `json:"appname"`
 	Space            string `json:"space"`
-}
-
-type Callbackspec struct {
-	Space   string `json:"space"`
-	Appname string `json:"appname"`
-	Url     string `json:"url"`
-	Tag     string `json:"tag"`
-	Method  string `json:"method"`
 }
 
 type VaultSecret struct {
@@ -334,12 +293,6 @@ type PromStat struct {
 	} `json:"data"`
 }
 
-type PodMemoryspec struct {
-	Namespace string `json:"namespace"`
-	Podname   string `json:"podname"`
-	MemoryMB  int    `json:"memorymb"`
-}
-
 type JobStatus struct {
 	Metadata struct {
 		Name                       string `json:"name"`
@@ -396,26 +349,6 @@ type CronJobStatus struct {
 		ResourceVersion string `json:"resourceVersion"`
 	} `json:"active"`
 	LastScheduleTime time.Time `json:"lastScheduleTime"`
-}
-
-type ResourceSpec struct {
-	Requests struct {
-		Memory string `json:"memory,omitempty"`
-		CPU    string `json:"cpu,omitempty"`
-	} `json:"requests"`
-	Limits struct {
-		Memory string `json:"memory,omitempty"`
-		CPU    string `json:"cpu,omitempty"`
-	} `json:"limits"`
-}
-
-type QoS struct {
-	Name        string       `json:"name"`
-	Resources   ResourceSpec `json:"resources"`
-	Price       int          `json:"price"`
-	Description zero.String  `json:"description"`
-	Deprecated  bool         `json:"deprecated"`
-	Type        zero.String  `json:"type"`
 }
 
 type OneOffSpec struct {
@@ -483,11 +416,7 @@ type Maintenancespec struct {
 	Space  string `json:"space"`
 	Status string `json:"status"`
 }
-type F5creds struct {
-	Username          string `json:"username"`
-	Password          string `json:"password"`
-	LoginProviderName string `json:"loginProviderName"`
-}
+
 type Rules struct {
 	Items []struct {
 		APIAnonymous string `json:"apiAnonymous"`
@@ -559,83 +488,8 @@ type Secret struct {
 	SecretName string `json:"secretName,omitempty"`
 }
 
-type KubeNodeItems struct {
-	Metadata struct {
-		Name string `json:"name"`
-		UID  string `json:"uid"`
-	} `json:"metadata"`
-	Spec struct {
-		Unschedulable bool `json:"unschedulable"`
-	} `json:"spec"`
-	Status struct {
-		Addresses []struct {
-			Type    string `json:"type"`
-			Address string `json:"address"`
-		} `json:"addresses"`
-	} `json:"status"`
-}
-
-type KubeNodes struct {
-	Kind       string          `json:"kind"`
-	APIVersion string          `json:"apiVersion"`
-	Items      []KubeNodeItems `json:"items"`
-}
-
 type URLTemplates struct {
 	Internal string `json:"internal"`
 	External string `json:"external"`
 }
 
-type KafkaTopic struct {
-	Topic struct {
-		Name   string `json:"name"`
-		Config struct {
-			Name          string `json:"name"`
-			Cleanuppolicy string `json:"cleanup.policy,omitempty"`
-			Partitions    *int   `json:"partitions,omitempty"`
-			Retentionms   *int   `json:"retention.ms,omitempty"`
-			Replicas      *int   `json:"replicas,omitempty"`
-		} `json:"config"`
-	} `json:"topic"`
-}
-
-type KafkaAclCredentials struct {
-	AclCredentials struct {
-		Username string `json:"username"`
-	} `json:"aclCredentials"`
-}
-
-type Kafkaspec struct {
-	Spec string `json:"spec"`
-}
-
-type TopicSchemaMapping struct {
-	Topic  string `json:"topic"`
-	Schema struct {
-		Name string `json:"name"`
-	} `json:"schema"`
-}
-
-type TopicKeyMapping struct {
-	Topic   string `json:"topic"`
-	KeyType string `json:"keyType"`
-	Schema  *struct {
-		Name string `json:"name"`
-	} `json:"schema,omitempty"`
-}
-
-type AclRequest struct {
-	Topic             string `json:"topic"`
-	User              string `json:"user,omitempty"`
-	Space             string `json:"space"`
-	Appname           string `json:"app"`
-	Role              string `json:"role"`
-	ConsumerGroupName string `json:"consumerGroupName,omitempty"`
-}
-
-type KafkaConsumerGroupSeekRequest struct {
-	Topic         string `json:"topic"`
-	Partitions    []int  `json:"partitions,omitempty"`
-	SeekTo        string `json:"seekTo"`
-	AllPartitions bool   `json:"allPartitions,omitempty"`
-}

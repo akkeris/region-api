@@ -72,7 +72,7 @@ func Describeapp(db *sql.DB, params martini.Params, r render.Render) {
 func getSpacesapps(db *sql.DB, appname string) (sa []structs.Spaceappspec, err error) {
 	var spaceapps []structs.Spaceappspec
 	var space string
-	var instances int
+	var instances int32
 	var plan string
 	var healthcheck string
 
@@ -120,7 +120,7 @@ func Describespace(db *sql.DB, params martini.Params, r render.Render) {
 	spacename := params["space"]
 
 	var appname string
-	var instances int
+	var instances int32
 	var plan string
 	var healthcheck string
 	rows, err := db.Query("select appname, instances, coalesce(plan,'noplan') as plan, COALESCE(spacesapps.healthcheck,'tcp') AS healthcheck from spacesapps where space = $1", spacename)
@@ -146,7 +146,7 @@ func DescribeappInSpace(db *sql.DB, params martini.Params, r render.Render) {
 	appname := params["appname"]
 	spacename := params["space"]
 
-	var instances int
+	var instances int32
 	var plan string
 	var healthcheck string
 	err := db.QueryRow("select appname, instances, coalesce(plan,'noplan') as plan, COALESCE(spacesapps.healthcheck,'tcp') AS healthcheck from spacesapps where space = $1 and appname = $2", spacename, appname).Scan(&appname, &instances, &plan, &healthcheck)
