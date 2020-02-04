@@ -10,9 +10,11 @@ HTTP API for regional akkeris actions, it integrates with kubernetes, and servic
 
 **Kubernetes**
 
-The region api requires a kubernetes runtime. When running in a kubernetes cluster it administrates it using a service account provided in its deployment. The service account should have the ability to read, write and delete services, deployments, configmaps, virtual services, certificates, gateways, secrets (within istio-system only), jobs and pods in all namespaces (unless otherwise specified). 
+The region api requires a kubernetes runtime. When running in a kubernetes cluster that it administrates, a service account must be specified in its deployment manifest. The service account should have the ability to read, write and delete services, deployments, configmaps, virtual services, certificates, gateways, secrets (within istio-system only), jobs and pods in all namespaces (unless otherwise specified). 
 
-To run this out-of-cluster specify the path to a kube config file using `--kubeconfig` flag, the current context in the kube config file is used.  If no service account or `--kubeconfig` is specified then the region api defaults to using the current context in `$HOME/.kube/config`. 
+When running the region api out-of-cluster (i.e. locally), a kubeconfig file can be specified using the `--kubeconfig` flag. This will instruct the region api to use the current context in the provided kubeconfig file. 
+
+If no service account or `--kubeconfig` is specified, the region api will use the current context in `$HOME/.kube/config` by default. 
 
 **Postgres Database**
 
