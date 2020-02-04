@@ -1317,6 +1317,9 @@ func (rt Kubernetes) GetService(space string, app string) (KubeService, error) {
 	if e != nil {
 		return response, e
 	}
+	if resp.StatusCode == http.StatusNotFound {
+		return response, errors.New("service not found")
+	}
 	if resp.StatusCode != http.StatusOK {
 		return response, errors.New("Unable to get service " + resp.Status)
 	}

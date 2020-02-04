@@ -40,7 +40,10 @@ func GetService(db *sql.DB, params martini.Params, r render.Render) {
 		return
 	}
 	service, err := rt.GetService(space, app)
-	if err != nil {
+	if err != nil && err.Error() == "service not found" {
+		r.JSON(http.StatusNotFound, "");
+		return
+	} else if err != nil {
 		ReportError(err, r)
 		return
 	}
