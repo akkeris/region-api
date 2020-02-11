@@ -3,6 +3,7 @@ package app
 import (
 	"database/sql"
 	"github.com/go-martini/martini"
+	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
 	"io/ioutil"
 	"net"
@@ -14,6 +15,23 @@ import (
 	"strconv"
 	"strings"
 )
+
+func Exec(db *sql.DB, spec structs.Exec, berr binding.Errors, params martini.Params, r render.Render) {
+	app := params["app"]
+	space := params["space"]
+	instance := params["instance"]
+	rt, err := runtime.GetRuntimeFor(db, space)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	if err := rt.Exec(space, app, instance, spec.Command); err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+
+	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: "OK"})
+}
 
 func Spaceappstatus(params martini.Params, r render.Render) {
 	app := params["app"]

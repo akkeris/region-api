@@ -18,6 +18,12 @@ type HttpFilters struct {
 	Data map[string]string `json:"data"`
 }
 
+type Exec struct {
+	Command []string `json:"command"`
+	Stdin string `json:"stdin"`
+	Tty string `json:"tty"`
+}
+
 //Deployspec deployment spec
 type Deployspec struct {
 	AppName  string   `json:"appname"`

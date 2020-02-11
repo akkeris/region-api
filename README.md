@@ -63,9 +63,6 @@ Set the following environment variables, if this is first time running it see th
 
 **Vault Settings**
 
-* `VAULT_ADDR` - The https url for vault
-* `VAULT_TOKEN` - The vault token
-* `VAULT_CERT_STORAGE` - Temporary vault path where uncommited certificates may be stored. 
 * `VAULT_PREFIX` - The prefix to use for vault credentials injected as enviornment variables.
 * `SECRETS` - A comma delimited list of vault paths where shared credentials are stored
 

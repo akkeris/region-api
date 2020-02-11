@@ -678,7 +678,7 @@ func TestQoSHandlers(t *testing.T) {
 			r, _ := http.NewRequest("GET", "/v1/apps/plans", nil)
 			w := httptest.NewRecorder()
 			m.ServeHTTP(w, r)
-			var response []structs.QoS
+			var response []qos
 			So(w.Code, ShouldEqual, http.StatusOK)
 			decoder := json.NewDecoder(w.Body)
 			if err := decoder.Decode(&response); err != nil {

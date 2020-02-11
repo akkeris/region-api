@@ -20,6 +20,7 @@ type Runtime interface {
 	UpdateDeployment(deployment *structs.Deployment) (err error)
 	DeleteDeployment(space string, app string) (e error)
 	DeploymentExists(space string, app string) (exists bool, e error)
+	Exec(space string, app string, instance string, command []string) (err error)
 	GetReplicas(space string, app string) (rs []string, e error)
 	DeleteReplica(space string, app string, replica string) (e error)
 	CreateOneOffPod(deployment *structs.Deployment) (e error)
