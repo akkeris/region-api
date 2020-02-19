@@ -25,6 +25,7 @@ type Runtime interface {
 	DeletePod(space string, pod string) (e error)
 	DeletePods(space string, label string) (e error)
 	GetPods(space string, app string) (rs []string, e error)
+	Exec(space string, app string, instance string, command []string, stdin string) (*string, *string, error)
 	CreateSpace(name string, internal bool, compliance string) (e error)
 	DeleteSpace(name string) (e error)
 	CreateSecret(space string, name string, data string, mimetype string) (s *Secretspec, e error)

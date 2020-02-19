@@ -58,6 +58,11 @@ type Tagspec struct {
 	Value    string `json:"value"`
 }
 
+type Exec struct {
+	Command []string `json:"command"`
+	Stdin string `json:"stdin"`
+}
+
 //Provisionspec provisionspec
 type Provisionspec struct {
 	Plan        string `json:"plan"`

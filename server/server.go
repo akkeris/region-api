@@ -228,6 +228,7 @@ func Server(db *sql.DB) *martini.ClassicMartini {
 	m.Get("/v1/space/:space/app/:app/instance", app.GetInstances)
 	m.Get("/v1/space/:space/app/:appname/instance/:instanceid/log", app.GetAppLogs)
 	m.Delete("/v1/space/:space/app/:app/instance/:instanceid", app.DeleteInstance)
+	m.Post("/v1/space/:space/app/:app/instance/:instance/exec", binding.Json(structs.Exec{}), app.Exec)
 	m.Get("/v1/apps", app.Listapps)
 	m.Get("/v1/apps/plans", app.GetPlans)
 	m.Post("/v1/space/:space/app/:app/rollback/:revision", app.Rollback)

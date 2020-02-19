@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/render"
+	"github.com/martini-contrib/binding"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -14,6 +15,40 @@ import (
 	"strconv"
 	"strings"
 )
+
+type ExecResponse struct {
+	Stdout string `json:"stdout"`
+	Stderr string `json:"stderr"`
+}
+
+func BlankIfNil(str *string) string {
+	if str == nil {
+		return ""
+	} else {
+		return *str
+	}
+}
+
+func Exec(db *sql.DB, spec structs.Exec, berr binding.Errors, params martini.Params, r render.Render) {
+	app := params["app"]
+	space := params["space"]
+	instance := params["instance"]
+	if berr != nil {
+		utils.ReportInvalidRequest(berr[0].Message, r)
+		return
+	}
+	rt, err := runtime.GetRuntimeFor(db, space)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	stdout, stderr, err := rt.Exec(space, app, instance, spec.Command, spec.Stdin)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	r.JSON(http.StatusOK, ExecResponse{Stdout:BlankIfNil(stdout), Stderr:BlankIfNil(stderr)})
+}
 
 func Spaceappstatus(params martini.Params, r render.Render) {
 	app := params["app"]
