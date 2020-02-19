@@ -21,6 +21,7 @@ import (
 	"flag"
 	"path/filepath"
 	kube "k8s.io/api/core/v1"
+	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/rest"
 )
@@ -606,6 +607,7 @@ func NewKubernetes(name string, imagePullSecret string) (r Runtime) {
 	
 	fmt.Printf("Connecting to kubernetes cluster at %s\n", config.Host)
 	rt.client = &http.Client{Transport: &http.Transport{TLSClientConfig: tlsConfig}}
+	rt.config = config
 	rt.defaultApiServerVersion = "v1"
 	rt.imagePullSecret = imagePullSecret
 	rt.mutex = &sync.Mutex{}
@@ -1303,6 +1305,52 @@ func (rt Kubernetes) GetPodLogs(space string, app string, pod string) (log strin
 		return "", errors.New(string(body))
 	}
 	return string(body), nil
+}
+
+func (rt Kubernetes) Exec(space string, app string, instance string, command []string, stdin string) (*string, *string, error) {
+	var commandQuery = strings.Join(command, "&command=")
+	var path = "/api/" + rt.defaultApiServerVersion + "/namespaces/" + space + "/pods/" + instance + "/exec?command=" + commandQuery +  "&container=" + app + "&stdin=true&stdout=true&stderr=true&tty=false"
+	uri, err := url.Parse("https://"+rt.apiServer+path)
+	
+	if rt.debug {
+		log.Printf("-> k8 (stream): %s %s with command [%#+v]\n", "POST", "https://"+rt.apiServer+path, command)
+	}
+	log.Printf("-> k8 (stream): %s %s with command [%#+v] with stdin: \n%s\n", "POST", "https://"+rt.apiServer+path, command, stdin)
+	if err != nil {
+		return nil, nil, err
+	}
+	stream, err := remotecommand.NewSPDYExecutor(rt.config, "POST", uri)
+	if err != nil {
+		return nil, nil, err
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	stdinBuf := bytes.NewBufferString(stdin)
+
+	timeout := make(chan error, 1)
+	go func() {
+		timeout <- stream.Stream(remotecommand.StreamOptions{
+			Tty:false,
+			Stdin:stdinBuf,
+			Stdout:&stdout,
+			Stderr:&stderr,
+		})
+	}()
+
+	select {
+	case <-time.After(60 * time.Second):
+		return nil, nil, errors.New("The program failed to return in the specified time alloted.")
+	case res := <-timeout:
+		if rt.debug {
+			log.Printf("<- k8: %s %s - %s\n", "POST", "https://"+rt.apiServer+path)
+		}
+		if res != nil {
+			return nil, nil, err
+		}
+		stdoutStr := stdout.String()
+		stderrStr := stderr.String()
+		return &stdoutStr, &stderrStr, nil
+	}
 }
 
 func (rt Kubernetes) GetService(space string, app string) (KubeService, error) {
