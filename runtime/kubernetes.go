@@ -1308,8 +1308,11 @@ func (rt Kubernetes) GetPodLogs(space string, app string, pod string) (log strin
 }
 
 func (rt Kubernetes) Exec(space string, app string, instance string, command []string, stdin string) (*string, *string, error) {
-	var commandQuery = strings.Join(command, "&command=")
-	var path = "/api/" + rt.defaultApiServerVersion + "/namespaces/" + space + "/pods/" + instance + "/exec?command=" + commandQuery +  "&container=" + app + "&stdin=true&stdout=true&stderr=true&tty=false"
+	var commandQuery = ""
+	for _, arg := range command {
+		commandQuery += "command=" + url.QueryEscape(arg) + "&"
+	}
+	var path = "/api/" + rt.defaultApiServerVersion + "/namespaces/" + space + "/pods/" + instance + "/exec?" + commandQuery +  "container=" + app + "&stdin=true&stdout=true&stderr=true&tty=false"
 	uri, err := url.Parse("https://"+rt.apiServer+path)
 	
 	if rt.debug {
