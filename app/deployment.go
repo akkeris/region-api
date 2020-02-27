@@ -19,6 +19,14 @@ import (
 	"time"
 )
 
+func GetPlanType(db *sql.DB, plan string) (plantype *string, e error) {
+	e = db.QueryRow("SELECT coalesce(type,'') from plans where name=$1", plan).Scan(plantype)
+	if e != nil {
+		return nil, e;
+	}
+	return plantype, nil;
+}
+
 func AddAkkerisConfigVars(appname string, space string) []structs.EnvVar {
 	elist := make([]structs.EnvVar, 0)
 	elist = append(elist, structs.EnvVar{
@@ -201,7 +209,14 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 	if deploy1.Labels == nil {
 		deploy1.Labels = make(map[string]string)
 	}
-
+	plantype, err := GetPlanType(db, plan)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	if plantype != nil && *plantype != "" {
+		deploy1.Labels["akkeris.io/plan-type"] = *plantype
+	}
 	deploy1.Labels["akkeris.io/plan"] = plan
 	if internal {
 		deploy1.Labels["akkeris.io/internal"] = "true"
@@ -295,6 +310,11 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 		// Inject istio sidecar for http filters
 		deployment.Features.IstioInject = true
 	}
+
+	if plantype != nil && *plantype != "" && *plantype != "general" {
+		deployment.PlanType = *plantype
+	}
+
 	deploymentExists, err := rt.DeploymentExists(space, appname)
 	if err != nil {
 		utils.ReportError(err, r)
