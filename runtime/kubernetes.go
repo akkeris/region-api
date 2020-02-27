@@ -764,6 +764,7 @@ func deploymentToDeploymentSpec(deployment *structs.Deployment) (dp Deploymentsp
 			Key:"akkeris.io/plan-type",
 			Operator:"Equal",
 			Value:deployment.PlanType,
+			Effect:"NoSchedule",
 		}
 	}
 	return krc
