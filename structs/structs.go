@@ -196,6 +196,7 @@ type Deployment struct {
 	Schedule             string
 	Features             Features
 	Labels				 map[string]string
+	PlanType			 string
 }
 
 //Deployresponse deploy response

@@ -207,6 +207,17 @@ type ServiceCollectionspec struct {
 	Items []Service `json:"items"`
 }
 
+type NodeSelector struct {
+	PlanType string `json:"akkeris.io/plan-type,omitempty"`
+}
+
+type Tolerations struct {
+	Key string `json:"key"`
+	Operator string `json:"operator"`
+	Effect string `json:"effect"`
+	Value string `json:"value"`
+}
+
 type Deploymentspec struct {
 	Metadata struct {
 		Name      string            `json:"name"`
@@ -245,6 +256,8 @@ type Deploymentspec struct {
 				} `json:"annotations,omitempty"`
 			} `json:"metadata"`
 			Spec struct {
+				NodeSelector                  *NodeSelector      `json:"nodeSelector,omitempty"`
+				Tolerations                   *Tolerations       `json:"tolerations,omitempty"`
 				Containers                    []ContainerItem    `json:"containers"`
 				ImagePullPolicy               string             `json:"imagePullPolicy,omitempty"`
 				ImagePullSecrets              []structs.Namespec `json:"imagePullSecrets,omitempty"`
@@ -745,7 +758,15 @@ func deploymentToDeploymentSpec(deployment *structs.Deployment) (dp Deploymentsp
 	krc.Spec.Template.Spec.Containers = clist
 	krc.Spec.Template.Spec.ImagePullPolicy = "Always"
 	krc.Spec.Template.Spec.TerminationGracePeriodSeconds = 60
-
+	if deployment.PlanType != "" && deployment.PlanType != "general" {
+		krc.Spec.Template.Spec.NodeSelector.PlanType = deployment.PlanType
+		krc.Spec.Template.Spec.Tolerations = &Tolerations{
+			Key:"akkeris.io/plan-type",
+			Operator:"Equal",
+			Value:deployment.PlanType,
+			Effect:"NoSchedule",
+		}
+	}
 	return krc
 }
 
