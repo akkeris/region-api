@@ -19,12 +19,13 @@ import (
 	"time"
 )
 
-func GetPlanType(db *sql.DB, plan string) (plantype *string, e error) {
-	e = db.QueryRow("SELECT coalesce(type,'') from plans where name=$1", plan).Scan(plantype)
+func GetPlanType(db *sql.DB, plan string) (*string, error) {
+	var plantype string
+	e := db.QueryRow("SELECT coalesce(type,'') from plans where name=$1", plan).Scan(&plantype)
 	if e != nil {
 		return nil, e;
 	}
-	return plantype, nil;
+	return &plantype, nil;
 }
 
 func AddAkkerisConfigVars(appname string, space string) []structs.EnvVar {
