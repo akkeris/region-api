@@ -1146,6 +1146,7 @@ func (rt Kubernetes)  CopySecret(secretName string, fromNamespace string, toName
 		return err
 	}
 
+	secret.SetResourceVersion("");
 	secret.SetNamespace(toNamespace)
 	
 	resp, err = rt.k8sRequest("post", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+toNamespace+"/secrets", secret)
