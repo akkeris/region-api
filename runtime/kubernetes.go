@@ -257,7 +257,7 @@ type Deploymentspec struct {
 			} `json:"metadata"`
 			Spec struct {
 				NodeSelector                  *NodeSelector      `json:"nodeSelector,omitempty"`
-				Tolerations                   *Tolerations       `json:"tolerations,omitempty"`
+				Tolerations                   *[]Tolerations     `json:"tolerations,omitempty"`
 				Containers                    []ContainerItem    `json:"containers"`
 				ImagePullPolicy               string             `json:"imagePullPolicy,omitempty"`
 				ImagePullSecrets              []structs.Namespec `json:"imagePullSecrets,omitempty"`
@@ -762,12 +762,14 @@ func deploymentToDeploymentSpec(deployment *structs.Deployment) (dp Deploymentsp
 		krc.Spec.Template.Spec.NodeSelector = &NodeSelector{
 			PlanType: deployment.PlanType,
 		}
-		krc.Spec.Template.Spec.Tolerations = &Tolerations{
+		t := make([]Tolerations, 0)
+		t = append(t, Tolerations{
 			Key:"akkeris.io/plan-type",
 			Operator:"Equal",
 			Value:deployment.PlanType,
 			Effect:"NoSchedule",
-		}
+		});
+		krc.Spec.Template.Spec.Tolerations = &t
 	}
 	return krc
 }
