@@ -759,7 +759,9 @@ func deploymentToDeploymentSpec(deployment *structs.Deployment) (dp Deploymentsp
 	krc.Spec.Template.Spec.ImagePullPolicy = "Always"
 	krc.Spec.Template.Spec.TerminationGracePeriodSeconds = 60
 	if deployment.PlanType != "" && deployment.PlanType != "general" {
-		krc.Spec.Template.Spec.NodeSelector.PlanType = deployment.PlanType
+		krc.Spec.Template.Spec.NodeSelector = &NodeSelector{
+			PlanType: deployment.PlanType,
+		}
 		krc.Spec.Template.Spec.Tolerations = &Tolerations{
 			Key:"akkeris.io/plan-type",
 			Operator:"Equal",
