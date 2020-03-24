@@ -143,10 +143,6 @@ func InitOldServiceEndpoints(m *martini.ClassicMartini) {
 	m.Post("/v1/service/influxdb/instance", binding.Json(structs.Provisionspec{}), service.ProvisionInfluxdb)
 	m.Delete("/v1/service/influxdb/instance/:servicename", service.DeleteInfluxdb)
 
-	m.Get("/v1/service/cassandra/plans", service.GetCassandraPlans)
-	m.Get("/v1/service/cassandra/url/:servicename", service.GetCassandraURL)
-	m.Post("/v1/service/cassandra/instance", binding.Json(structs.Provisionspec{}), service.ProvisionCassandra)
-	m.Delete("/v1/service/cassandra/instance/:servicename", service.DeleteCassandra)
 
 	m.Get("/v1/service/rabbitmq/plans", service.Getrabbitmqplans)
 	m.Post("/v1/service/rabbitmq/instance", binding.Json(structs.Provisionspec{}), service.Provisionrabbitmq)

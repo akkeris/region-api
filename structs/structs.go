@@ -171,13 +171,6 @@ type Influxdbspec struct {
 	Spec     string `json:"spec"`
 }
 
-type Cassandraspec struct {
-	Keyspace string `json:"CASSANDRA_KEYSPACE"`
-	Location string `json:"CASSANDRA_LOCATION"`
-	Password string `json:"CASSANDRA_PASSWORD"`
-	Username string `json:"CASSANDRA_USERNAME"`
-	Spec     string `json:"spec"`
-}
 
 type Deployment struct {
 	Space                string
