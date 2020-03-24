@@ -147,7 +147,7 @@ type Routes struct {
 }
 
 type HTTP struct {
-	Match      []Match      `json:"match"`
+	Match      []Match      `json:"match,omitempty"`
 	Route      []Routes 	`json:"route"`
 	Rewrite    *Rewrite 	`json:"rewrite,omitempty"`
 	Headers    *Headers 	`json:"headers,omitempty"`
