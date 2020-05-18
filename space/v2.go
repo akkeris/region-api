@@ -1,0 +1,257 @@
+package space
+
+import (
+	"database/sql"
+	"fmt"
+	"log"
+	"net/http"
+	runtime "region-api/runtime"
+	structs "region-api/structs"
+	utils "region-api/utils"
+
+	"github.com/go-martini/martini"
+	"github.com/martini-contrib/binding"
+	"github.com/martini-contrib/render"
+)
+
+// UpdateAppPlanV2 - V2 version of space.UpdateAppPlan
+// (original: "space/app.go")
+func UpdateAppPlanV2(db *sql.DB, params martini.Params, spaceapp structs.Spaceappspec, berr binding.Errors, r render.Render) {
+	if berr != nil {
+		utils.ReportInvalidRequest(berr[0].Message, r)
+		return
+	}
+	appname := params["app"]
+	space := params["space"]
+
+	_, err := db.Exec("UPDATE spacesapps SET plan=$1 WHERE appname=$2 AND space=$3", spaceapp.Plan, appname, space)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: "App: " + appname + "updated to use " + spaceapp.Plan + " plan"})
+}
+
+// UpdateAppHealthCheckV2 - V2 version of space.UpdateAppHealthCheck
+// (original: "space/app.go")
+func UpdateAppHealthCheckV2(db *sql.DB, params martini.Params, spaceapp structs.Spaceappspec, berr binding.Errors, r render.Render) {
+	if berr != nil {
+		utils.ReportInvalidRequest(berr[0].Message, r)
+		return
+	}
+
+	if spaceapp.Healthcheck == "" {
+		utils.ReportInvalidRequest("healthcheck required", r)
+		return
+	}
+
+	appname := params["app"]
+	space := params["space"]
+
+	_, err := db.Exec("UPDATE spacesapps SET healthcheck=$1 WHERE appname=$2 AND space=$3", spaceapp.Healthcheck, appname, space)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: "App: " + appname + " updated to use " + spaceapp.Healthcheck + " healthcheck"})
+}
+
+// DeleteAppHealthCheckV2 - V2 version of space.DeleteAppHealthCheck
+// (original: "space/app.go")
+func DeleteAppHealthCheckV2(db *sql.DB, params martini.Params, r render.Render) {
+
+	appname := params["app"]
+	space := params["space"]
+
+	_, err := db.Exec("UPDATE spacesapps SET healthcheck=NULL WHERE appname=$1 AND space=$2", appname, space)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: "App: " + appname + " healthcheck removed"})
+}
+
+// DeleteAppV2 - V2 version of space.DeleteAppV2
+// (original: "space/app.go")
+func DeleteAppV2(db *sql.DB, params martini.Params, r render.Render) {
+	appname := params["app"]
+	space := params["space"]
+
+	rt, err := runtime.GetRuntimeFor(db, space)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	err = rt.DeleteService(space, appname)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	err = rt.DeleteDeployment(space, appname)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+
+	if err != nil {
+		log.Println(err)
+	}
+	rslist, err := rt.GetReplicas(space, appname)
+	// in a previous iteration we ignored the error, i'll do so here
+	// but i need to put an if around it to prevent the nil rslist from
+	// bombing out everything
+	if err != nil {
+		fmt.Println(err)
+	}
+	if err == nil {
+		for _, rs := range rslist {
+			err = rt.DeleteReplica(space, appname, rs)
+			if err != nil {
+				log.Println("Failed to remove replica set: ", err)
+			}
+		}
+	} else {
+		log.Println("Error getting replica sets:", err)
+	}
+
+	var podlist []string
+	podlist, err = rt.GetPods(space, appname)
+	if err != nil {
+		fmt.Println(err)
+	}
+	// in a previous iteration we ignored the error, i'll do so here
+	// but i need to put an if around it to prevent the nil podlist from
+	// bombing out everything
+	if err == nil {
+		for _, pod := range podlist {
+			err = rt.DeletePod(space, pod)
+			if err != nil {
+				log.Println("Failed to remove pod: ", err)
+			}
+		}
+	} else {
+		log.Println("Error getting pods to remove:", err)
+	}
+	_, err = db.Exec("DELETE from appbindings where space=$1 and appname=$2", space, appname)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+
+	_, err = db.Exec("DELETE from spacesapps where space=$1 and appname=$2", space, appname)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: appname + " removed"})
+}
+
+// ScaleAppV2 - V2 version of space.ScaleApp
+// (original: "space/app.go")
+func ScaleAppV2(db *sql.DB, params martini.Params, spaceapp structs.Spaceappspec, berr binding.Errors, r render.Render) {
+	if berr != nil {
+		utils.ReportInvalidRequest(berr[0].Message, r)
+		return
+	}
+	appname := params["app"]
+	space := params["space"]
+
+	instances := spaceapp.Instances
+
+	_, err := db.Exec("update spacesapps set instances=$3 where space=$1 and appname=$2", space, appname, instances)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+
+	rt, err := runtime.GetRuntimeFor(db, space)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+
+	err = rt.Scale(space, appname, instances)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	r.JSON(http.StatusAccepted, structs.Messagespec{Status: http.StatusAccepted, Message: "instances updated"})
+}
+
+// AddAppV2 - V2 version of space.AddApp
+// (original: "space/app.go")
+func AddAppV2(db *sql.DB, params martini.Params, spaceapp structs.Spaceappspec, berr binding.Errors, r render.Render) {
+	if berr != nil {
+		utils.ReportInvalidRequest(berr[0].Message, r)
+		return
+	}
+	appname := params["app"]
+	space := params["space"]
+
+	var healthcheck *string
+	if spaceapp.Healthcheck == "" {
+		healthcheck = nil
+	} else {
+		healthcheck = &spaceapp.Healthcheck
+	}
+
+	inserterr := db.QueryRow("INSERT INTO spacesapps(space,appname,instances,plan,healthcheck) VALUES($1,$2,$3,$4,$5) returning appname;", space, appname, spaceapp.Instances, spaceapp.Plan, healthcheck).Scan(&appname)
+	if inserterr != nil {
+		utils.ReportError(inserterr, r)
+		return
+	}
+	r.JSON(http.StatusCreated, structs.Messagespec{Status: http.StatusCreated, Message: "app added to space"})
+}
+
+// DeleteSpaceV2 - V2 version of space.Deletespace
+// (original: "space/space.go")
+func DeleteSpaceV2(db *sql.DB, params martini.Params, r render.Render) {
+	space := params["space"]
+
+	if space == "" {
+		utils.ReportInvalidRequest("The space was blank or invalid.", r)
+		return
+	}
+
+	rt, err := runtime.GetRuntimeFor(db, space)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+
+	pods, err := rt.GetPodsBySpace(space)
+	if err != nil && err.Error() != "space does not exist" {
+		utils.ReportError(err, r)
+		return
+	} else if err == nil {
+		if len(pods.Items) != 0 {
+			r.JSON(http.StatusConflict, structs.Messagespec{Status: http.StatusConflict, Message: "The space cannot be deleted as it still has pods in it."})
+			return
+		}
+	}
+
+	var appsCount int
+	err = db.QueryRow("select count(*) from spacesapps where space = $1", space).Scan(&appsCount)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+
+	if appsCount > 0 {
+		r.JSON(http.StatusConflict, structs.Messagespec{Status: http.StatusConflict, Message: "The space cannot be deleted as it still has apps in it."})
+		return
+	}
+
+	// this must happen after GetRuntimeFor.
+	if _, err = db.Exec("delete from spaces where name = $1", space); err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+
+	if err = rt.DeleteSpace(space); err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+
+	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: "space deleted"})
+}
