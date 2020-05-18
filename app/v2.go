@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	config "region-api/config"
 	ingress "region-api/router"
@@ -20,116 +21,27 @@ import (
 	"github.com/martini-contrib/render"
 )
 
-func GetPlanType(db *sql.DB, plan string) (*string, error) {
-	var plantype string
-	e := db.QueryRow("SELECT coalesce(type,'') from plans where name=$1", plan).Scan(&plantype)
-	if e != nil {
-		return nil, e
-	}
-	return &plantype, nil
-}
-
-func AddAkkerisConfigVars(appname string, space string) []structs.EnvVar {
-	elist := make([]structs.EnvVar, 0)
-	elist = append(elist, structs.EnvVar{
-		Name:  "ALAMO_SPACE",
-		Value: space,
-	})
-	elist = append(elist, structs.EnvVar{
-		Name:  "AKKERIS_SPACE",
-		Value: space,
-	})
-	elist = append(elist, structs.EnvVar{
-		Name:  "ALAMO_DEPLOYMENT",
-		Value: appname,
-	})
-	elist = append(elist, structs.EnvVar{
-		Name:  "AKKERIS_DEPLOYMENT",
-		Value: appname,
-	})
-	elist = append(elist, structs.EnvVar{
-		Name:  "ALAMO_APPLICATION",
-		Value: appname + "-" + space,
-	})
-	elist = append(elist, structs.EnvVar{
-		Name:  "AKKERIS_APPLICATION",
-		Value: appname + "-" + space,
-	})
-	return elist
-}
-
-func GetMemoryLimits(db *sql.DB, plan string) (memorylimit string, memoryrequest string, e error) {
-	e = db.QueryRow("SELECT memrequest,memlimit from plans where name=$1", plan).Scan(&memoryrequest, &memorylimit)
-	if e != nil {
-		return "", "", e
-	}
-	return memorylimit, memoryrequest, nil
-}
-
-func GetServiceConfigVars(db *sql.DB, params martini.Params, r render.Render) {
-	space := params["space"]
+// DeleteAppV2 - V2 version of app.Deleteapp
+// (original: "app/deleteapp.go")
+func DeleteAppV2(db *sql.DB, params martini.Params, r render.Render) {
 	appname := params["appname"]
-	bindtype := params["bindtype"]
-	bindname := params["bindname"]
-
-	// add service vars
-	err, servicevars := service.GetServiceConfigVars(db, appname, space, []structs.Bindspec{structs.Bindspec{App: appname, Space: space, Bindtype: bindtype, Bindname: bindname}})
+	var space string
+	err := db.QueryRow("select space from spacesapps where appname = $1", appname).Scan(&space)
+	if err == nil && space != "" {
+		utils.ReportInvalidRequest("application still exists in spaces: "+space, r)
+		return
+	}
+	_, err = db.Exec("DELETE from apps where name=$1", appname)
 	if err != nil {
 		utils.ReportError(err, r)
 		return
-
 	}
-	r.JSON(201, servicevars)
+	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: appname + " deleted"})
 }
 
-func GetAllConfigVars(db *sql.DB, params martini.Params, r render.Render) {
-	space := params["space"]
-	appname := params["appname"]
-
-	var (
-		appport     int
-		instances   int
-		plan        string
-		healthcheck string
-	)
-
-	err := db.QueryRow("SELECT apps.port,spacesapps.instances,COALESCE(spacesapps.plan,'noplan') AS plan,COALESCE(spacesapps.healthcheck,'tcp') AS healthcheck from apps,spacesapps where apps.name=$1 and apps.name=spacesapps.appname and spacesapps.space=$2", appname, space).Scan(&appport, &instances, &plan, &healthcheck)
-	if err != nil {
-		utils.ReportError(err, r)
-		return
-	}
-
-	// Get bindings
-	appconfigset, appbindings, err := config.GetBindings(db, space, appname)
-	if err != nil {
-		utils.ReportError(err, r)
-		return
-	}
-	// Get user defined config vars
-	configvars, err := config.GetConfigVars(db, appconfigset)
-	if err != nil {
-		utils.ReportError(err, r)
-		return
-	}
-	// Assemble config -- akkeris "built in config", "user defined config vars", "service configvars"
-	elist := AddAkkerisConfigVars(appname, space)
-	for n, v := range configvars {
-		elist = append(elist, structs.EnvVar{Name: n, Value: v})
-	}
-	// add service vars
-	err, servicevars := service.GetServiceConfigVars(db, appname, space, appbindings)
-	if err != nil {
-		utils.ReportError(err, r)
-		return
-	}
-	for _, e := range servicevars {
-		elist = append(elist, e)
-	}
-	r.JSON(201, elist)
-}
-
-//Deployment centralized
-func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r render.Render) {
+// DeploymentV2 - V2 version of app.Deployment
+// (original: "app/deployment.go")
+func DeploymentV2(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r render.Render) {
 	if berr != nil {
 		utils.ReportInvalidRequest(berr[0].Message, r)
 		return
@@ -518,4 +430,285 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 		deployresponse.Controller = "Deployment Updated"
 	}
 	r.JSON(201, deployresponse)
+}
+
+// GetAllConfigVarsV2 - V2 version of app.Deleteapp
+// (original: "app/deployment.go")
+func GetAllConfigVarsV2(db *sql.DB, params martini.Params, r render.Render) {
+	space := params["space"]
+	appname := params["appname"]
+
+	var (
+		appport     int
+		instances   int
+		plan        string
+		healthcheck string
+	)
+
+	err := db.QueryRow("SELECT apps.port,spacesapps.instances,COALESCE(spacesapps.plan,'noplan') AS plan,COALESCE(spacesapps.healthcheck,'tcp') AS healthcheck from apps,spacesapps where apps.name=$1 and apps.name=spacesapps.appname and spacesapps.space=$2", appname, space).Scan(&appport, &instances, &plan, &healthcheck)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+
+	// Get bindings
+	appconfigset, appbindings, err := config.GetBindings(db, space, appname)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	// Get user defined config vars
+	configvars, err := config.GetConfigVars(db, appconfigset)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	// Assemble config -- akkeris "built in config", "user defined config vars", "service configvars"
+	elist := AddAkkerisConfigVars(appname, space)
+	for n, v := range configvars {
+		elist = append(elist, structs.EnvVar{Name: n, Value: v})
+	}
+	// add service vars
+	err, servicevars := service.GetServiceConfigVars(db, appname, space, appbindings)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	for _, e := range servicevars {
+		elist = append(elist, e)
+	}
+	r.JSON(201, elist)
+}
+
+// OneOffDeploymentV2 - V2 version of app.OneOffDeployment
+// (original: "app/oneoff.go")
+func OneOffDeploymentV2(db *sql.DB, oneoff1 structs.OneOffSpec, berr binding.Errors, r render.Render) {
+	if berr != nil {
+		utils.ReportInvalidRequest(berr[0].Message, r)
+		return
+	}
+	var name string
+	var repo string
+	var tag string
+
+	if oneoff1.Podname == "" {
+		utils.ReportInvalidRequest("Application Name can not be blank", r)
+		return
+	}
+	if oneoff1.Space == "" {
+		utils.ReportInvalidRequest("Space Name can not be blank", r)
+		return
+	}
+	if oneoff1.Image == "" {
+		utils.ReportInvalidRequest("Image must be specified", r)
+		return
+	}
+	if oneoff1.Image != "" && !(strings.Contains(oneoff1.Image, ":")) {
+		utils.ReportInvalidRequest("Image must contain tag", r)
+		return
+	}
+
+	rt, err := runtime.GetRuntimeFor(db, oneoff1.Space)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+
+	if rt.OneOffExists(oneoff1.Space, oneoff1.Podname) {
+		rt.DeletePod(oneoff1.Space, oneoff1.Podname)
+	}
+
+	name = oneoff1.Podname
+	space := oneoff1.Space
+	if oneoff1.Image != "" {
+		repo = strings.Split(oneoff1.Image, ":")[0]
+		tag = strings.Split(oneoff1.Image, ":")[1]
+	}
+	var (
+		appport     int
+		instances   int
+		plan        string
+		healthcheck string
+	)
+
+	err = db.QueryRow("SELECT apps.port,spacesapps.instances,COALESCE(spacesapps.plan,'noplan') AS plan,COALESCE(spacesapps.healthcheck,'tcp') AS healthcheck from apps,spacesapps where apps.name=$1 and apps.name=spacesapps.appname and spacesapps.space=$2", name, space).Scan(&appport, &instances, &plan, &healthcheck)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	appname := name
+	appimage := repo
+	apptag := tag
+
+	// Get app bindings
+	appconfigset, appbindings, err := config.GetBindings(db, space, appname)
+
+	// Get memory limits
+	memorylimit, memoryrequest, err := GetMemoryLimits(db, plan)
+
+	// Get user defined config vars
+	configvars, err := config.GetConfigVars(db, appconfigset)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+
+	// Assembly config
+	elist := AddAkkerisConfigVars(appname, space)
+	// add user specific vars
+	for n, v := range configvars {
+		elist = append(elist, structs.EnvVar{Name: n, Value: v})
+	}
+	// add service vars
+	err, servicevars := service.GetServiceConfigVars(db, appname, space, appbindings)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	for _, e := range servicevars {
+		elist = append(elist, e)
+	}
+	// Create deployment
+	var deployment structs.Deployment
+	deployment.Space = space
+	deployment.App = appname
+	deployment.Amount = instances
+	deployment.ConfigVars = elist
+	deployment.HealthCheck = healthcheck
+	deployment.MemoryRequest = memoryrequest
+	deployment.MemoryLimit = memorylimit
+	deployment.Image = appimage
+	deployment.Tag = apptag
+
+	err = rt.CreateOneOffPod(&deployment)
+	if err != nil {
+		fmt.Println("Error creating a one off pod")
+		utils.ReportError(err, r)
+	}
+
+	r.JSON(http.StatusCreated, map[string]string{"Status": "Created"})
+}
+
+// DescribeAppV2 - V2 version of app.Describeapp
+// (original: "app/describeapp.go")
+func DescribeAppV2(db *sql.DB, params martini.Params, r render.Render) {
+	appname := params["appname"]
+	var (
+		name string
+		port int
+	)
+	err := db.QueryRow("select name, port from apps where name=$1", appname).Scan(&name, &port)
+	if err != nil {
+		if err.Error() == "sql: no rows in result set" {
+			// To be backwards compatible with older systems lets fake a response back
+			// this ... isn't ideal, but .. well..
+			r.JSON(http.StatusOK, structs.Appspec{Name: "", Port: -1, Spaces: nil})
+			return
+		}
+		utils.ReportError(err, r)
+		return
+	}
+	spaceapps, err := getSpacesapps(db, appname)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+
+	r.JSON(http.StatusOK, structs.Appspec{Name: name, Port: port, Spaces: spaceapps})
+}
+
+// DescribeAppInSpaceV2 - V2 version of app.DescribeappInSpace
+// (original: "app/describeapp.go")
+func DescribeAppInSpaceV2(db *sql.DB, params martini.Params, r render.Render) {
+	appname := params["appname"]
+	spacename := params["space"]
+
+	var instances int
+	var plan string
+	var healthcheck string
+	err := db.QueryRow("select appname, instances, coalesce(plan,'noplan') as plan, COALESCE(spacesapps.healthcheck,'tcp') AS healthcheck from spacesapps where space = $1 and appname = $2", spacename, appname).Scan(&appname, &instances, &plan, &healthcheck)
+	if err != nil {
+		if err.Error() == "sql: no rows in result set" {
+			// To be backwards compatible with older systems lets fake a response back
+			// this ... isn't ideal, but .. well..
+			r.JSON(http.StatusOK, structs.Spaceappspec{Appname: appname, Space: spacename, Instances: 0, Plan: "", Healthcheck: "", Bindings: nil})
+			return
+		}
+		utils.ReportError(err, r)
+		return
+	}
+	bindings, _ := getBindings(db, appname, spacename)
+	currentapp := structs.Spaceappspec{Appname: appname, Space: spacename, Instances: instances, Plan: plan, Healthcheck: healthcheck, Bindings: bindings}
+
+	rt, err := runtime.GetRuntimeFor(db, spacename)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+
+	currentimage, err := rt.GetCurrentImage(spacename, appname)
+	if err != nil {
+		if err.Error() == "deployment not found" {
+			// if there has yet to be a deployment we'll get a not found error,
+			// just set the image to blank and keep moving.
+			currentimage = ""
+		} else {
+			utils.ReportError(err, r)
+			return
+		}
+	}
+	currentapp.Image = currentimage
+	r.JSON(http.StatusOK, currentapp)
+}
+
+// ListAppsV2 - V2 version of app.Listapps
+// (original: "app/listapps.go")
+func ListAppsV2(db *sql.DB, params martini.Params, r render.Render) {
+	var name string
+	rows, err := db.Query("select name from apps")
+	defer rows.Close()
+	var applist []string
+	for rows.Next() {
+		err := rows.Scan(&name)
+		if err != nil {
+			utils.ReportError(err, r)
+			return
+		}
+		applist = append(applist, name)
+	}
+	err = rows.Err()
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	r.JSON(http.StatusOK, structs.Applist{Apps: applist})
+}
+
+// DescribeSpaceV2 - V2 version of app.Describespace
+// (original: "app/describeapp.go")
+func DescribeSpaceV2(db *sql.DB, params martini.Params, r render.Render) {
+	var list []structs.Spaceappspec
+	spacename := params["space"]
+
+	var appname string
+	var instances int
+	var plan string
+	var healthcheck string
+	rows, err := db.Query("select appname, instances, coalesce(plan,'noplan') as plan, COALESCE(spacesapps.healthcheck,'tcp') AS healthcheck from spacesapps where space = $1", spacename)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		err := rows.Scan(&appname, &instances, &plan, &healthcheck)
+		if err != nil {
+			utils.ReportError(err, r)
+			return
+		}
+
+		bindings, _ := getBindings(db, appname, spacename)
+		list = append(list, structs.Spaceappspec{Appname: appname, Space: spacename, Instances: instances, Plan: plan, Healthcheck: healthcheck, Bindings: bindings})
+	}
+	r.JSON(http.StatusOK, list)
 }

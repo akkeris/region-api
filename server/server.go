@@ -2,11 +2,6 @@ package server
 
 import (
 	"database/sql"
-	"github.com/go-martini/martini"
-	"github.com/martini-contrib/auth"
-	"github.com/martini-contrib/binding"
-	"github.com/martini-contrib/render"
-	"github.com/robfig/cron"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -28,6 +23,12 @@ import (
 	"region-api/vault"
 	"strings"
 	"time"
+
+	"github.com/go-martini/martini"
+	"github.com/martini-contrib/auth"
+	"github.com/martini-contrib/binding"
+	"github.com/martini-contrib/render"
+	"github.com/robfig/cron"
 )
 
 func GetInfo(db *sql.DB, params martini.Params, r render.Render) {
@@ -142,7 +143,6 @@ func InitOldServiceEndpoints(m *martini.ClassicMartini) {
 	m.Get("/v1/service/influxdb/url/:servicename", service.GetInfluxdbURL)
 	m.Post("/v1/service/influxdb/instance", binding.Json(structs.Provisionspec{}), service.ProvisionInfluxdb)
 	m.Delete("/v1/service/influxdb/instance/:servicename", service.DeleteInfluxdb)
-
 
 	m.Get("/v1/service/rabbitmq/plans", service.Getrabbitmqplans)
 	m.Post("/v1/service/rabbitmq/instance", binding.Json(structs.Provisionspec{}), service.Provisionrabbitmq)
@@ -296,6 +296,9 @@ func Server(db *sql.DB) *martini.ClassicMartini {
 
 	InitOpenServiceBrokerEndpoints(db, m)
 	InitOldServiceEndpoints(m)
+
+	// Add V2 Endpoints
+	initV2Endpoints(m)
 
 	vault.GetVaultListPeriodic()
 	c := cron.New()
