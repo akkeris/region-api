@@ -56,7 +56,6 @@ Set the following environment variables, if this is first time running it see th
 
 * `SERVICES` - A comma delimited list of urls for open service brokers to use e.g., (https://user:pass@hostname/,https://:token@hostname/)
 * `RABBITMQ_BROKER_URL` - this is the host of the broker
-* `MONGODB_BROKER_URL` - this is the host of the broker
 * `INFLUXDB_BROKER_URL` - influx database broker
 * `CASSANDRA_BROKER_URL` - cassandra database broker
 * `KAFKA_BROKERS` - The kafka brokers for this region

@@ -150,13 +150,6 @@ func InitOldServiceEndpoints(m *martini.ClassicMartini) {
 	m.Delete("/v1/service/rabbitmq/instance/:servicename", service.Deleterabbitmq)
 	m.Post("/v1/service/rabbitmq/instance/tag", binding.Json(structs.Tagspec{}), service.Tagrabbitmq)
 
-	m.Get("/v1/service/mongodb/plans", service.GetmongodbplansV1)
-	m.Post("/v1/service/mongodb/instance", binding.Json(structs.Provisionspec{}), service.ProvisionmongodbV1)
-	m.Get("/v1/service/mongodb/url/:servicename", service.GetmongodburlV1)
-	m.Delete("/v1/service/mongodb/instance/:servicename", service.DeletemongodbV1)
-	m.Get("/v1/service/mongodb/:servicename", service.GetmongodbV1)
-	m.Get("/v1/service/mongodb/instance/:servicename", service.GetmongodbV1)
-
 	m.Get("/v1/service/:service/bindings", service.GetBindingList)
 }
 
