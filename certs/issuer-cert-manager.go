@@ -3,14 +3,15 @@ package certs
 import (
 	"encoding/json"
 	"errors"
-	"github.com/nu7hatch/gouuid"
 	"net/http"
 	"os"
 	"region-api/router"
 	"region-api/runtime"
 	"strconv"
 	"strings"
+
 	certmanager "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1alpha2"
+	uuid "github.com/nu7hatch/gouuid"
 	kube "k8s.io/api/core/v1"
 	kubemetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -18,11 +19,11 @@ import (
 type CertManagerIssuer struct {
 	runtime              runtime.Runtime
 	certificateNamespace string
-	clusterIssuers 		 []certmanager.ClusterIssuer
+	clusterIssuers       []certmanager.ClusterIssuer
 }
 
 func GetCertManagerIssuers(runtime runtime.Runtime) ([]Issuer, error) {
-	body, code, err := runtime.GenericRequest("get", "/apis/" + certmanager.SchemeGroupVersion.Group + "/" + certmanager.SchemeGroupVersion.Version + "/clusterissuers?limit=500", nil)
+	body, code, err := runtime.GenericRequest("get", "/apis/"+certmanager.SchemeGroupVersion.Group+"/"+certmanager.SchemeGroupVersion.Version+"/clusterissuers?limit=500", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -33,14 +34,14 @@ func GetCertManagerIssuers(runtime runtime.Runtime) ([]Issuer, error) {
 	if err = json.Unmarshal(body, &certManagerIssuers); err != nil {
 		return nil, err
 	}
-	namespace := os.Getenv("CERT_NAMESPACE");
+	namespace := os.Getenv("CERT_NAMESPACE")
 	if namespace == "" {
 		namespace = "istio-system"
 	}
 	return []Issuer{&CertManagerIssuer{
-		runtime:runtime,
-		certificateNamespace:namespace,
-		clusterIssuers:certManagerIssuers.Items,
+		runtime:              runtime,
+		certificateNamespace: namespace,
+		clusterIssuers:       certManagerIssuers.Items,
 	}}, nil
 }
 
@@ -55,13 +56,13 @@ func CertificateStatusToOrder(certificate certmanager.Certificate) (CertificateO
 			names = append(names, d)
 		}
 	}
-	annotations := certificate.GetAnnotations();
+	annotations := certificate.GetAnnotations()
 	labels := certificate.GetLabels()
 	var comments string = ""
 	var requestor string = ""
 	var id string = ""
 	var create = certificate.GetCreationTimestamp().UTC().String()
-	
+
 	var expires = ""
 	if certificate.Status.NotAfter != nil {
 		expires = certificate.Status.NotAfter.UTC().String()
@@ -116,18 +117,19 @@ func (issuer *CertManagerIssuer) CreateOrder(domain string, sans []string, comme
 	cert.Kind = "Certificate"
 	cert.SetName(strings.Replace(domain, "*", "star", -1))
 	cert.SetNamespace(issuer.certificateNamespace)
-	cert.SetAnnotations(map[string]string{"comment":comment, "requestor":requestor})
+	cert.SetAnnotations(map[string]string{"comment": comment, "requestor": requestor})
 	u, _ := uuid.NewV4()
-	cert.SetLabels(map[string]string{"akkeris-cert-id":u.String()})
+	cert.SetLabels(map[string]string{"akkeris-cert-id": u.String()})
 	cert.Spec.DNSNames = make([]string, 0)
 	cert.Spec.DNSNames = append(cert.Spec.DNSNames, domain)
 	cert.Spec.DNSNames = append(cert.Spec.DNSNames, sans...)
-	cert.Spec.RenewBefore = &kubemetav1.Duration{Duration:certmanager.DefaultRenewBefore}
+	// DefaultRenewBefore is defined as time.Hour * 24 * 30
+	cert.Spec.RenewBefore = &kubemetav1.Duration{Duration: certmanager.DefaultRenewBefore}
 	cert.Spec.CommonName = domain
 	cert.Spec.IssuerRef.Kind = "ClusterIssuer"
 	cert.Spec.IssuerRef.Name = issuerName
 	cert.Spec.SecretName = strings.Replace(strings.Replace(domain, "*", "star", -1), ".", "-", -1) + "-tls"
-	body, code, err := issuer.runtime.GenericRequest("post", "/apis/" + certmanager.SchemeGroupVersion.Group + "/" + certmanager.SchemeGroupVersion.Version + "/namespaces/" + issuer.certificateNamespace + "/certificates", cert)
+	body, code, err := issuer.runtime.GenericRequest("post", "/apis/"+certmanager.SchemeGroupVersion.Group+"/"+certmanager.SchemeGroupVersion.Version+"/namespaces/"+issuer.certificateNamespace+"/certificates", cert)
 	if err != nil {
 		return cert.GetLabels()["akkeris-cert-id"], err
 	}
@@ -138,7 +140,7 @@ func (issuer *CertManagerIssuer) CreateOrder(domain string, sans []string, comme
 }
 
 func (issuer *CertManagerIssuer) GetOrderStatus(id string) (*CertificateOrder, error) {
-	body, code, err := issuer.runtime.GenericRequest("get", "/apis/" + certmanager.SchemeGroupVersion.Group + "/" + certmanager.SchemeGroupVersion.Version + "/namespaces/" + issuer.certificateNamespace + "/certificates?labelSelector=akkeris-cert-id%3D"+id, nil)
+	body, code, err := issuer.runtime.GenericRequest("get", "/apis/"+certmanager.SchemeGroupVersion.Group+"/"+certmanager.SchemeGroupVersion.Version+"/namespaces/"+issuer.certificateNamespace+"/certificates?labelSelector=akkeris-cert-id%3D"+id, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +162,7 @@ func (issuer *CertManagerIssuer) GetOrderStatus(id string) (*CertificateOrder, e
 }
 
 func (issuer *CertManagerIssuer) GetOrders() (orders []CertificateOrder, err error) {
-	body, code, err := issuer.runtime.GenericRequest("get", "/apis/" + certmanager.SchemeGroupVersion.Group + "/" + certmanager.SchemeGroupVersion.Version + "/namespaces/" + issuer.certificateNamespace + "/certificates?labelSelector=akkeris-cert-id", nil)
+	body, code, err := issuer.runtime.GenericRequest("get", "/apis/"+certmanager.SchemeGroupVersion.Group+"/"+certmanager.SchemeGroupVersion.Version+"/namespaces/"+issuer.certificateNamespace+"/certificates?labelSelector=akkeris-cert-id", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -184,7 +186,7 @@ func (issuer *CertManagerIssuer) IsOrderAutoInstalled(ingress router.Ingress) (b
 }
 
 func (issuer *CertManagerIssuer) IsOrderReady(id string) (bool, error) {
-	body, code, err := issuer.runtime.GenericRequest("get", "/apis/" + certmanager.SchemeGroupVersion.Group + "/" + certmanager.SchemeGroupVersion.Version + "/namespaces/" + issuer.certificateNamespace + "/certificates?labelSelector=akkeris-cert-id%3D"+id, nil)
+	body, code, err := issuer.runtime.GenericRequest("get", "/apis/"+certmanager.SchemeGroupVersion.Group+"/"+certmanager.SchemeGroupVersion.Version+"/namespaces/"+issuer.certificateNamespace+"/certificates?labelSelector=akkeris-cert-id%3D"+id, nil)
 	if err != nil {
 		return false, err
 	}
@@ -212,7 +214,7 @@ func (issuer *CertManagerIssuer) IsOrderReady(id string) (bool, error) {
 func (issuer *CertManagerIssuer) GetCertificate(id string, domain string) (pem_cert []byte, pem_key []byte, err error) {
 	name := strings.Replace(domain, "*.", "star.", -1)
 	name = strings.Replace(name, ".", "-", -1) + "-tls"
-	body, code, err := issuer.runtime.GenericRequest("get", "/api/v1/namespaces/" + issuer.certificateNamespace + "/secrets/" + name, nil)
+	body, code, err := issuer.runtime.GenericRequest("get", "/api/v1/namespaces/"+issuer.certificateNamespace+"/secrets/"+name, nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -233,8 +235,8 @@ func (issuer *CertManagerIssuer) GetCertificate(id string, domain string) (pem_c
 }
 
 // Used by unit tests, shoudn't be used outside of that.
-func (issuer *CertManagerIssuer) DeleteCertificate(name string) (error) {
-	_, code, err := issuer.runtime.GenericRequest("delete", "/apis/" + certmanager.SchemeGroupVersion.Group + "/" + certmanager.SchemeGroupVersion.Version + "/namespaces/" + issuer.certificateNamespace + "/certificates/" + name, nil)
+func (issuer *CertManagerIssuer) DeleteCertificate(name string) error {
+	_, code, err := issuer.runtime.GenericRequest("delete", "/apis/"+certmanager.SchemeGroupVersion.Group+"/"+certmanager.SchemeGroupVersion.Version+"/namespaces/"+issuer.certificateNamespace+"/certificates/"+name, nil)
 	if err != nil {
 		return err
 	}

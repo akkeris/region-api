@@ -2,6 +2,7 @@ package app
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -19,6 +20,7 @@ import (
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
+	uuid "github.com/nu7hatch/gouuid"
 )
 
 // DeleteAppV2 - V2 version of app.Deleteapp
@@ -288,7 +290,7 @@ func DeploymentV2(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r
 		for _, filter := range deploy1.Filters {
 			if filter.Type == "jwt" {
 				issuer := ""
-				jwksUri := ""
+				jwksURI := ""
 				audiences := make([]string, 0)
 				excludes := make([]string, 0)
 				includes := make([]string, 0)
@@ -296,7 +298,7 @@ func DeploymentV2(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r
 					issuer = val
 				}
 				if val, ok := filter.Data["jwks_uri"]; ok {
-					jwksUri = val
+					jwksURI = val
 				}
 				if val, ok := filter.Data["audiences"]; ok {
 					if val != "" {
@@ -313,11 +315,11 @@ func DeploymentV2(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r
 						includes = strings.Split(val, ",")
 					}
 				}
-				if jwksUri == "" {
-					fmt.Printf("WARNING: Invalid jwt configuration, uri was not valid: %s\n", jwksUri)
+				if jwksURI == "" {
+					fmt.Printf("WARNING: Invalid jwt configuration, uri was not valid: %s\n", jwksURI)
 				} else {
 					foundJwtFilter = true
-					if err := appIngress.InstallOrUpdateJWTAuthFilter(appname, space, appFQDN, int64(finalport), issuer, jwksUri, audiences, excludes, includes); err != nil {
+					if err := appIngress.InstallOrUpdateJWTAuthFilter(appname, space, appFQDN, int64(finalport), issuer, jwksURI, audiences, excludes, includes); err != nil {
 						fmt.Printf("WARNING: There was an error installing or updating JWT Auth filter: %s\n", err.Error())
 					}
 				}
@@ -325,48 +327,48 @@ func DeploymentV2(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r
 				if os.Getenv("INGRESS_DEBUG") == "true" {
 					fmt.Printf("[ingress] Adding CORS filter %#+v\n", filter)
 				}
-				allow_origin := make([]string, 0)
-				allow_methods := make([]string, 0)
-				allow_headers := make([]string, 0)
-				expose_headers := make([]string, 0)
-				max_age := time.Second * 86400
-				allow_credentials := false
+				allowOrigin := make([]string, 0)
+				allowMethods := make([]string, 0)
+				allowHeaders := make([]string, 0)
+				exposeHeaders := make([]string, 0)
+				maxAge := time.Second * 86400
+				allowCredentials := false
 				if val, ok := filter.Data["allow_origin"]; ok {
 					if val != "" {
-						allow_origin = strings.Split(val, ",")
+						allowOrigin = strings.Split(val, ",")
 					}
 				}
 				if val, ok := filter.Data["allow_methods"]; ok {
 					if val != "" {
-						allow_methods = strings.Split(val, ",")
+						allowMethods = strings.Split(val, ",")
 					}
 				}
 				if val, ok := filter.Data["allow_headers"]; ok {
 					if val != "" {
-						allow_headers = strings.Split(val, ",")
+						allowHeaders = strings.Split(val, ",")
 					}
 				}
 				if val, ok := filter.Data["expose_headers"]; ok {
 					if val != "" {
-						expose_headers = strings.Split(val, ",")
+						exposeHeaders = strings.Split(val, ",")
 					}
 				}
 				if val, ok := filter.Data["max_age"]; ok {
 					age, err := strconv.ParseInt(val, 10, 32)
 					if err == nil {
-						max_age = time.Second * time.Duration(age)
+						maxAge = time.Second * time.Duration(age)
 					} else {
 						fmt.Printf("WARNING: Unable to convert max_age to value %s\n", val)
 					}
 				}
 				if val, ok := filter.Data["allow_credentials"]; ok {
 					if val == "true" {
-						allow_credentials = true
+						allowCredentials = true
 					} else {
-						allow_credentials = false
+						allowCredentials = false
 					}
 				}
-				if err := appIngress.InstallOrUpdateCORSAuthFilter(appname+"-"+space, "/", allow_origin, allow_methods, allow_headers, expose_headers, max_age, allow_credentials); err != nil {
+				if err := appIngress.InstallOrUpdateCORSAuthFilter(appname+"-"+space, "/", allowOrigin, allowMethods, allowHeaders, exposeHeaders, maxAge, allowCredentials); err != nil {
 					fmt.Printf("WARNING: There was an error installing or updating CORS Auth filter: %s\n", err.Error())
 				} else {
 					foundCorsFilter = true
@@ -374,7 +376,7 @@ func DeploymentV2(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r
 				routes, err := ingress.GetPathsByApp(db, appname, space)
 				if err == nil {
 					for _, route := range routes {
-						if err := siteIngress.InstallOrUpdateCORSAuthFilter(route.Domain, route.Path, allow_origin, allow_methods, allow_headers, expose_headers, max_age, allow_credentials); err != nil {
+						if err := siteIngress.InstallOrUpdateCORSAuthFilter(route.Domain, route.Path, allowOrigin, allowMethods, allowHeaders, exposeHeaders, maxAge, allowCredentials); err != nil {
 							fmt.Printf("WARNING: There was an error installing or updating CORS Auth filter on site: %s: %s\n", route.Domain, err.Error())
 						}
 					}
@@ -432,22 +434,34 @@ func DeploymentV2(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r
 	r.JSON(201, deployresponse)
 }
 
-// GetAllConfigVarsV2 - V2 version of app.Deleteapp
+// getAppIDFromName - Given a deployment name and space, get the associated app ID
+func getAppIDFromName(db *sql.DB, name string, space string) (string, error) {
+	var appid string
+	err := db.QueryRow("select appid from v2.deployments where name = $1 and space = $2", name, space).Scan(&appid)
+	if err != nil {
+		if err.Error() == "sql: no rows in result set" {
+			return "", errors.New("Invalid app or space name")
+		}
+		return "", err
+	}
+	return appid, nil
+}
+
+// GetAllConfigVarsV2 - Get all config vars for a deployment
 // (original: "app/deployment.go")
 func GetAllConfigVarsV2(db *sql.DB, params martini.Params, r render.Render) {
 	space := params["space"]
 	appname := params["appname"]
 
-	var (
-		appport     int
-		instances   int
-		plan        string
-		healthcheck string
-	)
+	var exists bool
 
-	err := db.QueryRow("SELECT apps.port,spacesapps.instances,COALESCE(spacesapps.plan,'noplan') AS plan,COALESCE(spacesapps.healthcheck,'tcp') AS healthcheck from apps,spacesapps where apps.name=$1 and apps.name=spacesapps.appname and spacesapps.space=$2", appname, space).Scan(&appport, &instances, &plan, &healthcheck)
+	err := db.QueryRow("select exists(select from v2.deployments where name = $1 and space = $2)", appname, space).Scan(&exists)
 	if err != nil {
 		utils.ReportError(err, r)
+		return
+	}
+	if exists == false {
+		utils.ReportInvalidRequest(err.Error(), r)
 		return
 	}
 
@@ -589,126 +603,157 @@ func OneOffDeploymentV2(db *sql.DB, oneoff1 structs.OneOffSpec, berr binding.Err
 	r.JSON(http.StatusCreated, map[string]string{"Status": "Created"})
 }
 
-// DescribeAppV2 - V2 version of app.Describeapp
-// (original: "app/describeapp.go")
+// getDeployments - Given an app ID, return information about all deployments for that app
+func getDeployments(db *sql.DB, appid string, rt runtime.Runtime) (ads []structs.AppDeploymentSpec, err error) {
+	var deployments []structs.AppDeploymentSpec
+	results, err := db.Query("select appid, name, space, instances, coalesce(plan, 'noplan') as plan, coalesce(healthcheck, 'tcp') as healthcheck from v2.deployments where appid = $1", appid)
+	if err != nil {
+		utils.LogError("", err)
+		return nil, err
+	}
+	defer results.Close()
+
+	// Assemble all neccesary data for each deployment
+	for results.Next() {
+		var deployment structs.AppDeploymentSpec
+		err := results.Scan(&deployment.AppID, &deployment.Name, &deployment.Space, &deployment.Instances, &deployment.Plan, &deployment.Healthcheck)
+		if err != nil {
+			utils.LogError("", err)
+			return nil, err
+		}
+		// Retrieve bindings for the deployment
+		bindings, err := getBindings(db, deployment.Name, deployment.Space)
+		if err != nil {
+			utils.LogError("", err)
+			return nil, err
+		}
+		deployment.Bindings = bindings
+
+		// Retrieve current image for deployment
+		if rt == nil {
+			rt, err = runtime.GetRuntimeFor(db, deployment.Space)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		currentimage, err := rt.GetCurrentImage(deployment.Name, deployment.Space)
+		if err != nil {
+			if err.Error() == "deployment not found" {
+				// if there has yet to be a deployment we'll get a not found error,
+				// just set the image to blank and keep moving.
+				currentimage = ""
+			} else {
+				return nil, err
+			}
+		}
+
+		deployment.Image = currentimage
+		deployments = append(deployments, deployment)
+	}
+	return deployments, nil
+}
+
+// DescribeAppV2 - Get all deployments for an app
 func DescribeAppV2(db *sql.DB, params martini.Params, r render.Render) {
 	appname := params["appname"]
-	var (
-		name string
-		port int
-	)
-	err := db.QueryRow("select name, port from apps where name=$1", appname).Scan(&name, &port)
-	if err != nil {
-		if err.Error() == "sql: no rows in result set" {
-			// To be backwards compatible with older systems lets fake a response back
-			// this ... isn't ideal, but .. well..
-			r.JSON(http.StatusOK, structs.Appspec{Name: "", Port: -1, Spaces: nil})
+	space := params["space"]
+	appid := params["appid"]
+	var err error
+
+	// App ID was not provided, find ID from app name + space
+	if appid == "" {
+		appid, err = getAppIDFromName(db, appname, space)
+		if err != nil {
+			if err.Error() == "Invalid app or space name" {
+				utils.ReportInvalidRequest(err.Error(), r)
+			} else {
+				utils.ReportError(err, r)
+			}
 			return
 		}
-		utils.ReportError(err, r)
-		return
+	} else {
+		_, err := uuid.ParseHex(appid)
+		if err != nil {
+			utils.ReportInvalidRequest("Invalid app UUID", r)
+		}
 	}
-	spaceapps, err := getSpacesapps(db, appname)
+
+	deployments, err := getDeployments(db, appid, nil)
 	if err != nil {
 		utils.ReportError(err, r)
 		return
 	}
 
-	r.JSON(http.StatusOK, structs.Appspec{Name: name, Port: port, Spaces: spaceapps})
+	r.JSON(http.StatusOK, deployments)
 }
 
-// DescribeAppInSpaceV2 - V2 version of app.DescribeappInSpace
-// (original: "app/describeapp.go")
-func DescribeAppInSpaceV2(db *sql.DB, params martini.Params, r render.Render) {
-	appname := params["appname"]
-	spacename := params["space"]
-
-	var instances int
-	var plan string
-	var healthcheck string
-	err := db.QueryRow("select appname, instances, coalesce(plan,'noplan') as plan, COALESCE(spacesapps.healthcheck,'tcp') AS healthcheck from spacesapps where space = $1 and appname = $2", spacename, appname).Scan(&appname, &instances, &plan, &healthcheck)
-	if err != nil {
-		if err.Error() == "sql: no rows in result set" {
-			// To be backwards compatible with older systems lets fake a response back
-			// this ... isn't ideal, but .. well..
-			r.JSON(http.StatusOK, structs.Spaceappspec{Appname: appname, Space: spacename, Instances: 0, Plan: "", Healthcheck: "", Bindings: nil})
-			return
-		}
-		utils.ReportError(err, r)
-		return
-	}
-	bindings, _ := getBindings(db, appname, spacename)
-	currentapp := structs.Spaceappspec{Appname: appname, Space: spacename, Instances: instances, Plan: plan, Healthcheck: healthcheck, Bindings: bindings}
-
-	rt, err := runtime.GetRuntimeFor(db, spacename)
-	if err != nil {
-		utils.ReportError(err, r)
-		return
-	}
-
-	currentimage, err := rt.GetCurrentImage(spacename, appname)
-	if err != nil {
-		if err.Error() == "deployment not found" {
-			// if there has yet to be a deployment we'll get a not found error,
-			// just set the image to blank and keep moving.
-			currentimage = ""
-		} else {
-			utils.ReportError(err, r)
-			return
-		}
-	}
-	currentapp.Image = currentimage
-	r.JSON(http.StatusOK, currentapp)
-}
-
-// ListAppsV2 - V2 version of app.Listapps
-// (original: "app/listapps.go")
+// ListAppsV2 - Return a list of all apps in the Deployments table
+// (v1: "app/listapps.go")
 func ListAppsV2(db *sql.DB, params martini.Params, r render.Render) {
-	var name string
-	rows, err := db.Query("select name from apps")
+	rows, err := db.Query("select concat(name, '-', space) from v2.deployments")
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
 	defer rows.Close()
-	var applist []string
+
+	var appList []string
 	for rows.Next() {
-		err := rows.Scan(&name)
+		var app string
+		err := rows.Scan(&app)
 		if err != nil {
 			utils.ReportError(err, r)
 			return
 		}
-		applist = append(applist, name)
+		appList = append(appList, app)
 	}
+
 	err = rows.Err()
 	if err != nil {
 		utils.ReportError(err, r)
 		return
 	}
-	r.JSON(http.StatusOK, structs.Applist{Apps: applist})
+
+	r.JSON(http.StatusOK, structs.Applist{Apps: appList})
 }
 
-// DescribeSpaceV2 - V2 version of app.Describespace
+// DescribeSpaceV2 - Get a list of all deployments for a space
 // (original: "app/describeapp.go")
 func DescribeSpaceV2(db *sql.DB, params martini.Params, r render.Render) {
-	var list []structs.Spaceappspec
-	spacename := params["space"]
+	var deployments []structs.AppDeploymentSpec
+	space := params["space"]
 
-	var appname string
-	var instances int
-	var plan string
-	var healthcheck string
-	rows, err := db.Query("select appname, instances, coalesce(plan,'noplan') as plan, COALESCE(spacesapps.healthcheck,'tcp') AS healthcheck from spacesapps where space = $1", spacename)
+	rt, err := runtime.GetRuntimeFor(db, space)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+
+	rows, err := db.Query("select appid from v2.deployments where space = $1", space)
 	if err != nil {
 		utils.ReportError(err, r)
 		return
 	}
 	defer rows.Close()
+
 	for rows.Next() {
-		err := rows.Scan(&appname, &instances, &plan, &healthcheck)
+		var appid string
+		err := rows.Scan(&appid)
 		if err != nil {
 			utils.ReportError(err, r)
 			return
 		}
 
-		bindings, _ := getBindings(db, appname, spacename)
-		list = append(list, structs.Spaceappspec{Appname: appname, Space: spacename, Instances: instances, Plan: plan, Healthcheck: healthcheck, Bindings: bindings})
+		appDeployments, err := getDeployments(db, appid, rt)
+		if err != nil {
+			utils.ReportError(err, r)
+			return
+		}
+		for _, deployment := range appDeployments {
+			deployments = append(deployments, deployment)
+		}
 	}
-	r.JSON(http.StatusOK, list)
+
+	r.JSON(http.StatusOK, deployments)
 }
