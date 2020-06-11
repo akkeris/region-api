@@ -23,22 +23,32 @@ import (
 	uuid "github.com/nu7hatch/gouuid"
 )
 
+// deploymentExists - Returns whether or not a deployment with a given name and space exists
+func deploymentExists(db *sql.DB, name string, space string) (bool, error) {
+	deploymentExistsQuery := "select exists(select from v2.deployments where name = $1 and space = $2)"
+
+	var exists bool
+	if err := db.QueryRow(deploymentExistsQuery, name, space).Scan(&exists); err != nil {
+		return false, err
+	}
+	return exists, nil
+}
+
 // DeleteAppV2 - V2 version of app.Deleteapp
 // (original: "app/deleteapp.go")
+// This should delete ALL deployments with a given app ID
 func DeleteAppV2(db *sql.DB, params martini.Params, r render.Render) {
-	appname := params["appname"]
-	var space string
-	err := db.QueryRow("select space from spacesapps where appname = $1", appname).Scan(&space)
-	if err == nil && space != "" {
-		utils.ReportInvalidRequest("application still exists in spaces: "+space, r)
-		return
+	appid := params["appid"]
+	if _, err := uuid.ParseHex(appid); err != nil {
+		utils.ReportInvalidRequest("Invalid app UUID", r)
 	}
-	_, err = db.Exec("DELETE from apps where name=$1", appname)
-	if err != nil {
-		utils.ReportError(err, r)
-		return
-	}
-	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: appname + " deleted"})
+
+	// _, err := db.Exec("DELETE from apps where name=$1", appname)
+	// if err != nil {
+	// 	utils.ReportError(err, r)
+	// 	return
+	// }
+	// r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: appname + " deleted"})
 }
 
 // DeploymentV2 - V2 version of app.Deployment
@@ -434,66 +444,6 @@ func DeploymentV2(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r
 	r.JSON(201, deployresponse)
 }
 
-// getAppIDFromName - Given a deployment name and space, get the associated app ID
-func getAppIDFromName(db *sql.DB, name string, space string) (string, error) {
-	var appid string
-	err := db.QueryRow("select appid from v2.deployments where name = $1 and space = $2", name, space).Scan(&appid)
-	if err != nil {
-		if err.Error() == "sql: no rows in result set" {
-			return "", errors.New("Invalid app or space name")
-		}
-		return "", err
-	}
-	return appid, nil
-}
-
-// GetAllConfigVarsV2 - Get all config vars for a deployment
-// (original: "app/deployment.go")
-func GetAllConfigVarsV2(db *sql.DB, params martini.Params, r render.Render) {
-	space := params["space"]
-	appname := params["appname"]
-
-	var exists bool
-
-	err := db.QueryRow("select exists(select from v2.deployments where name = $1 and space = $2)", appname, space).Scan(&exists)
-	if err != nil {
-		utils.ReportError(err, r)
-		return
-	}
-	if exists == false {
-		utils.ReportInvalidRequest(err.Error(), r)
-		return
-	}
-
-	// Get bindings
-	appconfigset, appbindings, err := config.GetBindings(db, space, appname)
-	if err != nil {
-		utils.ReportError(err, r)
-		return
-	}
-	// Get user defined config vars
-	configvars, err := config.GetConfigVars(db, appconfigset)
-	if err != nil {
-		utils.ReportError(err, r)
-		return
-	}
-	// Assemble config -- akkeris "built in config", "user defined config vars", "service configvars"
-	elist := AddAkkerisConfigVars(appname, space)
-	for n, v := range configvars {
-		elist = append(elist, structs.EnvVar{Name: n, Value: v})
-	}
-	// add service vars
-	err, servicevars := service.GetServiceConfigVars(db, appname, space, appbindings)
-	if err != nil {
-		utils.ReportError(err, r)
-		return
-	}
-	for _, e := range servicevars {
-		elist = append(elist, e)
-	}
-	r.JSON(201, elist)
-}
-
 // OneOffDeploymentV2 - V2 version of app.OneOffDeployment
 // (original: "app/oneoff.go")
 func OneOffDeploymentV2(db *sql.DB, oneoff1 structs.OneOffSpec, berr binding.Errors, r render.Render) {
@@ -603,10 +553,72 @@ func OneOffDeploymentV2(db *sql.DB, oneoff1 structs.OneOffSpec, berr binding.Err
 	r.JSON(http.StatusCreated, map[string]string{"Status": "Created"})
 }
 
-// getDeployments - Given an app ID, return information about all deployments for that app
-func getDeployments(db *sql.DB, appid string, rt runtime.Runtime) (ads []structs.AppDeploymentSpec, err error) {
+// getAppIDFromName - Given a deployment name and space, get the associated app ID
+func getAppIDFromName(db *sql.DB, name string, space string) (string, error) {
+	appidFromNameQuery := "select appid from v2.deployments where name = $1 and space = $2 and appid is not null"
+
+	var appid sql.NullString
+	if err := db.QueryRow(appidFromNameQuery, name, space).Scan(&appid); err != nil {
+		if err.Error() == "sql: no rows in result set" {
+			// Apps created with v1 schema might not have an appid set
+			return "", errors.New("Invalid app or space name, or created with v1 schema")
+		}
+		return "", err
+	}
+	return appid.String, nil
+}
+
+// GetAllConfigVarsV2 - Get all config vars for a deployment
+// (original: "app/deployment.go")
+func GetAllConfigVarsV2(db *sql.DB, params martini.Params, r render.Render) {
+	appname := params["appname"]
+	space := params["space"]
+
+	exists, err := deploymentExists(db, appname, space)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	if exists == false {
+		utils.ReportInvalidRequest(err.Error(), r)
+		return
+	}
+
+	// Get bindings
+	appconfigset, appbindings, err := config.GetBindings(db, space, appname)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	// Get user defined config vars
+	configvars, err := config.GetConfigVars(db, appconfigset)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	// Assemble config -- akkeris "built in config", "user defined config vars", "service configvars"
+	elist := AddAkkerisConfigVars(appname, space)
+	for n, v := range configvars {
+		elist = append(elist, structs.EnvVar{Name: n, Value: v})
+	}
+	// add service vars
+	err, servicevars := service.GetServiceConfigVars(db, appname, space, appbindings)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	for _, e := range servicevars {
+		elist = append(elist, e)
+	}
+	r.JSON(201, elist)
+}
+
+// GetDeployments - Given an app ID, return information about all deployments for that app
+func GetDeployments(db *sql.DB, appid string, rt runtime.Runtime) (ads []structs.AppDeploymentSpec, err error) {
+	deploymentsQuery := "select appid, name, space, instances, coalesce(plan, 'noplan') as plan, coalesce(healthcheck, 'tcp') as healthcheck from v2.deployments where appid = $1"
+
 	var deployments []structs.AppDeploymentSpec
-	results, err := db.Query("select appid, name, space, instances, coalesce(plan, 'noplan') as plan, coalesce(healthcheck, 'tcp') as healthcheck from v2.deployments where appid = $1", appid)
+	results, err := db.Query(deploymentsQuery, appid)
 	if err != nil {
 		utils.LogError("", err)
 		return nil, err
@@ -648,38 +660,23 @@ func getDeployments(db *sql.DB, appid string, rt runtime.Runtime) (ads []structs
 			}
 		}
 
-		deployment.Image = currentimage
+		deployment.Image = sql.NullString{String: currentimage, Valid: currentimage != ""}
 		deployments = append(deployments, deployment)
 	}
 	return deployments, nil
 }
 
-// DescribeAppV2 - Get all deployments for an app
+// DescribeAppV2 - Get all deployments for an app based on app ID
 func DescribeAppV2(db *sql.DB, params martini.Params, r render.Render) {
-	appname := params["appname"]
-	space := params["space"]
 	appid := params["appid"]
 	var err error
 
-	// App ID was not provided, find ID from app name + space
-	if appid == "" {
-		appid, err = getAppIDFromName(db, appname, space)
-		if err != nil {
-			if err.Error() == "Invalid app or space name" {
-				utils.ReportInvalidRequest(err.Error(), r)
-			} else {
-				utils.ReportError(err, r)
-			}
-			return
-		}
-	} else {
-		_, err := uuid.ParseHex(appid)
-		if err != nil {
-			utils.ReportInvalidRequest("Invalid app UUID", r)
-		}
+	if _, err := uuid.ParseHex(appid); err != nil {
+		utils.ReportInvalidRequest("Invalid app UUID", r)
+		return
 	}
 
-	deployments, err := getDeployments(db, appid, nil)
+	deployments, err := GetDeployments(db, appid, nil)
 	if err != nil {
 		utils.ReportError(err, r)
 		return
@@ -716,44 +713,4 @@ func ListAppsV2(db *sql.DB, params martini.Params, r render.Render) {
 	}
 
 	r.JSON(http.StatusOK, structs.Applist{Apps: appList})
-}
-
-// DescribeSpaceV2 - Get a list of all deployments for a space
-// (original: "app/describeapp.go")
-func DescribeSpaceV2(db *sql.DB, params martini.Params, r render.Render) {
-	var deployments []structs.AppDeploymentSpec
-	space := params["space"]
-
-	rt, err := runtime.GetRuntimeFor(db, space)
-	if err != nil {
-		utils.ReportError(err, r)
-		return
-	}
-
-	rows, err := db.Query("select appid from v2.deployments where space = $1", space)
-	if err != nil {
-		utils.ReportError(err, r)
-		return
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var appid string
-		err := rows.Scan(&appid)
-		if err != nil {
-			utils.ReportError(err, r)
-			return
-		}
-
-		appDeployments, err := getDeployments(db, appid, rt)
-		if err != nil {
-			utils.ReportError(err, r)
-			return
-		}
-		for _, deployment := range appDeployments {
-			deployments = append(deployments, deployment)
-		}
-	}
-
-	r.JSON(http.StatusOK, deployments)
 }

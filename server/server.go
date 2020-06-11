@@ -351,8 +351,42 @@ func CreateDB(db *sql.DB) {
 			}
 		}
 	}
-	_, err = db.Query(string(buf))
-	if err != nil {
+
+	// ========================================
+	// Temporary v2 Schema Migration Variables
+	// ========================================
+
+	// --  $1: controller-api database host
+	// --  $2: controller-api database name
+	// --  $3: controller-api database username
+	// --  $4: controller-api database password
+
+	if os.Getenv("V2_TEMP_CONTROLLER_API_DATABASE_HOST") == "" {
+		log.Fatalln("Error: Unable to run v2 schema migration - Missing controller-api database host!")
+	} else if os.Getenv("V2_TEMP_CONTROLLER_API_DATABASE_NAME") == "" {
+		log.Fatalln("Error: Unable to run v2 schema migration - Missing controller-api database name!")
+	} else if os.Getenv("V2_TEMP_CONTROLLER_API_DATABASE_USERNAME") == "" {
+		log.Fatalln("Error: Unable to run v2 schema migration - Missing controller-api database username!")
+	} else if os.Getenv("V2_TEMP_CONTROLLER_API_DATABASE_PASSWORD") == "" {
+		log.Fatalln("Error: Unable to run v2 schema migration - Missing controller-api database password!")
+	}
+
+	// revive:disable
+
+	v2temp_ControllerDBHost := os.Getenv("V2_TEMP_CONTROLLER_API_DATABASE_HOST")
+	v2temp_ControllerDBName := os.Getenv("V2_TEMP_CONTROLLER_API_DATABASE_NAME")
+	v2temp_ControllerDBUser := os.Getenv("V2_TEMP_CONTROLLER_API_DATABASE_USERNAME")
+	v2temp_ControllerDBPassword := os.Getenv("V2_TEMP_CONTROLLER_API_DATABASE_PASSWORD")
+
+	// revive:enable
+
+	if _, err = db.Query(
+		string(buf),
+		v2temp_ControllerDBHost,
+		v2temp_ControllerDBName,
+		v2temp_ControllerDBUser,
+		v2temp_ControllerDBPassword,
+	); err != nil {
 		log.Println("Error: Unable to run migration scripts, execution failed.")
 		log.Fatalln(err)
 	}

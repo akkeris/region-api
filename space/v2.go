@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"region-api/app"
 	runtime "region-api/runtime"
 	structs "region-api/structs"
 	utils "region-api/utils"
@@ -21,14 +22,15 @@ func UpdateAppPlanV2(db *sql.DB, params martini.Params, spaceapp structs.Spaceap
 		utils.ReportInvalidRequest(berr[0].Message, r)
 		return
 	}
+
 	appname := params["app"]
 	space := params["space"]
 
-	_, err := db.Exec("UPDATE spacesapps SET plan=$1 WHERE appname=$2 AND space=$3", spaceapp.Plan, appname, space)
-	if err != nil {
+	if _, err := db.Exec("UPDATE v2.deployments SET plan=$1 WHERE name=$2 AND space=$3", spaceapp.Plan, appname, space); err != nil {
 		utils.ReportError(err, r)
 		return
 	}
+
 	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: "App: " + appname + "updated to use " + spaceapp.Plan + " plan"})
 }
 
@@ -48,7 +50,7 @@ func UpdateAppHealthCheckV2(db *sql.DB, params martini.Params, spaceapp structs.
 	appname := params["app"]
 	space := params["space"]
 
-	_, err := db.Exec("UPDATE spacesapps SET healthcheck=$1 WHERE appname=$2 AND space=$3", spaceapp.Healthcheck, appname, space)
+	_, err := db.Exec("UPDATE v2.deployments SET healthcheck=$1 WHERE name=$2 AND space=$3", spaceapp.Healthcheck, appname, space)
 	if err != nil {
 		utils.ReportError(err, r)
 		return
@@ -59,12 +61,10 @@ func UpdateAppHealthCheckV2(db *sql.DB, params martini.Params, spaceapp structs.
 // DeleteAppHealthCheckV2 - V2 version of space.DeleteAppHealthCheck
 // (original: "space/app.go")
 func DeleteAppHealthCheckV2(db *sql.DB, params martini.Params, r render.Render) {
-
 	appname := params["app"]
 	space := params["space"]
 
-	_, err := db.Exec("UPDATE spacesapps SET healthcheck=NULL WHERE appname=$1 AND space=$2", appname, space)
-	if err != nil {
+	if _, err := db.Exec("UPDATE v2.deployments SET healthcheck=NULL WHERE name=$1 AND space=$2", appname, space); err != nil {
 		utils.ReportError(err, r)
 		return
 	}
@@ -73,29 +73,37 @@ func DeleteAppHealthCheckV2(db *sql.DB, params martini.Params, r render.Render) 
 
 // DeleteAppV2 - V2 version of space.DeleteAppV2
 // (original: "space/app.go")
-func DeleteAppV2(db *sql.DB, params martini.Params, r render.Render) {
+func DeleteDeploymentV2(db *sql.DB, params martini.Params, r render.Render) {
 	appname := params["app"]
 	space := params["space"]
+
+	var exists bool
+	query := "select exists(select 1 from v2.deployments where name = $1 and space = $2)"
+	if err := db.QueryRow(query, appname, space).Scan(&exists); err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	if exists == false {
+		utils.ReportInvalidRequest("Invalid app or space name", r)
+		return
+	}
 
 	rt, err := runtime.GetRuntimeFor(db, space)
 	if err != nil {
 		utils.ReportError(err, r)
 		return
 	}
-	err = rt.DeleteService(space, appname)
-	if err != nil {
-		utils.ReportError(err, r)
-		return
-	}
-	err = rt.DeleteDeployment(space, appname)
-	if err != nil {
+
+	if err = rt.DeleteService(space, appname); err != nil {
 		utils.ReportError(err, r)
 		return
 	}
 
-	if err != nil {
-		log.Println(err)
+	if err = rt.DeleteDeployment(space, appname); err != nil {
+		utils.ReportError(err, r)
+		return
 	}
+
 	rslist, err := rt.GetReplicas(space, appname)
 	// in a previous iteration we ignored the error, i'll do so here
 	// but i need to put an if around it to prevent the nil rslist from
@@ -138,7 +146,7 @@ func DeleteAppV2(db *sql.DB, params martini.Params, r render.Render) {
 		return
 	}
 
-	_, err = db.Exec("DELETE from spacesapps where space=$1 and appname=$2", space, appname)
+	_, err = db.Exec("DELETE from v2.deployments where space=$1 and name=$2", space, appname)
 	if err != nil {
 		utils.ReportError(err, r)
 		return
@@ -158,8 +166,7 @@ func ScaleAppV2(db *sql.DB, params martini.Params, spaceapp structs.Spaceappspec
 
 	instances := spaceapp.Instances
 
-	_, err := db.Exec("update spacesapps set instances=$3 where space=$1 and appname=$2", space, appname, instances)
-	if err != nil {
+	if _, err := db.Exec("update v2.deployments set instances=$3 where space=$1 and name=$2", space, appname, instances); err != nil {
 		utils.ReportError(err, r)
 		return
 	}
@@ -170,8 +177,7 @@ func ScaleAppV2(db *sql.DB, params martini.Params, spaceapp structs.Spaceappspec
 		return
 	}
 
-	err = rt.Scale(space, appname, instances)
-	if err != nil {
+	if err = rt.Scale(space, appname, instances); err != nil {
 		utils.ReportError(err, r)
 		return
 	}
@@ -231,8 +237,7 @@ func DeleteSpaceV2(db *sql.DB, params martini.Params, r render.Render) {
 	}
 
 	var appsCount int
-	err = db.QueryRow("select count(*) from spacesapps where space = $1", space).Scan(&appsCount)
-	if err != nil {
+	if err = db.QueryRow("select count(*) from v2.deployments where space = $1", space).Scan(&appsCount); err != nil {
 		utils.ReportError(err, r)
 		return
 	}
@@ -254,4 +259,48 @@ func DeleteSpaceV2(db *sql.DB, params martini.Params, r render.Render) {
 	}
 
 	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: "space deleted"})
+}
+
+// DescribeSpaceV2 - Get a list of all deployments for a space
+func DescribeSpaceV2(db *sql.DB, params martini.Params, r render.Render) {
+	var deployments []structs.AppDeploymentSpec
+	space := params["space"]
+
+	rt, err := runtime.GetRuntimeFor(db, space)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+
+	rows, err := db.Query("select appid from v2.deployments where space = $1", space)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var appid sql.NullString
+		err := rows.Scan(&appid)
+		if err != nil {
+			utils.ReportError(err, r)
+			return
+		}
+
+		appDeployments, err := app.GetDeployments(db, appid.String, rt)
+		if err != nil {
+			utils.ReportError(err, r)
+			return
+		}
+		for _, deployment := range appDeployments {
+			deployments = append(deployments, deployment)
+		}
+	}
+
+	r.JSON(http.StatusOK, deployments)
+}
+
+// DescribeDeploymentV2 - Get details about a specific deployment (based on name, space)
+func DescribeDeploymentV2(db *sql.DB, params martini.Params, r render.Render) {
+	//stub
 }
