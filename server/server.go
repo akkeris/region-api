@@ -352,6 +352,11 @@ func CreateDB(db *sql.DB) {
 		}
 	}
 
+	if _, err = db.Exec(string(buf)); err != nil {
+		log.Println("Error: Unable to run migration scripts, execution failed.")
+		log.Fatalln(err)
+	}
+
 	// ========================================
 	// Temporary v2 Schema Migration Variables
 	// ========================================
@@ -380,14 +385,33 @@ func CreateDB(db *sql.DB) {
 
 	// revive:enable
 
-	if _, err = db.Query(
-		string(buf),
+	buf, err = ioutil.ReadFile("./v2_schema_migration.sql")
+	if err != nil {
+		buf, err = ioutil.ReadFile("region-api/v2_schema_migration.sql")
+		if err != nil {
+			buf, err = ioutil.ReadFile("../v2_schema_migration.sql")
+			if err != nil {
+				log.Println("Error: Unable to run v2 schema migration scripts, could not load v2_schema_migration.sql.")
+				log.Fatalln(err)
+			}
+		}
+	}
+
+	// Create temporary function
+	if _, err = db.Exec(string(buf)); err != nil {
+		log.Println("Error: Unable to run v2 schema migration script, function creation failed.")
+		log.Fatalln(err)
+	}
+
+	// Execute function
+	if _, err = db.Exec(
+		"SELECT pg_temp.v2_schema_migration($1, $2, $3, $4)",
 		v2temp_ControllerDBHost,
 		v2temp_ControllerDBName,
 		v2temp_ControllerDBUser,
 		v2temp_ControllerDBPassword,
 	); err != nil {
-		log.Println("Error: Unable to run migration scripts, execution failed.")
+		log.Println("Error: Unable to run v2 schema migration script, function execution failed.")
 		log.Fatalln(err)
 	}
 }
