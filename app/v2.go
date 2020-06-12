@@ -714,3 +714,7 @@ func ListAppsV2(db *sql.DB, params martini.Params, r render.Render) {
 
 	r.JSON(http.StatusOK, structs.Applist{Apps: appList})
 }
+
+func RenameAppV2(db *sql.DB, params martini.Params, renamespec structs.AppRenameSpec, r render.Render) {
+	// function stub
+}

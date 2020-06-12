@@ -186,22 +186,24 @@ func ScaleAppV2(db *sql.DB, params martini.Params, spaceapp structs.Spaceappspec
 
 // AddAppV2 - V2 version of space.AddApp
 // (original: "space/app.go")
-func AddAppV2(db *sql.DB, params martini.Params, spaceapp structs.Spaceappspec, berr binding.Errors, r render.Render) {
+func AddAppV2(db *sql.DB, params martini.Params, deployment structs.AppDeploymentSpec, berr binding.Errors, r render.Render) {
 	if berr != nil {
 		utils.ReportInvalidRequest(berr[0].Message, r)
 		return
 	}
+
 	appname := params["app"]
 	space := params["space"]
 
 	var healthcheck *string
-	if spaceapp.Healthcheck == "" {
+	if deployment.Healthcheck == "" {
 		healthcheck = nil
 	} else {
-		healthcheck = &spaceapp.Healthcheck
+		healthcheck = &deployment.Healthcheck
 	}
 
-	inserterr := db.QueryRow("INSERT INTO spacesapps(space,appname,instances,plan,healthcheck) VALUES($1,$2,$3,$4,$5) returning appname;", space, appname, spaceapp.Instances, spaceapp.Plan, healthcheck).Scan(&appname)
+	insertQuery := "insert into v2.deployments(name, space, plan, instances, healthcheck) values($1, $2, $3, $4, $5) returning name"
+	inserterr := db.QueryRow(insertQuery, appname, space, deployment.Plan, deployment.Instances, healthcheck).Scan(&appname)
 	if inserterr != nil {
 		utils.ReportError(inserterr, r)
 		return

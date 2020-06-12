@@ -32,6 +32,21 @@ func initV2Endpoints(m *martini.ClassicMartini) {
 	// Get all config vars for an app
 	m.Get("/v2beta1/space/:space/app/:appname/configvars", app.GetAllConfigVarsV2)
 
+	// Add and remove apps
+	m.Put("/v2beta1/space/:space/app/:app", binding.Json(structs.AppDeploymentSpec{}), space.AddAppV2)
+	m.Delete("/v2beta1/space/:space/app/:app", space.DeleteDeploymentV2)
+
+	// Update app details
+	m.Put("/v2beta1/space/:space/app/:app/healthcheck", binding.Json(structs.Spaceappspec{}), space.UpdateAppHealthCheckV2)
+	m.Delete("/v2beta1/space/:space/app/:app/healthcheck", space.DeleteAppHealthCheckV2)
+	m.Put("/v2beta1/space/:space/app/:app/plan", binding.Json(structs.Spaceappspec{}), space.UpdateAppPlanV2)
+	m.Put("/v2beta1/space/:space/app/:app/scale", binding.Json(structs.Spaceappspec{}), space.ScaleAppV2)
+
+	m.Put("/v2beta1/app/:appid/name", binding.Json(structs.AppRenameSpec{}), app.RenameAppV2)
+
+	// Delete a space
+	m.Delete("/v2beta1/space/:space", binding.Json(structs.Spacespec{}), space.DeleteSpaceV2)
+
 	// Todo
 
 	// "from apps,spacesapps"
@@ -39,12 +54,4 @@ func initV2Endpoints(m *martini.ClassicMartini) {
 	m.Post("/v2beta1/app/deploy", binding.Json(structs.Deployspec{}), app.DeploymentV2)
 	m.Post("/v2beta1/app/deploy/oneoff", binding.Json(structs.OneOffSpec{}), app.OneOffDeploymentV2)
 
-	// "from spacesapps"
-	m.Put("/v2beta1/space/:space/app/:app/plan", binding.Json(structs.Spaceappspec{}), space.UpdateAppPlanV2)
-	m.Put("/v2beta1/space/:space/app/:app/healthcheck", binding.Json(structs.Spaceappspec{}), space.UpdateAppHealthCheckV2)
-	m.Delete("/v2beta1/space/:space/app/:app/healthcheck", space.DeleteAppHealthCheckV2)
-	m.Delete("/v2beta1/space/:space/app/:app", space.DeleteDeploymentV2)
-	m.Put("/v2beta1/space/:space/app/:app/scale", binding.Json(structs.Spaceappspec{}), space.ScaleAppV2)
-	m.Put("/v2beta1/space/:space/app/:app", binding.Json(structs.Spaceappspec{}), space.AddAppV2)
-	m.Delete("/v2beta1/space/:space", binding.Json(structs.Spacespec{}), space.DeleteSpaceV2)
 }
