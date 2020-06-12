@@ -15,9 +15,9 @@ import (
 	"github.com/martini-contrib/render"
 )
 
-// UpdateAppPlanV2 - V2 version of space.UpdateAppPlan
+// UpdateDeploymentPlanV2 - V2 version of space.UpdateAppPlan
 // (original: "space/app.go")
-func UpdateAppPlanV2(db *sql.DB, params martini.Params, spaceapp structs.Spaceappspec, berr binding.Errors, r render.Render) {
+func UpdateDeploymentPlanV2(db *sql.DB, params martini.Params, spaceapp structs.Spaceappspec, berr binding.Errors, r render.Render) {
 	if berr != nil {
 		utils.ReportInvalidRequest(berr[0].Message, r)
 		return
@@ -34,9 +34,9 @@ func UpdateAppPlanV2(db *sql.DB, params martini.Params, spaceapp structs.Spaceap
 	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: "App: " + appname + "updated to use " + spaceapp.Plan + " plan"})
 }
 
-// UpdateAppHealthCheckV2 - V2 version of space.UpdateAppHealthCheck
+// UpdateDeploymentHealthCheckV2 - V2 version of space.UpdateAppHealthCheck
 // (original: "space/app.go")
-func UpdateAppHealthCheckV2(db *sql.DB, params martini.Params, spaceapp structs.Spaceappspec, berr binding.Errors, r render.Render) {
+func UpdateDeploymentHealthCheckV2(db *sql.DB, params martini.Params, spaceapp structs.Spaceappspec, berr binding.Errors, r render.Render) {
 	if berr != nil {
 		utils.ReportInvalidRequest(berr[0].Message, r)
 		return
@@ -58,9 +58,9 @@ func UpdateAppHealthCheckV2(db *sql.DB, params martini.Params, spaceapp structs.
 	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: "App: " + appname + " updated to use " + spaceapp.Healthcheck + " healthcheck"})
 }
 
-// DeleteAppHealthCheckV2 - V2 version of space.DeleteAppHealthCheck
+// DeleteDeploymentHealthCheckV2 - V2 version of space.DeleteAppHealthCheck
 // (original: "space/app.go")
-func DeleteAppHealthCheckV2(db *sql.DB, params martini.Params, r render.Render) {
+func DeleteDeploymentHealthCheckV2(db *sql.DB, params martini.Params, r render.Render) {
 	appname := params["app"]
 	space := params["space"]
 
@@ -71,7 +71,7 @@ func DeleteAppHealthCheckV2(db *sql.DB, params martini.Params, r render.Render) 
 	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: "App: " + appname + " healthcheck removed"})
 }
 
-// DeleteAppV2 - V2 version of space.DeleteAppV2
+// DeleteDeploymentV2 - V2 version of space.DeleteAppV2
 // (original: "space/app.go")
 func DeleteDeploymentV2(db *sql.DB, params martini.Params, r render.Render) {
 	appname := params["app"]
@@ -154,9 +154,9 @@ func DeleteDeploymentV2(db *sql.DB, params martini.Params, r render.Render) {
 	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: appname + " removed"})
 }
 
-// ScaleAppV2 - V2 version of space.ScaleApp
+// ScaleDeploymentV2 - V2 version of space.ScaleApp
 // (original: "space/app.go")
-func ScaleAppV2(db *sql.DB, params martini.Params, spaceapp structs.Spaceappspec, berr binding.Errors, r render.Render) {
+func ScaleDeploymentV2(db *sql.DB, params martini.Params, spaceapp structs.Spaceappspec, berr binding.Errors, r render.Render) {
 	if berr != nil {
 		utils.ReportInvalidRequest(berr[0].Message, r)
 		return
@@ -184,9 +184,9 @@ func ScaleAppV2(db *sql.DB, params martini.Params, spaceapp structs.Spaceappspec
 	r.JSON(http.StatusAccepted, structs.Messagespec{Status: http.StatusAccepted, Message: "instances updated"})
 }
 
-// AddAppV2 - V2 version of space.AddApp
+// AddDeploymentV2 - V2 version of space.AddApp
 // (original: "space/app.go")
-func AddAppV2(db *sql.DB, params martini.Params, deployment structs.AppDeploymentSpec, berr binding.Errors, r render.Render) {
+func AddDeploymentV2(db *sql.DB, params martini.Params, deployment structs.AppDeploymentSpec, berr binding.Errors, r render.Render) {
 	if berr != nil {
 		utils.ReportInvalidRequest(berr[0].Message, r)
 		return
@@ -196,10 +196,10 @@ func AddAppV2(db *sql.DB, params martini.Params, deployment structs.AppDeploymen
 	space := params["space"]
 
 	var healthcheck *string
-	if deployment.Healthcheck == "" {
+	if deployment.Healthcheck.String == "" {
 		healthcheck = nil
 	} else {
-		healthcheck = &deployment.Healthcheck
+		healthcheck = &deployment.Healthcheck.String
 	}
 
 	insertQuery := "insert into v2.deployments(name, space, plan, instances, healthcheck) values($1, $2, $3, $4, $5) returning name"

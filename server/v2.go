@@ -11,47 +11,51 @@ import (
 
 func initV2Endpoints(m *martini.ClassicMartini) {
 
-	/****************************
-	*
-	*	 Modified from V1 Schema
-	*
-	****************************/
+	// app* endpoints affect resources on ALL deployments for an Akkeris app
+	// space* endpoints affect individual deployments in a namespace
 
-	// Get details about all of the deployments for an app
-	m.Get("/v2beta1/app/:appid", app.DescribeAppV2)
-
-	// Get details about a specific deployment for an app
-	m.Get("/v2beta1/space/:space/app/:appname", space.DescribeDeploymentV2)
-
-	// Get a list of all app names
+	// Get a list of all apps
 	m.Get("/v2beta1/apps", app.ListAppsV2)
 
-	// Get a list of all apps in a space
-	m.Get("/v2beta1/space/:space/apps", space.DescribeSpaceV2)
+	// Get a list of all deployments for an app
+	m.Get("/v2beta1/app/:appid", app.DescribeAppV2)
 
-	// Get all config vars for an app
-	m.Get("/v2beta1/space/:space/app/:appname/configvars", app.GetAllConfigVarsV2)
+	// List all deployments in a space
+	m.Get("/v2beta1/space/:space/deployments", space.DescribeSpaceV2)
 
-	// Add and remove apps
-	m.Put("/v2beta1/space/:space/app/:app", binding.Json(structs.AppDeploymentSpec{}), space.AddAppV2)
-	m.Delete("/v2beta1/space/:space/app/:app", space.DeleteDeploymentV2)
+	// Get info on a deployment
+	m.Get("/v2beta1/space/:space/deployment/:deployment", space.DescribeDeploymentV2)
 
-	// Update app details
-	m.Put("/v2beta1/space/:space/app/:app/healthcheck", binding.Json(structs.Spaceappspec{}), space.UpdateAppHealthCheckV2)
-	m.Delete("/v2beta1/space/:space/app/:app/healthcheck", space.DeleteAppHealthCheckV2)
-	m.Put("/v2beta1/space/:space/app/:app/plan", binding.Json(structs.Spaceappspec{}), space.UpdateAppPlanV2)
-	m.Put("/v2beta1/space/:space/app/:app/scale", binding.Json(structs.Spaceappspec{}), space.ScaleAppV2)
+	// Get configvars for a deployment
+	m.Get("/v2beta1/space/:space/deployment/:deployment/configvars", app.GetAllConfigVarsV2) // SHOULD BE IN SPACE PACKAGE
 
-	m.Put("/v2beta1/app/:appid/name", binding.Json(structs.AppRenameSpec{}), app.RenameAppV2)
+	// Create a new deployment
+	// Create db record AND deploy to k8s.
+	// Oneoff exists here as well (parameter in body)
+	m.Post("/v2beta1/space/:space/deployment/:deployment", binding.Json(structs.AppDeploymentSpec{}), space.AddDeploymentV2)
+
+	// Redeploy (modify) an existing deployment
+	m.Put("/v2beta1/space/:space/deployment/:deployment/deploy", app.DeploymentV2) // SHOULD BE IN SPACE PACKAGE
+
+	// Modify deployment healthcheck
+	m.Put("/v2beta1/space/:space/deployment/:deployment/healthcheck", binding.Json(structs.Spaceappspec{}), space.UpdateDeploymentHealthCheckV2)
+	m.Delete("/v2beta1/space/:space/deployment/:deployment/healthcheck", space.DeleteDeploymentHealthCheckV2)
+	// Update deployment plan
+	m.Put("/v2beta1/space/:space/deployment/:deployment/plan", space.UpdateDeploymentPlanV2)
+
+	// Scale deployment
+	m.Put("/v2beta1/space/:space/deployment/:deployment/scale", space.ScaleDeploymentV2)
+
+	// Rename all deployments for an app
+	m.Put("/v2beta1/app/:appid/rename", app.RenameAppV2)
+
+	// Remove all deployments for an app
+	m.Delete("/v2beta1/app/:appid", app.DeleteAppV2)
+
+	// Remove a deployment
+	m.Delete("/v2beta1/space/:space/deployment/:deployment", space.DeleteDeploymentV2)
 
 	// Delete a space
-	m.Delete("/v2beta1/space/:space", binding.Json(structs.Spacespec{}), space.DeleteSpaceV2)
-
-	// Todo
-
-	// "from apps,spacesapps"
-	m.Delete("/v2beta1/app/:appid", app.DeleteAppV2)
-	m.Post("/v2beta1/app/deploy", binding.Json(structs.Deployspec{}), app.DeploymentV2)
-	m.Post("/v2beta1/app/deploy/oneoff", binding.Json(structs.OneOffSpec{}), app.OneOffDeploymentV2)
+	m.Delete("/v2beta1/space/:space", space.DeleteSpaceV2)
 
 }

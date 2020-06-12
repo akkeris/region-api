@@ -96,8 +96,8 @@ func DeploymentV2(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r
 		healthcheck string
 	)
 
-	err = db.QueryRow("SELECT apps.port,spacesapps.instances,COALESCE(spacesapps.plan,'noplan') AS plan,COALESCE(spacesapps.healthcheck,'tcp') AS healthcheck from apps,spacesapps where apps.name=$1 and apps.name=spacesapps.appname and spacesapps.space=$2", appname, space).Scan(&appport, &instances, &plan, &healthcheck)
-	if err != nil {
+	deploymentQuery := "select instances, coalesce(port, '') as port, coalesce(plan, 'noplan') as plan, coalesce(healthcheck, 'tcp') as healthcheck from v2.deployments where name = $1 and space = $2"
+	if err = db.QueryRow(deploymentQuery, appname, space).Scan(&instances, &appport, &plan, &healthcheck); err != nil {
 		utils.ReportError(err, r)
 		return
 	}
