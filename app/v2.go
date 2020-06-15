@@ -17,6 +17,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/lib/pq"
+
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
@@ -568,51 +570,6 @@ func getAppIDFromName(db *sql.DB, name string, space string) (string, error) {
 	return appid.String, nil
 }
 
-// GetAllConfigVarsV2 - Get all config vars for a deployment
-// (original: "app/deployment.go")
-func GetAllConfigVarsV2(db *sql.DB, params martini.Params, r render.Render) {
-	appname := params["appname"]
-	space := params["space"]
-
-	exists, err := deploymentExists(db, appname, space)
-	if err != nil {
-		utils.ReportError(err, r)
-		return
-	}
-	if exists == false {
-		utils.ReportInvalidRequest(err.Error(), r)
-		return
-	}
-
-	// Get bindings
-	appconfigset, appbindings, err := config.GetBindings(db, space, appname)
-	if err != nil {
-		utils.ReportError(err, r)
-		return
-	}
-	// Get user defined config vars
-	configvars, err := config.GetConfigVars(db, appconfigset)
-	if err != nil {
-		utils.ReportError(err, r)
-		return
-	}
-	// Assemble config -- akkeris "built in config", "user defined config vars", "service configvars"
-	elist := AddAkkerisConfigVars(appname, space)
-	for n, v := range configvars {
-		elist = append(elist, structs.EnvVar{Name: n, Value: v})
-	}
-	// add service vars
-	err, servicevars := service.GetServiceConfigVars(db, appname, space, appbindings)
-	if err != nil {
-		utils.ReportError(err, r)
-		return
-	}
-	for _, e := range servicevars {
-		elist = append(elist, e)
-	}
-	r.JSON(201, elist)
-}
-
 // GetDeployments - Given an app ID, return information about all deployments for that app
 func GetDeployments(db *sql.DB, appid string, rt runtime.Runtime) (ads []structs.AppDeploymentSpec, err error) {
 	deploymentsQuery := "select appid, name, space, instances, coalesce(plan, 'noplan') as plan, coalesce(healthcheck, 'tcp') as healthcheck from v2.deployments where appid = $1"
@@ -660,7 +617,10 @@ func GetDeployments(db *sql.DB, appid string, rt runtime.Runtime) (ads []structs
 			}
 		}
 
-		deployment.Image = sql.NullString{String: currentimage, Valid: currentimage != ""}
+		deployment.Image = structs.PrettyNullString{NullString: sql.NullString{
+			String: currentimage,
+			Valid:  currentimage != "",
+		}}
 		deployments = append(deployments, deployment)
 	}
 	return deployments, nil
@@ -685,34 +645,37 @@ func DescribeAppV2(db *sql.DB, params martini.Params, r render.Render) {
 	r.JSON(http.StatusOK, deployments)
 }
 
-// ListAppsV2 - Return a list of all apps in the Deployments table
-// (v1: "app/listapps.go")
+// ListAppsV2 - Get a list of all Akkeris apps and their associated deployments
 func ListAppsV2(db *sql.DB, params martini.Params, r render.Render) {
-	rows, err := db.Query("select concat(name, '-', space) from v2.deployments")
+	rows, err := db.Query("select appid, array_agg(name || '-' || space) deployments from v2.deployments group by appid")
 	if err != nil {
 		utils.ReportError(err, r)
 		return
 	}
 	defer rows.Close()
 
-	var appList []string
+	type appInfo struct {
+		ID          string   `json:"id"`          // App ID
+		Deployments []string `json:"deployments"` // List of deployments associated with the app
+	}
+
+	var appList []appInfo
+
 	for rows.Next() {
-		var app string
-		err := rows.Scan(&app)
-		if err != nil {
+		var app appInfo
+		if err = rows.Scan(&app.ID, pq.Array(&app.Deployments)); err != nil {
 			utils.ReportError(err, r)
 			return
 		}
 		appList = append(appList, app)
 	}
 
-	err = rows.Err()
-	if err != nil {
+	if err = rows.Err(); err != nil {
 		utils.ReportError(err, r)
 		return
 	}
 
-	r.JSON(http.StatusOK, structs.Applist{Apps: appList})
+	r.JSON(http.StatusOK, appList)
 }
 
 func RenameAppV2(db *sql.DB, params martini.Params, renamespec structs.AppRenameSpec, r render.Render) {

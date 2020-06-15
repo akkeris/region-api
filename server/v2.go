@@ -15,19 +15,26 @@ func initV2Endpoints(m *martini.ClassicMartini) {
 	// space* endpoints affect individual deployments in a namespace
 
 	// Get a list of all apps
+	// Code done, need to write tests
 	m.Get("/v2beta1/apps", app.ListAppsV2)
 
 	// Get a list of all deployments for an app
+	// Code done, need to write tests
 	m.Get("/v2beta1/app/:appid", app.DescribeAppV2)
 
 	// List all deployments in a space
+	// Code done, need to write tests
 	m.Get("/v2beta1/space/:space/deployments", space.DescribeSpaceV2)
 
 	// Get info on a deployment
+	// Code done, need to write tests
 	m.Get("/v2beta1/space/:space/deployment/:deployment", space.DescribeDeploymentV2)
 
 	// Get configvars for a deployment
-	m.Get("/v2beta1/space/:space/deployment/:deployment/configvars", app.GetAllConfigVarsV2) // SHOULD BE IN SPACE PACKAGE
+	// Code done, need to write tests
+	m.Get("/v2beta1/space/:space/deployment/:deployment/configvars", space.GetAllConfigVarsV2)
+
+	// Todo / Verify:
 
 	// Create a new deployment
 	// Create db record AND deploy to k8s.

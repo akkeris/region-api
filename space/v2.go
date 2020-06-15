@@ -6,7 +6,9 @@ import (
 	"log"
 	"net/http"
 	"region-api/app"
+	"region-api/config"
 	runtime "region-api/runtime"
+	"region-api/service"
 	structs "region-api/structs"
 	utils "region-api/utils"
 
@@ -14,6 +16,16 @@ import (
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
 )
+
+// Check to see if a given deployment exists in the database
+func checkDeployment(db *sql.DB, name string, space string) (bool, error) {
+	var exists bool
+	query := "select exists(select 1 from v2.deployments where name = $1 and space = $2)"
+	if err := db.QueryRow(query, name, space).Scan(&exists); err != nil {
+		return false, err
+	}
+	return exists, nil
+}
 
 // UpdateDeploymentPlanV2 - V2 version of space.UpdateAppPlan
 // (original: "space/app.go")
@@ -77,12 +89,12 @@ func DeleteDeploymentV2(db *sql.DB, params martini.Params, r render.Render) {
 	appname := params["app"]
 	space := params["space"]
 
-	var exists bool
-	query := "select exists(select 1 from v2.deployments where name = $1 and space = $2)"
-	if err := db.QueryRow(query, appname, space).Scan(&exists); err != nil {
+	exists, err := checkDeployment(db, appname, space)
+	if err != nil {
 		utils.ReportError(err, r)
 		return
 	}
+
 	if exists == false {
 		utils.ReportInvalidRequest("Invalid app or space name", r)
 		return
@@ -283,8 +295,7 @@ func DescribeSpaceV2(db *sql.DB, params martini.Params, r render.Render) {
 
 	for rows.Next() {
 		var appid sql.NullString
-		err := rows.Scan(&appid)
-		if err != nil {
+		if err := rows.Scan(&appid); err != nil {
 			utils.ReportError(err, r)
 			return
 		}
@@ -304,5 +315,127 @@ func DescribeSpaceV2(db *sql.DB, params martini.Params, r render.Render) {
 
 // DescribeDeploymentV2 - Get details about a specific deployment (based on name, space)
 func DescribeDeploymentV2(db *sql.DB, params martini.Params, r render.Render) {
-	//stub
+	name := params["deployment"]
+	space := params["space"]
+
+	exists, err := checkDeployment(db, name, space)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	if exists == false {
+		utils.ReportNotFoundError(r)
+		return
+	}
+
+	var deployment structs.AppDeploymentSpec
+
+	deploymentQuery := "select appid, name, space, instances, coalesce(plan, 'noplan') as plan, coalesce(healthcheck, 'tcp') as healthcheck from v2.deployments where name = $1 and space = $2"
+	if err = db.QueryRow(deploymentQuery, name, space).Scan(
+		&deployment.AppID,
+		&deployment.Name,
+		&deployment.Space,
+		&deployment.Instances,
+		&deployment.Plan,
+		&deployment.Healthcheck,
+	); err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+
+	// Retrieve bindings for the deployment
+	var bindings []structs.Bindspec
+	var bindtype string
+	var bindname string
+	crows, err := db.Query("select bindtype, bindname from appbindings where appname=$1 and space=$2", name, space)
+	defer crows.Close()
+	for crows.Next() {
+		if err := crows.Scan(&bindtype, &bindname); err != nil {
+			utils.ReportError(err, r)
+			return
+		}
+		bindings = append(bindings, structs.Bindspec{App: name, Bindtype: bindtype, Bindname: bindname, Space: space})
+	}
+	deployment.Bindings = bindings
+
+	// Retrieve current image for deployment
+	rt, err := runtime.GetRuntimeFor(db, deployment.Space)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+
+	currentimage, err := rt.GetCurrentImage(deployment.Name, deployment.Space)
+	if err != nil {
+		if err.Error() == "deployment not found" {
+			// if there has yet to be a deployment we'll get a not found error,
+			// just set the image to blank and keep moving.
+			currentimage = ""
+		} else {
+			utils.ReportError(err, r)
+			return
+		}
+	}
+
+	deployment.Image = structs.PrettyNullString{NullString: sql.NullString{
+		String: currentimage,
+		Valid:  currentimage != "",
+	}}
+
+	r.JSON(http.StatusOK, deployment)
+}
+
+func getConfigVars(db *sql.DB, appname string, space string) ([]structs.EnvVar, error) {
+	// Get bindings
+	appconfigset, appbindings, err := config.GetBindings(db, space, appname)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get user defined config vars
+	configvars, err := config.GetConfigVars(db, appconfigset)
+	if err != nil {
+		return nil, err
+	}
+
+	// Assemble config -- akkeris "built in config", "user defined config vars", "service configvars"
+	elist := app.AddAkkerisConfigVars(appname, space)
+	for n, v := range configvars {
+		elist = append(elist, structs.EnvVar{Name: n, Value: v})
+	}
+
+	// add service vars
+	err, servicevars := service.GetServiceConfigVars(db, appname, space, appbindings)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, e := range servicevars {
+		elist = append(elist, e)
+	}
+	return elist, nil
+}
+
+// GetAllConfigVarsV2 - Get all config vars for a deployment
+func GetAllConfigVarsV2(db *sql.DB, params martini.Params, r render.Render) {
+	name := params["deployment"]
+	space := params["space"]
+
+	exists, err := checkDeployment(db, name, space)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	if exists == false {
+		utils.ReportNotFoundError(r)
+		return
+	}
+
+	configList, err := getConfigVars(db, name, space)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+
+	r.JSON(201, configList)
 }
