@@ -34,19 +34,26 @@ func initV2Endpoints(m *martini.ClassicMartini) {
 	// Code done, need to write tests
 	m.Get("/v2beta1/space/:space/deployment/:deployment/configvars", space.GetAllConfigVarsV2)
 
-	// Todo / Verify:
-
-	// Create a new deployment
-	// Create db record AND deploy to k8s.
+	// TODO: Combine space.AddDeploymentV2 and space.DeploymentV2 (if deployment DNE in db, create at deploy time)
+	// Create a new deployment in the DB
 	// Oneoff exists here as well (parameter in body)
+	// Code done, need to write tests
 	m.Post("/v2beta1/space/:space/deployment/:deployment", binding.Json(structs.AppDeploymentSpec{}), space.AddDeploymentV2)
 
 	// Redeploy (modify) an existing deployment
-	m.Put("/v2beta1/space/:space/deployment/:deployment/deploy", app.DeploymentV2) // SHOULD BE IN SPACE PACKAGE
+	// Code done, need to test
+	m.Put("/v2beta1/space/:space/deployment/:deployment/deploy", binding.Json(structs.DeploySpecV2{}), space.DeploymentV2)
+
+	// Remove a deployment
+	// Code done, need to test
+	m.Delete("/v2beta1/space/:space/deployment/:deployment", space.DeleteDeploymentV2)
+
+	// Todo / Verify:
 
 	// Modify deployment healthcheck
 	m.Put("/v2beta1/space/:space/deployment/:deployment/healthcheck", binding.Json(structs.Spaceappspec{}), space.UpdateDeploymentHealthCheckV2)
 	m.Delete("/v2beta1/space/:space/deployment/:deployment/healthcheck", space.DeleteDeploymentHealthCheckV2)
+
 	// Update deployment plan
 	m.Put("/v2beta1/space/:space/deployment/:deployment/plan", space.UpdateDeploymentPlanV2)
 
@@ -58,9 +65,6 @@ func initV2Endpoints(m *martini.ClassicMartini) {
 
 	// Remove all deployments for an app
 	m.Delete("/v2beta1/app/:appid", app.DeleteAppV2)
-
-	// Remove a deployment
-	m.Delete("/v2beta1/space/:space/deployment/:deployment", space.DeleteDeploymentV2)
 
 	// Delete a space
 	m.Delete("/v2beta1/space/:space", space.DeleteSpaceV2)
