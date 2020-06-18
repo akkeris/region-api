@@ -15,6 +15,7 @@ import (
 	"encoding/json"
 
 	"fmt"
+
 	"time"
 
 	"github.com/go-martini/martini"
@@ -71,10 +72,6 @@ func Server() *martini.ClassicMartini {
 	m.Post("/v1/config/set", binding.Json(structs.Setspec{}), config.Createset)
 	m.Post("/v1/config/set/configvar", binding.Json([]structs.Varspec{}), config.Addvars)
 	m.Delete("/v1/config/set/:setname", config.Deleteset)
-
-	// V2 Endpoints
-	m.Get("/v2beta1/apps", ListAppsV2)
-	m.Get("/v2beta1/app/:appid", DescribeAppV2)
 
 	return m
 }
