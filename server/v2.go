@@ -41,32 +41,39 @@ func initV2Endpoints(m *martini.ClassicMartini) {
 	m.Post("/v2beta1/space/:space/deployment/:deployment", binding.Json(structs.AppDeploymentSpec{}), space.AddDeploymentV2)
 
 	// Redeploy (modify) an existing deployment
-	// Code done, need to test
-	m.Put("/v2beta1/space/:space/deployment/:deployment/deploy", binding.Json(structs.DeploySpecV2{}), space.DeploymentV2)
+	// Code done, need to write tests
+	m.Put("/v2beta1/space/:space/deployment/:deployment/deploy", binding.Json(structs.DeploySpecV2{}), space.DeploymentV2Handler)
 
 	// Remove a deployment
-	// Code done, need to test
-	m.Delete("/v2beta1/space/:space/deployment/:deployment", space.DeleteDeploymentV2)
-
-	// Todo / Verify:
+	// Code done, need to write tests
+	m.Delete("/v2beta1/space/:space/deployment/:deployment", space.DeleteDeploymentV2Handler)
 
 	// Modify deployment healthcheck
-	m.Put("/v2beta1/space/:space/deployment/:deployment/healthcheck", binding.Json(structs.Spaceappspec{}), space.UpdateDeploymentHealthCheckV2)
+	// Code done, need to write tests
+	m.Put("/v2beta1/space/:space/deployment/:deployment/healthcheck", binding.Json(structs.AppDeploymentSpec{}), space.UpdateDeploymentHealthCheckV2)
 	m.Delete("/v2beta1/space/:space/deployment/:deployment/healthcheck", space.DeleteDeploymentHealthCheckV2)
 
 	// Update deployment plan
-	m.Put("/v2beta1/space/:space/deployment/:deployment/plan", space.UpdateDeploymentPlanV2)
+	// Code done, need to write tests
+	m.Put("/v2beta1/space/:space/deployment/:deployment/plan", binding.Json(structs.AppDeploymentSpec{}), space.UpdateDeploymentPlanV2)
 
 	// Scale deployment
-	m.Put("/v2beta1/space/:space/deployment/:deployment/scale", space.ScaleDeploymentV2)
-
-	// Rename all deployments for an app
-	m.Put("/v2beta1/app/:appid/rename", app.RenameAppV2)
+	// Code done, need to write tests
+	m.Put("/v2beta1/space/:space/deployment/:deployment/scale", binding.Json(structs.AppDeploymentSpec{}), space.ScaleDeploymentV2)
 
 	// Remove all deployments for an app
+	// Code done, need to write tests
 	m.Delete("/v2beta1/app/:appid", app.DeleteAppV2)
 
+	// TODOs below
+
+	// TODO: Implement
 	// Delete a space
 	m.Delete("/v2beta1/space/:space", space.DeleteSpaceV2)
 
+	// TODO: Implement
+	// Rename all deployments for an app
+	m.Put("/v2beta1/app/:appid/rename", app.RenameAppV2)
+
+	// TODO: Take Deployment functions out of the space package. Create "deployment" package maybe?
 }

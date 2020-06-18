@@ -19,7 +19,7 @@ func (s PrettyNullString) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON is called by json.Marshal when it is type PrettyNullString
-func (s PrettyNullString) UnmarshalJSON(data []byte) error {
+func (s *PrettyNullString) UnmarshalJSON(data []byte) error {
 	// Unmarshal into pointer so we can detect null
 	var x *string
 	if err := json.Unmarshal(data, &x); err != nil {
@@ -48,7 +48,7 @@ func (n PrettyNullInt64) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON is called by json.Marshal when it is type PrettyNullInt64
-func (n PrettyNullInt64) UnmarshalJSON(data []byte) error {
+func (n *PrettyNullInt64) UnmarshalJSON(data []byte) error {
 	// Unmarshal into pointer so we can detect null
 	var x *int64
 	if err := json.Unmarshal(data, &x); err != nil {

@@ -35,91 +35,108 @@ func checkDeployment(db *sql.DB, name string, space string) (bool, error) {
 
 // UpdateDeploymentPlanV2 - V2 version of space.UpdateAppPlan
 // (original: "space/app.go")
-func UpdateDeploymentPlanV2(db *sql.DB, params martini.Params, spaceapp structs.Spaceappspec, berr binding.Errors, r render.Render) {
+func UpdateDeploymentPlanV2(db *sql.DB, params martini.Params, deployment structs.AppDeploymentSpec, berr binding.Errors, r render.Render) {
 	if berr != nil {
 		utils.ReportInvalidRequest(berr[0].Message, r)
 		return
 	}
 
-	appname := params["app"]
+	name := params["deployment"]
 	space := params["space"]
 
-	if _, err := db.Exec("UPDATE v2.deployments SET plan=$1 WHERE name=$2 AND space=$3", spaceapp.Plan, appname, space); err != nil {
+	if _, err := db.Exec("UPDATE v2.deployments SET plan=$1 WHERE name=$2 AND space=$3", deployment.Plan, name, space); err != nil {
 		utils.ReportError(err, r)
 		return
 	}
 
-	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: "App: " + appname + "updated to use " + spaceapp.Plan + " plan"})
+	r.JSON(http.StatusOK, structs.Messagespec{
+		Status:  http.StatusOK,
+		Message: "Deployment: " + name + "-" + space + " updated to use " + deployment.Plan + " plan",
+	})
 }
 
 // UpdateDeploymentHealthCheckV2 - V2 version of space.UpdateAppHealthCheck
 // (original: "space/app.go")
-func UpdateDeploymentHealthCheckV2(db *sql.DB, params martini.Params, spaceapp structs.Spaceappspec, berr binding.Errors, r render.Render) {
+func UpdateDeploymentHealthCheckV2(db *sql.DB, params martini.Params, deployment structs.AppDeploymentSpec, berr binding.Errors, r render.Render) {
 	if berr != nil {
 		utils.ReportInvalidRequest(berr[0].Message, r)
 		return
 	}
 
-	if spaceapp.Healthcheck == "" {
+	if !deployment.Healthcheck.Valid || deployment.Healthcheck.String == "" {
 		utils.ReportInvalidRequest("healthcheck required", r)
 		return
 	}
 
-	appname := params["app"]
+	name := params["deployment"]
 	space := params["space"]
 
-	_, err := db.Exec("UPDATE v2.deployments SET healthcheck=$1 WHERE name=$2 AND space=$3", spaceapp.Healthcheck, appname, space)
+	_, err := db.Exec("UPDATE v2.deployments SET healthcheck=$1 WHERE name=$2 AND space=$3", deployment.Healthcheck.String, name, space)
 	if err != nil {
 		utils.ReportError(err, r)
 		return
 	}
-	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: "App: " + appname + " updated to use " + spaceapp.Healthcheck + " healthcheck"})
+	r.JSON(http.StatusOK, structs.Messagespec{
+		Status:  http.StatusOK,
+		Message: "Deployment: " + name + "-" + space + " updated to use " + deployment.Healthcheck.String + " healthcheck",
+	})
 }
 
 // DeleteDeploymentHealthCheckV2 - V2 version of space.DeleteAppHealthCheck
 // (original: "space/app.go")
 func DeleteDeploymentHealthCheckV2(db *sql.DB, params martini.Params, r render.Render) {
-	appname := params["app"]
+	name := params["deployment"]
 	space := params["space"]
 
-	if _, err := db.Exec("UPDATE v2.deployments SET healthcheck=NULL WHERE name=$1 AND space=$2", appname, space); err != nil {
+	if _, err := db.Exec("UPDATE v2.deployments SET healthcheck=NULL WHERE name=$1 AND space=$2", name, space); err != nil {
 		utils.ReportError(err, r)
 		return
 	}
-	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: "App: " + appname + " healthcheck removed"})
+
+	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: "Deployment: " + name + "-" + space + " healthcheck removed"})
+}
+
+// DeleteDeploymentV2Handler - HTTP Handler for DeleteDeploymentV2
+func DeleteDeploymentV2Handler(db *sql.DB, params martini.Params, r render.Render) {
+	name := params["deployment"]
+	space := params["space"]
+
+	responseCode, err := DeleteDeploymentV2(db, name, space)
+	if err != nil {
+		if responseCode == 400 {
+			utils.ReportInvalidRequest(err.Error(), r)
+		} else {
+			utils.ReportError(err, r)
+		}
+		return
+	}
+
+	r.JSON(responseCode, structs.Messagespec{Status: responseCode, Message: name + "-" + space + " removed"})
 }
 
 // DeleteDeploymentV2 - V2 version of space.DeleteAppV2
 // (original: "space/app.go")
-func DeleteDeploymentV2(db *sql.DB, params martini.Params, r render.Render) {
-	name := params["deployment"]
-	space := params["space"]
-
+func DeleteDeploymentV2(db *sql.DB, name string, space string) (int, error) {
 	exists, err := checkDeployment(db, name, space)
 	if err != nil {
-		utils.ReportError(err, r)
-		return
+		return 500, err
 	}
 
 	if exists == false {
-		utils.ReportInvalidRequest("Invalid app or space name", r)
-		return
+		return 400, errors.New("Invalid app or space name")
 	}
 
 	rt, err := runtime.GetRuntimeFor(db, space)
 	if err != nil {
-		utils.ReportError(err, r)
-		return
+		return 500, err
 	}
 
 	if err = rt.DeleteService(space, name); err != nil {
-		utils.ReportError(err, r)
-		return
+		return 500, err
 	}
 
 	if err = rt.DeleteDeployment(space, name); err != nil {
-		utils.ReportError(err, r)
-		return
+		return 500, err
 	}
 
 	rslist, err := rt.GetReplicas(space, name)
@@ -160,31 +177,37 @@ func DeleteDeploymentV2(db *sql.DB, params martini.Params, r render.Render) {
 	}
 	_, err = db.Exec("DELETE from appbindings where space=$1 and appname=$2", space, name)
 	if err != nil {
-		utils.ReportError(err, r)
-		return
+		return 500, err
 	}
 
 	_, err = db.Exec("DELETE from v2.deployments where space=$1 and name=$2", space, name)
 	if err != nil {
-		utils.ReportError(err, r)
-		return
+		return 500, err
 	}
-	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: name + "-" + space + " removed"})
+
+	return http.StatusOK, nil
 }
 
 // ScaleDeploymentV2 - V2 version of space.ScaleApp
 // (original: "space/app.go")
-func ScaleDeploymentV2(db *sql.DB, params martini.Params, spaceapp structs.Spaceappspec, berr binding.Errors, r render.Render) {
+func ScaleDeploymentV2(db *sql.DB, params martini.Params, deployment structs.AppDeploymentSpec, berr binding.Errors, r render.Render) {
 	if berr != nil {
 		utils.ReportInvalidRequest(berr[0].Message, r)
 		return
 	}
-	appname := params["app"]
+
+	name := params["deployment"]
 	space := params["space"]
 
-	instances := spaceapp.Instances
+	var instances int
+	if !deployment.Instances.Valid || deployment.Instances.Int64 < 0 {
+		utils.ReportInvalidRequest("Instances missing or invalid", r)
+		return
+	}
 
-	if _, err := db.Exec("update v2.deployments set instances=$3 where space=$1 and name=$2", space, appname, instances); err != nil {
+	instances = int(deployment.Instances.Int64)
+
+	if _, err := db.Exec("update v2.deployments set instances=$3 where space=$1 and name=$2", space, name, instances); err != nil {
 		utils.ReportError(err, r)
 		return
 	}
@@ -195,11 +218,12 @@ func ScaleDeploymentV2(db *sql.DB, params martini.Params, spaceapp structs.Space
 		return
 	}
 
-	if err = rt.Scale(space, appname, instances); err != nil {
+	if err = rt.Scale(space, name, instances); err != nil {
 		utils.ReportError(err, r)
 		return
 	}
-	r.JSON(http.StatusAccepted, structs.Messagespec{Status: http.StatusAccepted, Message: "instances updated"})
+
+	r.JSON(http.StatusAccepted, structs.Messagespec{Status: http.StatusAccepted, Message: "Instances updated"})
 }
 
 // DeleteSpaceV2 - V2 version of space.Deletespace
@@ -430,6 +454,17 @@ func AddDeploymentV2(db *sql.DB, params martini.Params, deployment structs.AppDe
 	name := params["deployment"]
 	space := params["space"]
 
+	exists, err := checkDeployment(db, name, space)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+
+	if exists {
+		utils.ReportInvalidRequest("Deployment already exists", r)
+		return
+	}
+
 	var healthcheck *string
 	if deployment.Healthcheck.String == "" {
 		healthcheck = nil
@@ -438,7 +473,7 @@ func AddDeploymentV2(db *sql.DB, params martini.Params, deployment structs.AppDe
 	}
 
 	insertQuery := "insert into v2.deployments(name, space, plan, instances, healthcheck) values($1, $2, $3, $4, $5) returning name"
-	inserterr := db.QueryRow(insertQuery, name, space, deployment.Plan, deployment.Instances.Int64, healthcheck).Scan(&name)
+	inserterr := db.QueryRow(insertQuery, name, space, deployment.Plan, int(deployment.Instances.Int64), healthcheck).Scan(&name)
 	if inserterr != nil {
 		utils.ReportError(inserterr, r)
 		return
@@ -447,14 +482,14 @@ func AddDeploymentV2(db *sql.DB, params martini.Params, deployment structs.AppDe
 	r.JSON(http.StatusCreated, structs.Messagespec{Status: http.StatusCreated, Message: "app added to space"})
 }
 
-// DeploymentV2 - HTTP handler for deployV2
-func DeploymentV2(db *sql.DB, payload structs.DeploySpecV2, berr binding.Errors, r render.Render) {
+// DeploymentV2Handler - HTTP handler for DeploymentV2
+func DeploymentV2Handler(db *sql.DB, payload structs.DeploySpecV2, berr binding.Errors, r render.Render) {
 	if berr != nil {
 		utils.ReportInvalidRequest(berr[0].Message, r)
 		return
 	}
 
-	response, responseCode, err := deployV2(db, payload)
+	response, responseCode, err := DeploymentV2(db, payload)
 	if err != nil {
 		if responseCode == 400 {
 			utils.ReportInvalidRequest(err.Error(), r)
@@ -467,8 +502,8 @@ func DeploymentV2(db *sql.DB, payload structs.DeploySpecV2, berr binding.Errors,
 	r.JSON(responseCode, response)
 }
 
-// deployV2 - Deploy (or redeploy) a deployment
-func deployV2(db *sql.DB, payload structs.DeploySpecV2) (structs.Deployresponse, int, error) {
+// DeploymentV2 - Deploy (or redeploy) a deployment
+func DeploymentV2(db *sql.DB, payload structs.DeploySpecV2) (structs.Deployresponse, int, error) {
 	var (
 		deployresponse structs.Deployresponse
 		nullPort       sql.NullInt64
@@ -499,8 +534,6 @@ func deployV2(db *sql.DB, payload structs.DeploySpecV2) (structs.Deployresponse,
 		return deployresponse, 500, err
 	}
 
-	fmt.Println("A")
-
 	name := payload.Name
 	space := payload.Space
 	image := strings.Split(payload.Image, ":")[0]
@@ -516,8 +549,6 @@ func deployV2(db *sql.DB, payload structs.DeploySpecV2) (structs.Deployresponse,
 	} else {
 		port = 0
 	}
-
-	fmt.Println("B")
 
 	// Get bindings
 	appconfigset, appbindings, err := config.GetBindings(db, space, name)
@@ -576,8 +607,6 @@ func deployV2(db *sql.DB, payload structs.DeploySpecV2) (structs.Deployresponse,
 		return deployresponse, 201, nil
 	}
 
-	fmt.Println("C")
-
 	isInternal, err := utils.IsInternalSpace(db, space)
 	if err != nil {
 		return deployresponse, 500, err
@@ -599,8 +628,6 @@ func deployV2(db *sql.DB, payload structs.DeploySpecV2) (structs.Deployresponse,
 	payload.Labels["akkeris.io/plan"] = plan
 	payload.Labels["akkeris.io/internal"] = strconv.FormatBool(isInternal)
 	payload.Labels["akkeris.io/http2"] = strconv.FormatBool(payload.Features.Http2EndToEndService)
-
-	fmt.Println("D")
 
 	// Via heuristics and rules, determine and/or override ports and configvars
 	var finalport int
@@ -630,8 +657,6 @@ func deployV2(db *sql.DB, payload structs.DeploySpecV2) (structs.Deployresponse,
 			revisionhistorylimit = 10
 		}
 	}
-
-	fmt.Println("E")
 
 	appIngress, err := ingress.GetAppIngress(db, isInternal)
 	if err != nil {
@@ -672,8 +697,6 @@ func deployV2(db *sql.DB, payload structs.DeploySpecV2) (structs.Deployresponse,
 		deployment.PlanType = *plantype
 	}
 
-	fmt.Println("F")
-
 	deploymentExists, err := rt.DeploymentExists(space, name)
 	if err != nil {
 		return deployresponse, 500, err
@@ -696,8 +719,6 @@ func deployV2(db *sql.DB, payload structs.DeploySpecV2) (structs.Deployresponse,
 			return deployresponse, 500, err
 		}
 	}
-
-	fmt.Println("G")
 
 	// Any deployment features requiring istio transitioned ingresses should
 	// be marked here. Only apply this to the web dyno types.
