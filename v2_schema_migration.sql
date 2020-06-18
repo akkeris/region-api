@@ -77,7 +77,7 @@ BEGIN
 					and table_schema = 'v2'
 	) then
 			create view v2.deployments as
-					select controller_results.appid as appid,
+					select coalesce(controller_results.appid, spacesapps.appid) as appid,
 							spacesapps.appname as name,
 							spacesapps.space as space,
 							spacesapps.plan as plan,
@@ -85,7 +85,7 @@ BEGIN
 							spacesapps.healthcheck as healthcheck,
 							spacesapps.port as port
 					from spacesapps
-					join (
+					left join (
 							select apps.app as appid,
 											apps.name as appname,
 											spaces.name as spacename
@@ -100,9 +100,10 @@ BEGIN
 
 	create or replace function v2_deployments_insert_row() returns trigger as $v2_deployments_insert$
 			begin
-					-- Ignore the app ID and insert all other values into the spacesapps table
-					insert into spacesapps(appname, space, plan, instances, healthcheck, port) 
+					-- Insert all values into the spacesapps table
+					insert into spacesapps(appid, appname, space, plan, instances, healthcheck, port) 
 							values(
+									NEW.appid,
 									NEW.name,
 									NEW.space,
 									NEW.plan,

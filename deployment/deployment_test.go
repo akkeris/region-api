@@ -1,18 +1,14 @@
-package space
+package deployment
 
 import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"region-api/app"
-	"region-api/config"
 	"region-api/structs"
 	"region-api/utils"
-	"strings"
 	"testing"
 
 	"github.com/go-martini/martini"
@@ -24,51 +20,6 @@ import (
 func Server() *martini.ClassicMartini {
 	m := martini.Classic()
 	m.Use(render.Renderer())
-
-	m.Post("/v1/app", binding.Json(structs.Appspec{}), app.Createapp)  //createapp.go
-	m.Patch("/v1/app", binding.Json(structs.Appspec{}), app.Updateapp) //updateapp.go
-	m.Get("/v1/apps", app.Listapps)                                    //listapps.go
-	m.Get("/v1/app/:appname", app.Describeapp)                         //describeapp.go
-	m.Delete("/v1/app/:appname", app.Deleteapp)                        //deleteapp.go
-	m.Get("/v1/apps/plans", app.GetPlans)                              //plan.go
-
-	m.Post("/v1/app/deploy", binding.Json(structs.Deployspec{}), app.Deployment) //deployment.go
-
-	m.Post("/v1/app/bind", binding.Json(structs.Bindspec{}), app.Createbind)                       //createbind.go
-	m.Delete("/v1/app/:appname/bind/:bindspec", app.Unbindapp)                                     //unbindapp.go
-	m.Post("/v1/space/:space/app/:appname/bind", binding.Json(structs.Bindspec{}), app.Createbind) //createbind.go
-	m.Delete("/v1/space/:space/app/:appname/bind/**", app.Unbindapp)                               //unbindapp.go
-
-	m.Get("/v1/space/:space/app/:app/instance", app.GetInstances)                   //instance.go
-	m.Get("/v1/space/:space/app/:appname/instance/:instanceid/log", app.GetAppLogs) //instance.go
-	m.Delete("/v1/space/:space/app/:app/instance/:instanceid", app.DeleteInstance)  //instance.go
-
-	m.Post("/v1/space/:space/app/:app/rollback/:revision", app.Rollback) //rollback.,go
-
-	m.Get("/v1/space/:space/apps", app.Describespace)              //describeapp.go
-	m.Get("/v1/space/:space/app/:appname", app.DescribeappInSpace) //describeapp.go
-
-	m.Post("/v1/space/:space/app/:appname/restart", app.Restart)  //restart.go
-	m.Get("/v1/space/:space/app/:app/status", app.Spaceappstatus) //status.go
-	m.Get("/v1/kube/podstatus/:space/:app", app.PodStatus)        //status.go
-
-	//Helper endpoints for creating an app in a space these are not tested here
-	m.Delete("/v1/space/:space/app/:app", DeleteApp)
-	m.Post("/v1/space", binding.Json(structs.Spacespec{}), Createspace)
-	m.Get("/v1/spaces", Listspaces)
-	m.Get("/v1/space/:space", Space)
-
-	m.Delete("/v1/space/:space", binding.Json(structs.Spacespec{}), Deletespace)
-	m.Put("/v1/space/:space/tags", binding.Json(structs.Spacespec{}), UpdateSpaceTags)
-	m.Put("/v1/space/:space/app/:app", binding.Json(structs.Spaceappspec{}), AddApp)
-	m.Put("/v1/space/:space/app/:app/healthcheck", binding.Json(structs.Spaceappspec{}), UpdateAppHealthCheck)
-	m.Delete("/v1/space/:space/app/:app/healthcheck", DeleteAppHealthCheck)
-	m.Put("/v1/space/:space/app/:app/plan", binding.Json(structs.Spaceappspec{}), UpdateAppPlan)
-	m.Put("/v1/space/:space/app/:app/scale", binding.Json(structs.Spaceappspec{}), ScaleApp)
-
-	m.Post("/v1/config/set", binding.Json(structs.Setspec{}), config.Createset)
-	m.Post("/v1/config/set/configvar", binding.Json([]structs.Varspec{}), config.Addvars)
-	m.Delete("/v1/config/set/:setname", config.Deleteset)
 
 	// V2 ENDPOINTS
 	m.Get("/v2beta1/space/:space/deployments", DescribeSpaceV2)
@@ -82,6 +33,9 @@ func Server() *martini.ClassicMartini {
 	m.Patch("/v2beta1/space/:space/deployment/:deployment/plan", binding.Json(structs.AppDeploymentSpec{}), UpdateDeploymentPlanV2)
 	m.Patch("/v2beta1/space/:space/deployment/:deployment/scale", binding.Json(structs.AppDeploymentSpec{}), ScaleDeploymentV2)
 
+	m.Get("/v2beta1/apps", ListAppsV2)
+	m.Get("/v2beta1/app/:appid", DescribeAppV2)
+
 	return m
 }
 
@@ -93,55 +47,6 @@ func Init() *martini.ClassicMartini {
 	httpMartini.Map(pool)
 	return httpMartini
 }
-
-func sendRequest(m *martini.ClassicMartini, method string, url string, payload interface{}) *httptest.ResponseRecorder {
-	b := new(bytes.Buffer)
-	if err := json.NewEncoder(b).Encode(payload); err != nil {
-		panic(err)
-	}
-	r, _ := http.NewRequest(strings.ToUpper(method), url, b)
-	w := httptest.NewRecorder()
-	m.ServeHTTP(w, r)
-	return w
-}
-
-func TestCreatingDeletingSpaces(t *testing.T) {
-	m := Init()
-	Convey("Given we need a space", t, func() {
-		Convey("Ensure an incorrect space returns a 404", func() {
-			w := sendRequest(m, "get", "/v1/space/foobardoesnotexistextan", nil)
-			So(w.Code, ShouldEqual, http.StatusNotFound)
-			So(w.Body.String(), ShouldContainSubstring, "The specified space does not exist")
-		})
-		Convey("Ensure we can create a space", func() {
-			w := sendRequest(m, "post", "/v1/space", structs.Spacespec{Name: "alamotestspace", Internal: false, ComplianceTags: "", Stack: "ds1"})
-			So(w.Code, ShouldEqual, http.StatusCreated)
-			So(w.Body.String(), ShouldContainSubstring, "space created")
-		})
-		Convey("Ensure we cant create a space twice", func() {
-			w := sendRequest(m, "post", "/v1/space", structs.Spacespec{Name: "alamotestspace", Internal: false, ComplianceTags: "", Stack: "ds1"})
-			So(w.Code, ShouldEqual, http.StatusBadRequest)
-			So(w.Body.String(), ShouldContainSubstring, "The specified space is already taken.")
-		})
-		Convey("We should be able to see the spaces", func() {
-			w := sendRequest(m, "get", "/v1/spaces", nil)
-			So(w.Code, ShouldEqual, http.StatusOK)
-			So(w.Body.String(), ShouldContainSubstring, "alamotestspace")
-		})
-		Convey("We should be able to get the test space", func() {
-			w := sendRequest(m, "get", "/v1/space/alamotestspace", nil)
-			So(w.Code, ShouldEqual, http.StatusOK)
-			fmt.Println(w.Body.String())
-		})
-		Convey("Given we should be able to delete a space", func() {
-			w := sendRequest(m, "delete", "/v1/space/alamotestspace", nil)
-			So(w.Code, ShouldEqual, http.StatusOK)
-			So(w.Body.String(), ShouldContainSubstring, "space deleted")
-		})
-	})
-}
-
-// V2
 
 func TestDeploymentsV2(t *testing.T) {
 	testDeploymentName := "gotest"
@@ -390,6 +295,237 @@ func TestDeploymentsV2(t *testing.T) {
 				m.ServeHTTP(w, r)
 				So(w.Code, ShouldEqual, http.StatusOK)
 			})
+		})
+	})
+}
+
+func TestAppsV2(t *testing.T) {
+	// DescribeAppV2
+
+	testDeploymentName := "gotest"
+	testDeploymentName2 := "gotest2"
+	testDeploymentSpace := "gotest"
+	testDeploymentID := structs.PrettyNullString{sql.NullString{
+		String: "12345678-1234-1234-1234-123456789abc",
+		Valid:  true,
+	}}
+	testInstances := structs.PrettyNullInt64{sql.NullInt64{
+		Int64: 1,
+		Valid: true,
+	}}
+	m := Init()
+
+	Convey("Given we have a Deployment", t, func() {
+		Convey("When the deployment is successfully created", func() {
+			testDeployment := structs.AppDeploymentSpec{
+				AppID:     testDeploymentID,
+				Name:      testDeploymentName,
+				Space:     testDeploymentSpace,
+				Instances: testInstances,
+				Plan:      "scout",
+			}
+			b := new(bytes.Buffer)
+			if err := json.NewEncoder(b).Encode(testDeployment); err != nil {
+				panic(err)
+			}
+			r, _ := http.NewRequest("POST", "/v2beta1/space/"+testDeploymentSpace+"/deployment/"+testDeploymentName, b)
+			w := httptest.NewRecorder()
+			m.ServeHTTP(w, r)
+			So(w.Code, ShouldEqual, http.StatusCreated)
+			So(w.Body.String(), ShouldContainSubstring, "Deployment record created")
+
+			Convey("it should exist in a list of all deployments", func() {
+				r, _ := http.NewRequest("GET", "/v2beta1/apps", nil)
+				w := httptest.NewRecorder()
+				m.ServeHTTP(w, r)
+				type appInfo struct {
+					ID          string   `json:"id"`          // App ID
+					Deployments []string `json:"deployments"` // List of deployments associated with the app
+				}
+				var response []appInfo
+				So(w.Code, ShouldEqual, http.StatusOK)
+				decoder := json.NewDecoder(w.Body)
+				if err := decoder.Decode(&response); err != nil {
+					panic(err)
+				}
+				So(
+					response,
+					func(actual interface{}, expected ...interface{}) string {
+						for _, v := range response {
+							for _, w := range v.Deployments {
+								if w == testDeploymentName+"-"+testDeploymentSpace {
+									return ""
+								}
+							}
+						}
+						return "Deployment was not found in list of deployments for the given ID."
+					},
+				)
+			})
+
+			Convey("it should exist in a list of deployments for a specific app", func() {
+				r, _ := http.NewRequest("GET", "/v2beta1/app/"+testDeploymentID.String, nil)
+				w := httptest.NewRecorder()
+				m.ServeHTTP(w, r)
+				var response []structs.AppDeploymentSpec
+				So(w.Code, ShouldEqual, http.StatusOK)
+				decoder := json.NewDecoder(w.Body)
+				if err := decoder.Decode(&response); err != nil {
+					panic(err)
+				}
+				So(
+					response,
+					func(actual interface{}, expected ...interface{}) string {
+						for _, v := range response {
+							if v.AppID.String == testDeploymentID.String &&
+								v.Name == testDeploymentName &&
+								v.Space == testDeploymentSpace &&
+								v.Instances.Int64 == testInstances.Int64 &&
+								v.Plan == "scout" {
+								return ""
+							}
+						}
+						return "Deployment was not found in list of deployments for the " + testDeploymentID.String + " app."
+					},
+				)
+			})
+		})
+		Reset(func() {
+			r, _ := http.NewRequest("DELETE", "/v2beta1/space/"+testDeploymentSpace+"/deployment/"+testDeploymentName, nil)
+			w := httptest.NewRecorder()
+			m.ServeHTTP(w, r)
+			So(w.Code, ShouldEqual, http.StatusOK)
+		})
+	})
+
+	Convey("Given we have two deployments", t, func() {
+		Convey("When both of the deployments are successfully created", func() {
+			testDeployment := structs.AppDeploymentSpec{
+				AppID:     testDeploymentID,
+				Name:      testDeploymentName,
+				Space:     testDeploymentSpace,
+				Instances: testInstances,
+				Plan:      "scout",
+			}
+			b := new(bytes.Buffer)
+			if err := json.NewEncoder(b).Encode(testDeployment); err != nil {
+				panic(err)
+			}
+			r, _ := http.NewRequest("POST", "/v2beta1/space/"+testDeploymentSpace+"/deployment/"+testDeploymentName, b)
+			w := httptest.NewRecorder()
+			m.ServeHTTP(w, r)
+
+			testDeployment2 := structs.AppDeploymentSpec{
+				AppID:     testDeploymentID,
+				Name:      testDeploymentName2,
+				Space:     testDeploymentSpace,
+				Instances: testInstances,
+				Plan:      "scout",
+			}
+			b2 := new(bytes.Buffer)
+			if err2 := json.NewEncoder(b2).Encode(testDeployment2); err2 != nil {
+				panic(err2)
+			}
+			r2, _ := http.NewRequest("POST", "/v2beta1/space/"+testDeploymentSpace+"/deployment/"+testDeploymentName2, b2)
+			w2 := httptest.NewRecorder()
+			m.ServeHTTP(w2, r2)
+
+			So(w.Code, ShouldEqual, http.StatusCreated)
+			So(w.Body.String(), ShouldContainSubstring, "Deployment record created")
+			So(w2.Code, ShouldEqual, http.StatusCreated)
+			So(w2.Body.String(), ShouldContainSubstring, "Deployment record created")
+
+			Convey("they should both exist in a list of all deployments", func() {
+				r, _ := http.NewRequest("GET", "/v2beta1/apps", nil)
+				w := httptest.NewRecorder()
+				m.ServeHTTP(w, r)
+				type appInfo struct {
+					ID          string   `json:"id"`          // App ID
+					Deployments []string `json:"deployments"` // List of deployments associated with the app
+				}
+				var response []appInfo
+				So(w.Code, ShouldEqual, http.StatusOK)
+				decoder := json.NewDecoder(w.Body)
+				if err := decoder.Decode(&response); err != nil {
+					panic(err)
+				}
+				So(
+					response,
+					func(actual interface{}, expected ...interface{}) string {
+						found1 := false
+						found2 := false
+						for _, v := range response {
+							for _, w := range v.Deployments {
+								if w == testDeploymentName+"-"+testDeploymentSpace {
+									found1 = true
+									continue
+								}
+								if w == testDeploymentName2+"-"+testDeploymentSpace {
+									found2 = true
+									continue
+								}
+							}
+						}
+						if found1 && found2 {
+							return ""
+						}
+						return "One or more deployments were not found in the list of deployments for the given ID."
+					},
+				)
+			})
+
+			Convey("they should both exist alongside each other", func() {
+				r, _ := http.NewRequest("GET", "/v2beta1/app/"+testDeploymentID.String, nil)
+				w := httptest.NewRecorder()
+				m.ServeHTTP(w, r)
+				var response []structs.AppDeploymentSpec
+				So(w.Code, ShouldEqual, http.StatusOK)
+				decoder := json.NewDecoder(w.Body)
+				if err := decoder.Decode(&response); err != nil {
+					panic(err)
+				}
+				So(
+					response,
+					func(actual interface{}, expected ...interface{}) string {
+						found1 := false
+						found2 := false
+						for _, v := range response {
+							if v.AppID.String == testDeploymentID.String &&
+								v.Name == testDeploymentName &&
+								v.Space == testDeploymentSpace &&
+								v.Instances.Int64 == testInstances.Int64 &&
+								v.Plan == "scout" {
+								found1 = true
+								continue
+							}
+							if v.AppID.String == testDeploymentID.String &&
+								v.Name == testDeploymentName2 &&
+								v.Space == testDeploymentSpace &&
+								v.Instances.Int64 == testInstances.Int64 &&
+								v.Plan == "scout" {
+								found2 = true
+								continue
+							}
+						}
+						if found1 && found2 {
+							return ""
+						}
+						return "One or more deployments were not found in the list of deployments for the " + testDeploymentID.String + " app."
+					},
+				)
+			})
+		})
+
+		Reset(func() {
+			r, _ := http.NewRequest("DELETE", "/v2beta1/space/"+testDeploymentSpace+"/deployment/"+testDeploymentName, nil)
+			w := httptest.NewRecorder()
+			m.ServeHTTP(w, r)
+			So(w.Code, ShouldEqual, http.StatusOK)
+
+			r2, _ := http.NewRequest("DELETE", "/v2beta1/space/"+testDeploymentSpace+"/deployment/"+testDeploymentName2, nil)
+			w2 := httptest.NewRecorder()
+			m.ServeHTTP(w2, r2)
+			So(w2.Code, ShouldEqual, http.StatusOK)
 		})
 	})
 }
