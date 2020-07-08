@@ -31,7 +31,9 @@ type Router struct {
 type Ingress interface {
 	InstallOrUpdateCORSAuthFilter(domain string, path string, allowOrigin []string, allowMethods []string, allowHeaders []string, exposeHeaders []string, maxAge time.Duration, allowCredentials bool) (error)
 	InstallOrUpdateJWTAuthFilter(appname string, space string, fqdn string, port int64, issuer string, jwksUri string, audiences []string, excludes []string, includes []string) (error)
+	InstallOrUpdateCSPFilter(domain string, path string, policy string) (error)
 	DeleteCORSAuthFilter(vsname string, path string) (error)
+	DeleteCSPFilter(vsname string, path string) (error)
 	DeleteJWTAuthFilter(appname string, space string, fqdn string, port int64) (error)
 	SetMaintenancePage(app string, space string, value bool) error
 	GetMaintenancePageStatus(app string, space string) (bool, error)
