@@ -1,6 +1,6 @@
 FROM golang:1.13-alpine
 RUN apk update
-RUN apk add openssl ca-certificates git curl build-base bzr
+RUN apk add openssl ca-certificates git curl build-base
 WORKDIR /go/src/region-api
 COPY . .
 ENV GO111MODULE on
