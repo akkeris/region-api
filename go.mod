@@ -12,10 +12,10 @@ require (
 	github.com/go-martini/martini v0.0.0-20140519164645-49411a5b6468
 	github.com/gocql/gocql v0.0.0-20190402132108-0e1d5de854df
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
-	github.com/golang/snappy v0.0.0-20180518054509-2e65f85255db
+	github.com/golang/snappy v0.0.1
 	github.com/gopherjs/gopherjs v0.0.0-20181017120253-0766667cb4d1
 	github.com/hailocab/go-hostpool v0.0.0-20160125115350-e80d13ce29ed
-	github.com/jetstack/cert-manager v0.12.0
+	github.com/jetstack/cert-manager v0.15.2
 	github.com/jmcvetta/napping v3.2.0+incompatible
 	github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af
 	github.com/jtolds/gls v4.20.0+incompatible
@@ -34,7 +34,8 @@ require (
 	gopkg.in/guregu/null.v3 v3.4.0
 	gopkg.in/inf.v0 v0.9.1
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22
-	k8s.io/api v0.17.0
-	k8s.io/apimachinery v0.17.0
-	k8s.io/client-go v0.0.0-20191114101535-6c5935290e33
+	k8s.io/api v0.18.0
+	k8s.io/apimachinery v0.18.0
+	k8s.io/client-go v0.18.0
+	sigs.k8s.io/structured-merge-diff v0.0.0-20190525122527-15d366b2352e // indirect
 )
