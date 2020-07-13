@@ -797,6 +797,7 @@ func DeploymentV2(db *sql.DB, payload structs.DeploySpecV2) (structs.Deployrespo
 		// Apply the HTTP filters
 		foundJwtFilter := false
 		foundCorsFilter := false
+		foundCspFilter := false
 		for _, filter := range payload.Filters {
 			if filter.Type == "jwt" {
 				issuer := ""
@@ -893,6 +894,31 @@ func DeploymentV2(db *sql.DB, payload structs.DeploySpecV2) (structs.Deployrespo
 				} else {
 					fmt.Printf("WARNING: There was an error trying to pull the routes for an app to install the CORS auth filters on: %s\n", err.Error())
 				}
+			} else if filter.Type == "csp" {
+				if os.Getenv("INGRESS_DEBUG") == "true" {
+					fmt.Printf("[ingress] Adding CSP filter %#+v\n", filter)
+				}
+				policy := ""
+				if val, ok := filter.Data["policy"]; ok {
+					policy = val
+				}
+				if policy != "" {
+					if err := appIngress.InstallOrUpdateCSPFilter(name+"-"+space, "/", policy); err != nil {
+						fmt.Printf("WARNING: There was an error installing or updating CORS Auth filter: %s\n", err.Error())
+					} else {
+						foundCspFilter = true
+					}
+					routes, err := ingress.GetPathsByApp(db, name, space)
+					if err == nil {
+						for _, route := range routes {
+							if err := siteIngress.InstallOrUpdateCSPFilter(route.Domain, route.Path, policy); err != nil {
+								fmt.Printf("WARNING: There was an error installing or updating CSP filter on site: %s: %s\n", route.Domain, err.Error())
+							}
+						}
+					} else {
+						fmt.Printf("WARNING: There was an error trying to pull the routes for an app to install the CSP filters on: %s\n", err.Error())
+					}
+				}
 			} else {
 				fmt.Printf("WARNING: Unknown filter type: %s\n", filter.Type)
 			}
@@ -913,6 +939,21 @@ func DeploymentV2(db *sql.DB, payload structs.DeploySpecV2) (structs.Deployrespo
 				}
 			} else {
 				fmt.Printf("WARNING: There was an error trying to pull the routes for an app to install the CORS auth filters on: %s\n", err.Error())
+			}
+		}
+		if !foundCspFilter {
+			if err := appIngress.DeleteCSPFilter(name+"-"+space, "/"); err != nil {
+				fmt.Printf("WARNING: There was an error removing the CSP filter from the app: %s\n", err.Error())
+			}
+			routes, err := ingress.GetPathsByApp(db, name, space)
+			if err == nil {
+				for _, route := range routes {
+					if err := siteIngress.DeleteCSPFilter(route.Domain, route.Path); err != nil {
+						fmt.Printf("WARNING: There was an error removing CSP filter on site: %s: %s\n", route.Domain, err.Error())
+					}
+				}
+			} else {
+				fmt.Printf("WARNING: There was an error trying to pull the routes for an app to install the CSP filters on: %s\n", err.Error())
 			}
 		}
 		if !foundJwtFilter {
