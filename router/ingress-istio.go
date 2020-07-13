@@ -1008,6 +1008,85 @@ func (ingress *IstioIngress) DeleteCORSAuthFilter(vsname string, path string) (e
 	return nil
 }
 
+func (ingress *IstioIngress) InstallOrUpdateCSPFilter(vsname string, path string, policy string) (error) {
+	virtualService, err := ingress.GetVirtualService(vsname)
+	if err != nil {
+		// not yet deployed
+		return nil
+	}
+	var dirty = false
+	for i, http := range virtualService.Spec.HTTP {
+		if http.Match == nil || len(http.Match) == 0 {
+			if virtualService.Spec.HTTP[0].Headers.Response.Set == nil {
+				virtualService.Spec.HTTP[0].Headers.Response.Set = make(map[string]string)
+			}
+			virtualService.Spec.HTTP[0].Headers.Response.Set["Content-Security-Policy"] = policy
+			dirty = true
+		} else {
+			for _, match := range http.Match {
+				if os.Getenv("INGRESS_DEBUG") == "true" {
+					fmt.Printf("[ingress] Looking to add CSP policy, comparing path: %s with match prefix %s and match exact %s\n", path, match.URI.Prefix, match.URI.Exact)
+				}
+				if strings.HasPrefix(match.URI.Prefix, path) || match.URI.Exact == path || match.URI.Prefix == path {
+					if virtualService.Spec.HTTP[i].Headers.Response.Set == nil {
+						virtualService.Spec.HTTP[i].Headers.Response.Set = make(map[string]string)
+					}
+					virtualService.Spec.HTTP[i].Headers.Response.Set["Content-Security-Policy"] = policy
+					dirty = true
+				}
+			}
+		}
+	}
+	if dirty == true {
+		if os.Getenv("INGRESS_DEBUG") == "true" {
+			fmt.Printf("[ingress] Istio - Installing or updating CSP policy for %s at path %s: %#+v\n", vsname, path, virtualService)
+		}
+		if err = ingress.UpdateVirtualService(virtualService, vsname); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+
+func (ingress *IstioIngress) DeleteCSPFilter(vsname string, path string) (error) {
+	virtualService, err := ingress.GetVirtualService(vsname)
+	if err != nil {
+		if err.Error() == "virtual service was not found" {
+			// Go ahead and ignore setting this.  We can't as there's no deployment yet.
+			return nil
+		}
+		return err
+	}
+	var dirty = false
+	for i, http := range virtualService.Spec.HTTP {
+		if http.Match == nil || len(http.Match) == 0 {
+			virtualService.Spec.HTTP[i].Headers.Response.Set["Content-Security-Policy"] = ""
+			dirty = true
+		} else {
+			for _, match := range http.Match {
+				if os.Getenv("INGRESS_DEBUG") == "true" {
+					fmt.Printf("[ingress] Looking to remove CSP policy, comparing path: %s with match prefix %s and match exact %s\n", path, match.URI.Prefix, match.URI.Exact)
+				}
+				if strings.HasPrefix(match.URI.Prefix, path) || match.URI.Exact == path || match.URI.Prefix == path {
+					virtualService.Spec.HTTP[i].Headers.Response.Set["Content-Security-Policy"] = ""
+					dirty = true
+				}
+			}
+		}
+	}
+	if dirty == true {
+		if os.Getenv("INGRESS_DEBUG") == "true" {
+			fmt.Printf("[ingress] Removing CSP policy for %s at path %s\n", vsname, path)
+		}
+		if err = ingress.UpdateVirtualService(virtualService, vsname); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+
 func (ingress *IstioIngress) SetMaintenancePage(app string, space string, value bool) error {
 	virtualService, err := ingress.AppVirtualService(space, app)
 	if err != nil {
