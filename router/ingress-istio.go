@@ -1017,6 +1017,9 @@ func (ingress *IstioIngress) InstallOrUpdateCSPFilter(vsname string, path string
 	var dirty = false
 	for i, http := range virtualService.Spec.HTTP {
 		if http.Match == nil || len(http.Match) == 0 {
+			if virtualService.Spec.HTTP[0].Headers == nil {
+				virtualService.Spec.HTTP[0].Headers = &Headers{}
+			}
 			if virtualService.Spec.HTTP[0].Headers.Response.Set == nil {
 				virtualService.Spec.HTTP[0].Headers.Response.Set = make(map[string]string)
 			}
@@ -1028,6 +1031,9 @@ func (ingress *IstioIngress) InstallOrUpdateCSPFilter(vsname string, path string
 					fmt.Printf("[ingress] Looking to add CSP policy, comparing path: %s with match prefix %s and match exact %s\n", path, match.URI.Prefix, match.URI.Exact)
 				}
 				if strings.HasPrefix(match.URI.Prefix, path) || match.URI.Exact == path || match.URI.Prefix == path {
+					if virtualService.Spec.HTTP[i].Headers == nil {
+						virtualService.Spec.HTTP[i].Headers = &Headers{}
+					}
 					if virtualService.Spec.HTTP[i].Headers.Response.Set == nil {
 						virtualService.Spec.HTTP[i].Headers.Response.Set = make(map[string]string)
 					}
@@ -1061,16 +1067,20 @@ func (ingress *IstioIngress) DeleteCSPFilter(vsname string, path string) (error)
 	var dirty = false
 	for i, http := range virtualService.Spec.HTTP {
 		if http.Match == nil || len(http.Match) == 0 {
-			virtualService.Spec.HTTP[i].Headers.Response.Set["Content-Security-Policy"] = ""
-			dirty = true
+			if virtualService.Spec.HTTP[i].Headers != nil && virtualService.Spec.HTTP[i].Headers.Response.Set != nil {
+				virtualService.Spec.HTTP[i].Headers.Response.Set["Content-Security-Policy"] = ""
+				dirty = true
+			}
 		} else {
 			for _, match := range http.Match {
 				if os.Getenv("INGRESS_DEBUG") == "true" {
 					fmt.Printf("[ingress] Looking to remove CSP policy, comparing path: %s with match prefix %s and match exact %s\n", path, match.URI.Prefix, match.URI.Exact)
 				}
 				if strings.HasPrefix(match.URI.Prefix, path) || match.URI.Exact == path || match.URI.Prefix == path {
-					virtualService.Spec.HTTP[i].Headers.Response.Set["Content-Security-Policy"] = ""
-					dirty = true
+					if virtualService.Spec.HTTP[i].Headers != nil && virtualService.Spec.HTTP[i].Headers.Response.Set != nil {
+						virtualService.Spec.HTTP[i].Headers.Response.Set["Content-Security-Policy"] = ""
+						dirty = true
+					}
 				}
 			}
 		}
