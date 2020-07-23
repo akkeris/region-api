@@ -9,6 +9,7 @@ import (
 	"os"
 	"region-api/structs"
 	"region-api/utils"
+	"strings"
 	"testing"
 
 	"github.com/go-martini/martini"
@@ -49,6 +50,9 @@ func Init() *martini.ClassicMartini {
 }
 
 func TestDeploymentsV2(t *testing.T) {
+	if os.Getenv("ENABLE_V2_ENDPOINTS") == "" || strings.ToLower(os.Getenv("ENABLE_V2_ENDPOINTS")) != "true" {
+		t.Skip("V2 endpoints not enabled, skipping TestDeploymentsV2")
+	}
 	testDeploymentName := "gotest"
 	testDeploymentSpace := "gotest"
 	testDeploymentID := structs.PrettyNullString{sql.NullString{
@@ -300,6 +304,10 @@ func TestDeploymentsV2(t *testing.T) {
 }
 
 func TestAppsV2(t *testing.T) {
+	if os.Getenv("ENABLE_V2_ENDPOINTS") == "" || strings.ToLower(os.Getenv("ENABLE_V2_ENDPOINTS")) != "true" {
+		t.Skip("V2 endpoints not enabled, skipping TestAppsV2")
+	}
+
 	// DescribeAppV2
 
 	testDeploymentName := "gotest"

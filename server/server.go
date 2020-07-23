@@ -291,7 +291,9 @@ func Server(db *sql.DB) *martini.ClassicMartini {
 	InitOldServiceEndpoints(m)
 
 	// Add V2 Endpoints
-	initV2Endpoints(m)
+	if os.Getenv("ENABLE_V2_ENDPOINTS") != "" && strings.ToLower(os.Getenv("ENABLE_V2_ENDPOINTS")) == "true" {
+		initV2Endpoints(m)
+	}
 
 	vault.GetVaultListPeriodic()
 	c := cron.New()
@@ -365,6 +367,11 @@ func CreateDB(db *sql.DB) {
 	// --  $2: controller-api database name
 	// --  $3: controller-api database username
 	// --  $4: controller-api database password
+
+	if os.Getenv("ENABLE_V2_ENDPOINTS") == "" || strings.ToLower(os.Getenv("ENABLE_V2_ENDPOINTS")) != "true" {
+		log.Println("V2 endpoints not enabled, skipping V2 schema migration scripts")
+		return
+	}
 
 	if os.Getenv("V2_TEMP_CONTROLLER_API_DATABASE_HOST") == "" {
 		log.Fatalln("Error: Unable to run v2 schema migration - Missing controller-api database host!")

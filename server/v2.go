@@ -60,7 +60,8 @@ func initV2Endpoints(m *martini.ClassicMartini) {
 	// Rename all deployments for an app
 	m.Put("/v2beta1/app/:appid/rename", deployment.RenameAppV2)
 
-	// TODO: Combine deployment.AddDeploymentV2 and deployment.DeploymentV2 (if deployment DNE in db, create at deploy time)
+	// TODO: Investigate combining deployment.AddDeploymentV2 and
+	// deployment.DeploymentV2 (if deployment DNE in db, create at deploy time)
 
 	// TODO: Write tests for v2 one off deployments
 }
