@@ -107,7 +107,7 @@ func DeleteDeploymentV2Handler(db *sql.DB, params martini.Params, r render.Rende
 
 	responseCode, err := DeleteDeploymentV2(db, name, space)
 	if err != nil {
-		if responseCode == 400 {
+		if responseCode == http.StatusBadRequest {
 			utils.ReportInvalidRequest(err.Error(), r)
 		} else {
 			utils.ReportError(err, r)
@@ -123,24 +123,24 @@ func DeleteDeploymentV2Handler(db *sql.DB, params martini.Params, r render.Rende
 func DeleteDeploymentV2(db *sql.DB, name string, space string) (int, error) {
 	exists, err := checkDeployment(db, name, space)
 	if err != nil {
-		return 500, err
+		return http.StatusInternalServerError, err
 	}
 
 	if exists == false {
-		return 400, errors.New("Invalid app or space name")
+		return http.StatusBadRequest, errors.New("Invalid app or space name")
 	}
 
 	rt, err := runtime.GetRuntimeFor(db, space)
 	if err != nil {
-		return 500, err
+		return http.StatusInternalServerError, err
 	}
 
 	if err = rt.DeleteService(space, name); err != nil {
-		return 500, err
+		return http.StatusInternalServerError, err
 	}
 
 	if err = rt.DeleteDeployment(space, name); err != nil {
-		return 500, err
+		return http.StatusInternalServerError, err
 	}
 
 	rslist, err := rt.GetReplicas(space, name)
@@ -181,12 +181,12 @@ func DeleteDeploymentV2(db *sql.DB, name string, space string) (int, error) {
 	}
 	_, err = db.Exec("DELETE from appbindings where space=$1 and appname=$2", space, name)
 	if err != nil {
-		return 500, err
+		return http.StatusInternalServerError, err
 	}
 
 	_, err = db.Exec("DELETE from v2.deployments where space=$1 and name=$2", space, name)
 	if err != nil {
-		return 500, err
+		return http.StatusInternalServerError, err
 	}
 
 	return http.StatusOK, nil
@@ -485,7 +485,7 @@ func GetAllConfigVarsV2(db *sql.DB, params martini.Params, r render.Render) {
 		return
 	}
 
-	r.JSON(201, configList)
+	r.JSON(http.StatusCreated, configList)
 }
 
 // AddDeploymentV2 - V2 version of space.AddApp
@@ -567,21 +567,21 @@ func DeploymentV2(db *sql.DB, payload structs.DeploySpecV2) (structs.Deployrespo
 
 	// Validate input
 	if payload.Name == "" {
-		return deployresponse, 400, errors.New("Deployment Name can not be blank")
+		return deployresponse, http.StatusBadRequest, errors.New("Deployment Name can not be blank")
 	}
 	if payload.Space == "" {
-		return deployresponse, 400, errors.New("Space Name can not be blank")
+		return deployresponse, http.StatusBadRequest, errors.New("Space Name can not be blank")
 	}
 	if payload.Image == "" {
-		return deployresponse, 400, errors.New("Image must be specified")
+		return deployresponse, http.StatusBadRequest, errors.New("Image must be specified")
 	}
 	if !(strings.Contains(payload.Image, ":")) {
-		return deployresponse, 400, errors.New("Image must contain tag")
+		return deployresponse, http.StatusBadRequest, errors.New("Image must contain tag")
 	}
 
 	rt, err := runtime.GetRuntimeFor(db, payload.Space)
 	if err != nil {
-		return deployresponse, 500, err
+		return deployresponse, http.StatusInternalServerError, err
 	}
 
 	name := payload.Name
@@ -591,7 +591,7 @@ func DeploymentV2(db *sql.DB, payload structs.DeploySpecV2) (structs.Deployrespo
 
 	deploymentQuery := "select instances, port, coalesce(plan, 'noplan') as plan, coalesce(healthcheck, 'tcp') as healthcheck from v2.deployments where name = $1 and space = $2"
 	if err = db.QueryRow(deploymentQuery, name, space).Scan(&instances, &nullPort, &plan, &healthcheck); err != nil {
-		return deployresponse, 500, err
+		return deployresponse, http.StatusInternalServerError, err
 	}
 
 	if nullPort.Valid {
@@ -603,19 +603,19 @@ func DeploymentV2(db *sql.DB, payload structs.DeploySpecV2) (structs.Deployrespo
 	// Get bindings
 	appconfigset, appbindings, err := config.GetBindings(db, space, name)
 	if err != nil {
-		return deployresponse, 500, err
+		return deployresponse, http.StatusInternalServerError, err
 	}
 
 	// Get memory limits
 	memorylimit, memoryrequest, err := app.GetMemoryLimits(db, plan)
 	if err != nil {
-		return deployresponse, 500, err
+		return deployresponse, http.StatusInternalServerError, err
 	}
 
 	// Get user defined config vars
 	configvars, err := config.GetConfigVars(db, appconfigset)
 	if err != nil {
-		return deployresponse, 500, err
+		return deployresponse, http.StatusInternalServerError, err
 	}
 
 	// Assemble config -- akkeris "built in config", "user defined config vars", "service configvars"
@@ -627,7 +627,7 @@ func DeploymentV2(db *sql.DB, payload structs.DeploySpecV2) (structs.Deployrespo
 	// add service vars
 	err, servicevars := service.GetServiceConfigVars(db, name, space, appbindings)
 	if err != nil {
-		return deployresponse, 500, err
+		return deployresponse, http.StatusInternalServerError, err
 	}
 	for _, e := range servicevars {
 		elist = append(elist, e)
@@ -650,16 +650,16 @@ func DeploymentV2(db *sql.DB, payload structs.DeploySpecV2) (structs.Deployrespo
 			Tag:           imageTag,
 		}); err != nil {
 			fmt.Println("Error creating a one off pod!")
-			return deployresponse, 500, err
+			return deployresponse, http.StatusInternalServerError, err
 		}
 		deployresponse.Controller = "Deployment Created"
 		deployresponse.Service = "Service not required"
-		return deployresponse, 201, nil
+		return deployresponse, http.StatusCreated, nil
 	}
 
 	isInternal, err := utils.IsInternalSpace(db, space)
 	if err != nil {
-		return deployresponse, 500, err
+		return deployresponse, http.StatusInternalServerError, err
 	}
 
 	if payload.Labels == nil {
@@ -668,7 +668,7 @@ func DeploymentV2(db *sql.DB, payload structs.DeploySpecV2) (structs.Deployrespo
 
 	plantype, err := app.GetPlanType(db, plan)
 	if err != nil {
-		return deployresponse, 500, err
+		return deployresponse, http.StatusInternalServerError, err
 	}
 
 	if plantype != nil && *plantype != "" {
@@ -710,11 +710,11 @@ func DeploymentV2(db *sql.DB, payload structs.DeploySpecV2) (structs.Deployrespo
 
 	appIngress, err := ingress.GetAppIngress(db, isInternal)
 	if err != nil {
-		return deployresponse, 500, err
+		return deployresponse, http.StatusInternalServerError, err
 	}
 	siteIngress, err := ingress.GetSiteIngress(db, isInternal)
 	if err != nil {
-		return deployresponse, 500, err
+		return deployresponse, http.StatusInternalServerError, err
 	}
 
 	// Create deployment
@@ -749,11 +749,11 @@ func DeploymentV2(db *sql.DB, payload structs.DeploySpecV2) (structs.Deployrespo
 
 	deploymentExists, err := rt.DeploymentExists(space, name)
 	if err != nil {
-		return deployresponse, 500, err
+		return deployresponse, http.StatusInternalServerError, err
 	}
 	serviceExists, err := rt.ServiceExists(space, name)
 	if err != nil {
-		return deployresponse, 500, err
+		return deployresponse, http.StatusInternalServerError, err
 	}
 
 	// Do not write to cluster above this line, everything below should apply changes,
@@ -762,11 +762,11 @@ func DeploymentV2(db *sql.DB, payload structs.DeploySpecV2) (structs.Deployrespo
 
 	if !deploymentExists {
 		if err = rt.CreateDeployment(&deployment); err != nil {
-			return deployresponse, 500, err
+			return deployresponse, http.StatusInternalServerError, err
 		}
 	} else {
 		if err = rt.UpdateDeployment(&deployment); err != nil {
-			return deployresponse, 500, err
+			return deployresponse, http.StatusInternalServerError, err
 		}
 	}
 
@@ -786,11 +786,11 @@ func DeploymentV2(db *sql.DB, payload structs.DeploySpecV2) (structs.Deployrespo
 	if finalport != -1 {
 		if !serviceExists {
 			if err := rt.CreateService(space, name, finalport, payload.Labels, payload.Features); err != nil {
-				return deployresponse, 500, err
+				return deployresponse, http.StatusInternalServerError, err
 			}
 		} else {
 			if err := rt.UpdateService(space, name, finalport, payload.Labels, payload.Features); err != nil {
-				return deployresponse, 500, err
+				return deployresponse, http.StatusInternalServerError, err
 			}
 		}
 
@@ -981,7 +981,7 @@ func DeploymentV2(db *sql.DB, payload structs.DeploySpecV2) (structs.Deployrespo
 		}
 		deployresponse.Controller = "Deployment Updated"
 	}
-	return deployresponse, 201, nil
+	return deployresponse, http.StatusCreated, nil
 }
 
 // deploymentExists - Returns whether or not a deployment with a given name and space exists
