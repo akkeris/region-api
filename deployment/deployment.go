@@ -37,6 +37,25 @@ func checkDeployment(db *sql.DB, name string, space string) (bool, error) {
 	return exists, nil
 }
 
+// getDeploymentInfo - Get database record for the deployment with the given name and space
+func getDeploymentInfo(db *sql.DB, name string, space string) (structs.AppDeploymentSpec, error) {
+	var d structs.AppDeploymentSpec
+
+	deploymentQuery := "select appid, name, space, instances, coalesce(plan, 'noplan') as plan, coalesce(healthcheck, 'tcp') as healthcheck from v2.deployments where name = $1 and space = $2"
+	if err := db.QueryRow(deploymentQuery, name, space).Scan(
+		&d.AppID,
+		&d.Name,
+		&d.Space,
+		&d.Instances,
+		&d.Plan,
+		&d.Healthcheck,
+	); err != nil {
+		return d, err
+	}
+
+	return d, nil
+}
+
 // UpdateDeploymentPlanV2 - V2 version of space.UpdateAppPlan
 // (original: "space/app.go")
 func UpdateDeploymentPlanV2(db *sql.DB, params martini.Params, deployment structs.AppDeploymentSpec, berr binding.Errors, r render.Render) {
@@ -53,10 +72,13 @@ func UpdateDeploymentPlanV2(db *sql.DB, params martini.Params, deployment struct
 		return
 	}
 
-	r.JSON(http.StatusOK, structs.Messagespec{
-		Status:  http.StatusOK,
-		Message: "Deployment: " + name + "-" + space + " updated to use " + deployment.Plan + " plan",
-	})
+	updatedDeployment, err := getDeploymentInfo(db, name, space)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+
+	r.JSON(http.StatusOK, updatedDeployment)
 }
 
 // UpdateDeploymentHealthCheckV2 - V2 version of space.UpdateAppHealthCheck
@@ -80,10 +102,14 @@ func UpdateDeploymentHealthCheckV2(db *sql.DB, params martini.Params, deployment
 		utils.ReportError(err, r)
 		return
 	}
-	r.JSON(http.StatusOK, structs.Messagespec{
-		Status:  http.StatusOK,
-		Message: "Deployment: " + name + "-" + space + " updated to use " + deployment.Healthcheck.String + " healthcheck",
-	})
+
+	updatedDeployment, err := getDeploymentInfo(db, name, space)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+
+	r.JSON(http.StatusOK, updatedDeployment)
 }
 
 // DeleteDeploymentHealthCheckV2 - V2 version of space.DeleteAppHealthCheck
@@ -97,13 +123,25 @@ func DeleteDeploymentHealthCheckV2(db *sql.DB, params martini.Params, r render.R
 		return
 	}
 
-	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: "Deployment: " + name + "-" + space + " healthcheck removed"})
+	updatedDeployment, err := getDeploymentInfo(db, name, space)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+
+	r.JSON(http.StatusOK, updatedDeployment)
 }
 
 // DeleteDeploymentV2Handler - HTTP Handler for DeleteDeploymentV2
 func DeleteDeploymentV2Handler(db *sql.DB, params martini.Params, r render.Render) {
 	name := params["deployment"]
 	space := params["space"]
+
+	oldDeployment, err := getDeploymentInfo(db, name, space)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
 
 	responseCode, err := DeleteDeploymentV2(db, name, space)
 	if err != nil {
@@ -115,7 +153,7 @@ func DeleteDeploymentV2Handler(db *sql.DB, params martini.Params, r render.Rende
 		return
 	}
 
-	r.JSON(responseCode, structs.Messagespec{Status: responseCode, Message: name + "-" + space + " removed"})
+	r.JSON(responseCode, oldDeployment)
 }
 
 // DeleteDeploymentV2 - V2 version of space.DeleteAppV2
@@ -227,7 +265,13 @@ func ScaleDeploymentV2(db *sql.DB, params martini.Params, deployment structs.App
 		return
 	}
 
-	r.JSON(http.StatusAccepted, structs.Messagespec{Status: http.StatusAccepted, Message: "Instances updated"})
+	scaledDeployment, err := getDeploymentInfo(db, name, space)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+
+	r.JSON(http.StatusAccepted, scaledDeployment)
 }
 
 // DeleteSpaceV2 - V2 version of space.Deletespace
@@ -307,17 +351,8 @@ func DescribeSpaceV2(db *sql.DB, params martini.Params, r render.Render) {
 			return
 		}
 
-		var deployment structs.AppDeploymentSpec
-
-		deploymentQuery := "select appid, name, space, instances, coalesce(plan, 'noplan') as plan, coalesce(healthcheck, 'tcp') as healthcheck from v2.deployments where name = $1 and space = $2"
-		if err = db.QueryRow(deploymentQuery, name, space).Scan(
-			&deployment.AppID,
-			&deployment.Name,
-			&deployment.Space,
-			&deployment.Instances,
-			&deployment.Plan,
-			&deployment.Healthcheck,
-		); err != nil {
+		deployment, err := getDeploymentInfo(db, name, space)
+		if err != nil {
 			utils.ReportError(err, r)
 			return
 		}
@@ -376,17 +411,8 @@ func DescribeDeploymentV2(db *sql.DB, params martini.Params, r render.Render) {
 		return
 	}
 
-	var deployment structs.AppDeploymentSpec
-
-	deploymentQuery := "select appid, name, space, instances, coalesce(plan, 'noplan') as plan, coalesce(healthcheck, 'tcp') as healthcheck from v2.deployments where name = $1 and space = $2"
-	if err = db.QueryRow(deploymentQuery, name, space).Scan(
-		&deployment.AppID,
-		&deployment.Name,
-		&deployment.Space,
-		&deployment.Instances,
-		&deployment.Plan,
-		&deployment.Healthcheck,
-	); err != nil {
+	deployment, err := getDeploymentInfo(db, name, space)
+	if err != nil {
 		utils.ReportError(err, r)
 		return
 	}
@@ -529,7 +555,13 @@ func AddDeploymentV2(db *sql.DB, params martini.Params, deployment structs.AppDe
 		return
 	}
 
-	r.JSON(http.StatusCreated, structs.Messagespec{Status: http.StatusCreated, Message: "Deployment record created"})
+	newDeployment, err := getDeploymentInfo(db, name, space)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+
+	r.JSON(http.StatusCreated, newDeployment)
 }
 
 // DeploymentV2Handler - HTTP handler for DeploymentV2
@@ -1032,6 +1064,7 @@ func DeleteAppV2(db *sql.DB, params martini.Params, r render.Render) {
 	}
 
 	var deletionErrors []deletionError
+	var deletedApps []string
 
 	for rows.Next() {
 		var dName string
@@ -1056,6 +1089,8 @@ func DeleteAppV2(db *sql.DB, params martini.Params, r render.Render) {
 					DeploymentSpace: dSpace,
 					Error:           err2.Error(),
 				})
+			} else {
+				deletedApps = append(deletedApps, dName+"-"+dSpace)
 			}
 		}
 	}
@@ -1073,7 +1108,7 @@ func DeleteAppV2(db *sql.DB, params martini.Params, r render.Render) {
 		return
 	}
 
-	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: "All deployments for the specified app were successfully deleted."})
+	r.JSON(http.StatusOK, deletedApps)
 }
 
 // getAppIDFromName - Given a deployment name and space, get the associated app ID
