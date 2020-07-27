@@ -51,9 +51,9 @@ func Server() *martini.ClassicMartini {
 	m.Get("/v1/space/:space/apps", Describespace)              //describeapp.go
 	m.Get("/v1/space/:space/app/:appname", DescribeappInSpace) //describeapp.go
 
-	m.Post("/v1/space/:space/app/:appname/restart", Restart)           //restart.go
-	m.Get("/v1/space/:space/app/:app/status", Spaceappstatus)          //status.go
-	m.Get("/v1/kube/podstatus/:space/:app", PodStatus)                 //status.go
+	m.Post("/v1/space/:space/app/:appname/restart", Restart)  //restart.go
+	m.Get("/v1/space/:space/app/:app/status", Spaceappstatus) //status.go
+	m.Get("/v1/kube/podstatus/:space/:app", PodStatus)        //status.go
 
 	//Helper endpoints for creating an app in a space these are not tested here
 	m.Delete("/v1/space/:space/app/:app", space.DeleteApp)
@@ -431,94 +431,91 @@ func TestDeployments(t *testing.T) {
 							So(w.Code, ShouldEqual, http.StatusCreated)
 							So(w.Body.String(), ShouldContainSubstring, "Deployment Created")
 
-							
+							Convey("it should have an instance", func() {
+								r, _ := http.NewRequest("GET", "/v1/space/"+testAppSpace+"/app/"+testAppName+"/instance", nil)
+								w := httptest.NewRecorder()
+								m.ServeHTTP(w, r)
+								var response []structs.Instance
+								So(w.Code, ShouldEqual, http.StatusOK)
+								decoder := json.NewDecoder(w.Body)
+								if err := decoder.Decode(&response); err != nil {
+									panic(err)
+								}
+								So(len(response), ShouldBeGreaterThan, 0)
+								instance := response[0].InstanceID
 
-								Convey("it should have an instance", func() {
-									r, _ := http.NewRequest("GET", "/v1/space/"+testAppSpace+"/app/"+testAppName+"/instance", nil)
+								Convey("the instance should have a status", func() {
+									time.Sleep(time.Second * 240)
+									r, _ := http.NewRequest("GET", "/v1/kube/podstatus/"+testAppSpace+"/"+testAppName, nil)
 									w := httptest.NewRecorder()
 									m.ServeHTTP(w, r)
-									var response []structs.Instance
-									So(w.Code, ShouldEqual, http.StatusOK)
+									response := []structs.SpaceAppStatus{}
 									decoder := json.NewDecoder(w.Body)
 									if err := decoder.Decode(&response); err != nil {
 										panic(err)
 									}
-									So(len(response), ShouldBeGreaterThan, 0)
-									instance := response[0].InstanceID
+									fmt.Println(response)
+									So(w.Code, ShouldEqual, http.StatusOK)
+									So(response[0].Output, ShouldContainSubstring, "Running")
 
-									Convey("the instance should have a status", func() {
-										time.Sleep(time.Second * 240)
-										r, _ := http.NewRequest("GET", "/v1/kube/podstatus/"+testAppSpace+"/"+testAppName, nil)
+									Convey("the spaceapp should have a status", func() {
+										r, _ := http.NewRequest("GET", "/v1/space/"+testAppSpace+"/app/"+testAppName+"/status", nil)
 										w := httptest.NewRecorder()
 										m.ServeHTTP(w, r)
-										response := []structs.SpaceAppStatus{}
+										response := structs.SpaceAppStatus{}
 										decoder := json.NewDecoder(w.Body)
 										if err := decoder.Decode(&response); err != nil {
 											panic(err)
 										}
 										fmt.Println(response)
 										So(w.Code, ShouldEqual, http.StatusOK)
-										So(response[0].Output, ShouldContainSubstring, "Running")
 
-										Convey("the spaceapp should have a status", func() {
-											r, _ := http.NewRequest("GET", "/v1/space/"+testAppSpace+"/app/"+testAppName+"/status", nil)
+										Convey("the instance should have logs", func() {
+											r, _ := http.NewRequest("GET", "/v1/space/"+testAppSpace+"/app/"+testAppName+"/instance/"+instance+"/log", nil)
 											w := httptest.NewRecorder()
 											m.ServeHTTP(w, r)
-											response := structs.SpaceAppStatus{}
+											var response struct {
+												Logs string `json:"logs"`
+											}
 											decoder := json.NewDecoder(w.Body)
 											if err := decoder.Decode(&response); err != nil {
 												panic(err)
 											}
-											fmt.Println(response)
 											So(w.Code, ShouldEqual, http.StatusOK)
+											So(response.Logs, ShouldNotBeEmpty)
 
-											Convey("the instance should have logs", func() {
-												r, _ := http.NewRequest("GET", "/v1/space/"+testAppSpace+"/app/"+testAppName+"/instance/"+instance+"/log", nil)
-												w := httptest.NewRecorder()
-												m.ServeHTTP(w, r)
-												var response struct {
-													Logs string `json:"logs"`
-												}
-												decoder := json.NewDecoder(w.Body)
-												if err := decoder.Decode(&response); err != nil {
+											Convey("it should be able to be updated", func() {
+												testApp := structs.Deployspec{AppName: testAppName, Space: testAppSpace, Image: "docker.io/akkeris/apachetest:latest", Port: 8080}
+												b := new(bytes.Buffer)
+												if err := json.NewEncoder(b).Encode(testApp); err != nil {
 													panic(err)
 												}
-												So(w.Code, ShouldEqual, http.StatusOK)
-												So(response.Logs, ShouldNotBeEmpty)
+												r, _ := http.NewRequest("POST", "/v1/app/deploy", b)
+												w := httptest.NewRecorder()
+												m.ServeHTTP(w, r)
+												So(w.Code, ShouldEqual, http.StatusCreated)
+												So(w.Body.String(), ShouldContainSubstring, "Deployment Updated")
 
-												Convey("it should be able to be updated", func() {
-													testApp := structs.Deployspec{AppName: testAppName, Space: testAppSpace, Image: "docker.io/akkeris/apachetest:latest", Port: 8080}
-													b := new(bytes.Buffer)
-													if err := json.NewEncoder(b).Encode(testApp); err != nil {
-														panic(err)
-													}
-													r, _ := http.NewRequest("POST", "/v1/app/deploy", b)
+												Convey("the instance can be deleted", func() {
+													r, _ := http.NewRequest("DELETE", "/v1/space/"+testAppSpace+"/app/"+testAppName+"/instance/"+instance, nil)
 													w := httptest.NewRecorder()
 													m.ServeHTTP(w, r)
-													So(w.Code, ShouldEqual, http.StatusCreated)
-													So(w.Body.String(), ShouldContainSubstring, "Deployment Updated")
+													So(w.Code, ShouldEqual, http.StatusOK)
+													So(w.Body.String(), ShouldContainSubstring, "Deleted "+instance)
 
-													Convey("the instance can be deleted", func() {
-														r, _ := http.NewRequest("DELETE", "/v1/space/"+testAppSpace+"/app/"+testAppName+"/instance/"+instance, nil)
+													Convey("the deployment can be restarted", func() {
+														r, _ := http.NewRequest("POST", "/v1/space/"+testAppSpace+"/app/"+testAppName+"/restart", nil)
 														w := httptest.NewRecorder()
 														m.ServeHTTP(w, r)
 														So(w.Code, ShouldEqual, http.StatusOK)
-														So(w.Body.String(), ShouldContainSubstring, "Deleted "+instance)
+														So(w.Body.String(), ShouldContainSubstring, "Restart Submitted")
 
-														Convey("the deployment can be restarted", func() {
-															r, _ := http.NewRequest("POST", "/v1/space/"+testAppSpace+"/app/"+testAppName+"/restart", nil)
+														Convey("the deployment can be rolled back", func() {
+															r, _ := http.NewRequest("POST", "/v1/space/"+testAppSpace+"/app/"+testAppName+"/rollback/1", nil)
 															w := httptest.NewRecorder()
 															m.ServeHTTP(w, r)
 															So(w.Code, ShouldEqual, http.StatusOK)
-															So(w.Body.String(), ShouldContainSubstring, "Restart Submitted")
-
-															Convey("the deployment can be rolled back", func() {
-																r, _ := http.NewRequest("POST", "/v1/space/"+testAppSpace+"/app/"+testAppName+"/rollback/1", nil)
-																w := httptest.NewRecorder()
-																m.ServeHTTP(w, r)
-																So(w.Code, ShouldEqual, http.StatusOK)
-																So(w.Body.String(), ShouldContainSubstring, "rolled back to 1")
-															})
+															So(w.Body.String(), ShouldContainSubstring, "rolled back to 1")
 														})
 													})
 												})
@@ -526,6 +523,7 @@ func TestDeployments(t *testing.T) {
 										})
 									})
 								})
+							})
 						})
 
 						Reset(func() {

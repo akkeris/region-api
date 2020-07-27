@@ -291,7 +291,9 @@ func Server(db *sql.DB) *martini.ClassicMartini {
 	InitOldServiceEndpoints(m)
 
 	// Add V2 Endpoints
-	initV2Endpoints(m)
+	if os.Getenv("ENABLE_V2_ENDPOINTS") != "" && strings.ToLower(os.Getenv("ENABLE_V2_ENDPOINTS")) == "true" {
+		initV2Endpoints(m)
+	}
 
 	vault.GetVaultListPeriodic()
 	c := cron.New()
@@ -351,9 +353,72 @@ func CreateDB(db *sql.DB) {
 			}
 		}
 	}
-	_, err = db.Query(string(buf))
-	if err != nil {
+
+	if _, err = db.Exec(string(buf)); err != nil {
 		log.Println("Error: Unable to run migration scripts, execution failed.")
+		log.Fatalln(err)
+	}
+
+	// ========================================
+	// Temporary v2 Schema Migration Variables
+	// ========================================
+
+	// --  $1: controller-api database host
+	// --  $2: controller-api database name
+	// --  $3: controller-api database username
+	// --  $4: controller-api database password
+
+	if os.Getenv("ENABLE_V2_ENDPOINTS") == "" || strings.ToLower(os.Getenv("ENABLE_V2_ENDPOINTS")) != "true" {
+		log.Println("V2 endpoints not enabled, skipping V2 schema migration scripts")
+		return
+	}
+
+	if os.Getenv("V2_TEMP_CONTROLLER_API_DATABASE_HOST") == "" {
+		log.Fatalln("Error: Unable to run v2 schema migration - Missing controller-api database host!")
+	} else if os.Getenv("V2_TEMP_CONTROLLER_API_DATABASE_NAME") == "" {
+		log.Fatalln("Error: Unable to run v2 schema migration - Missing controller-api database name!")
+	} else if os.Getenv("V2_TEMP_CONTROLLER_API_DATABASE_USERNAME") == "" {
+		log.Fatalln("Error: Unable to run v2 schema migration - Missing controller-api database username!")
+	} else if os.Getenv("V2_TEMP_CONTROLLER_API_DATABASE_PASSWORD") == "" {
+		log.Fatalln("Error: Unable to run v2 schema migration - Missing controller-api database password!")
+	}
+
+	// revive:disable
+
+	v2temp_ControllerDBHost := os.Getenv("V2_TEMP_CONTROLLER_API_DATABASE_HOST")
+	v2temp_ControllerDBName := os.Getenv("V2_TEMP_CONTROLLER_API_DATABASE_NAME")
+	v2temp_ControllerDBUser := os.Getenv("V2_TEMP_CONTROLLER_API_DATABASE_USERNAME")
+	v2temp_ControllerDBPassword := os.Getenv("V2_TEMP_CONTROLLER_API_DATABASE_PASSWORD")
+
+	// revive:enable
+
+	buf, err = ioutil.ReadFile("./v2_schema_migration.sql")
+	if err != nil {
+		buf, err = ioutil.ReadFile("region-api/v2_schema_migration.sql")
+		if err != nil {
+			buf, err = ioutil.ReadFile("../v2_schema_migration.sql")
+			if err != nil {
+				log.Println("Error: Unable to run v2 schema migration scripts, could not load v2_schema_migration.sql.")
+				log.Fatalln(err)
+			}
+		}
+	}
+
+	// Create temporary function
+	if _, err = db.Exec(string(buf)); err != nil {
+		log.Println("Error: Unable to run v2 schema migration script, function creation failed.")
+		log.Fatalln(err)
+	}
+
+	// Execute function
+	if _, err = db.Exec(
+		"SELECT pg_temp.v2_schema_migration($1, $2, $3, $4)",
+		v2temp_ControllerDBHost,
+		v2temp_ControllerDBName,
+		v2temp_ControllerDBUser,
+		v2temp_ControllerDBPassword,
+	); err != nil {
+		log.Println("Error: Unable to run v2 schema migration script, function execution failed.")
 		log.Fatalln(err)
 	}
 }
