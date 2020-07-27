@@ -146,7 +146,6 @@ func TestDeploymentsV2(t *testing.T) {
 			w := httptest.NewRecorder()
 			m.ServeHTTP(w, r)
 			So(w.Code, ShouldEqual, http.StatusCreated)
-			So(w.Body.String(), ShouldContainSubstring, "Deployment record created")
 
 			Convey("it should exist in a list of deployments", func() {
 				r, _ := http.NewRequest("GET", "/v2beta1/space/"+testDeploymentSpace+"/deployments", nil)
@@ -205,14 +204,16 @@ func TestDeploymentsV2(t *testing.T) {
 					w := httptest.NewRecorder()
 					m.ServeHTTP(w, r)
 					So(w.Code, ShouldEqual, http.StatusOK)
-					So(w.Body.String(), ShouldContainSubstring, "updated to use /test healthcheck")
+					// Should probably change this to unmarshal JSON and check actual returned object
+					So(w.Body.String(), ShouldContainSubstring, `"healthcheck":"/test"`)
 				})
 				Convey("it should be able to delete the healthcheck", func() {
 					r, _ := http.NewRequest("DELETE", "/v2beta1/space/"+testDeploymentSpace+"/deployment/"+testDeploymentName+"/healthcheck", nil)
 					w := httptest.NewRecorder()
 					m.ServeHTTP(w, r)
 					So(w.Code, ShouldEqual, http.StatusOK)
-					So(w.Body.String(), ShouldContainSubstring, "healthcheck removed")
+					// Should probably change this to unmarshal JSON and check actual returned object
+					So(w.Body.String(), ShouldContainSubstring, `"healthcheck":"tcp"`)
 				})
 				Convey("it should be able to update the plan", func() {
 					testDeployment := structs.AppDeploymentSpec{Plan: "constellation"}
@@ -224,7 +225,8 @@ func TestDeploymentsV2(t *testing.T) {
 					w := httptest.NewRecorder()
 					m.ServeHTTP(w, r)
 					So(w.Code, ShouldEqual, http.StatusOK)
-					So(w.Body.String(), ShouldContainSubstring, "updated to use constellation plan")
+					// Should probably change this to unmarshal JSON and check actual returned object
+					So(w.Body.String(), ShouldContainSubstring, `"plan":"constellation"`)
 				})
 			})
 
@@ -253,7 +255,6 @@ func TestDeploymentsV2(t *testing.T) {
 			w := httptest.NewRecorder()
 			m.ServeHTTP(w, r)
 			So(w.Code, ShouldEqual, http.StatusCreated)
-			So(w.Body.String(), ShouldContainSubstring, "Deployment record created")
 
 			Convey("when a web deployment is created", func() {
 				testDeployment := structs.DeploySpecV2{Name: testDeploymentName, Space: testDeploymentSpace, Image: "docker.io/akkeris/apachetest:latest", Port: 8080}
@@ -289,7 +290,8 @@ func TestDeploymentsV2(t *testing.T) {
 					w := httptest.NewRecorder()
 					m.ServeHTTP(w, r)
 					So(w.Code, ShouldEqual, http.StatusAccepted)
-					So(w.Body.String(), ShouldContainSubstring, "Instances updated")
+					// Should probably change this to unmarshal JSON and check actual returned object
+					So(w.Body.String(), ShouldContainSubstring, `"instances":2`)
 				})
 			})
 
@@ -340,7 +342,6 @@ func TestAppsV2(t *testing.T) {
 			w := httptest.NewRecorder()
 			m.ServeHTTP(w, r)
 			So(w.Code, ShouldEqual, http.StatusCreated)
-			So(w.Body.String(), ShouldContainSubstring, "Deployment record created")
 
 			Convey("it should exist in a list of all deployments", func() {
 				r, _ := http.NewRequest("GET", "/v2beta1/apps", nil)
@@ -439,9 +440,7 @@ func TestAppsV2(t *testing.T) {
 			m.ServeHTTP(w2, r2)
 
 			So(w.Code, ShouldEqual, http.StatusCreated)
-			So(w.Body.String(), ShouldContainSubstring, "Deployment record created")
 			So(w2.Code, ShouldEqual, http.StatusCreated)
-			So(w2.Body.String(), ShouldContainSubstring, "Deployment record created")
 
 			Convey("they should both exist in a list of all deployments", func() {
 				r, _ := http.NewRequest("GET", "/v2beta1/apps", nil)
