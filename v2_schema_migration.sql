@@ -92,7 +92,9 @@ BEGIN
 							from controller_api.apps as apps
 							join controller_api.spaces as spaces on apps.space = spaces.space
 							where apps.deleted = false
-					) as controller_results on spacesapps.appname = controller_results.appname 
+					) as controller_results on 
+							-- Account for rows in the spacesapps table with the dyno appended to the app name
+							(select regexp_matches(spacesapps.appname, '([a-zA-Z0-9]+)(--.*)?'))[1] = controller_results.appname 
 							and spacesapps.space = controller_results.spacename;
 	end if;
 
