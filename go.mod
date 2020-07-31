@@ -4,20 +4,20 @@ go 1.12
 
 require (
 	github.com/akkeris/vault-client v0.0.0-20180727165111-6788ec8d1925
-	github.com/aws/aws-sdk-go v1.25.2
+	github.com/aws/aws-sdk-go v1.31.3
 	github.com/bitly/go-simplejson v0.5.0
 	github.com/codegangsta/inject v0.0.0-20140425184007-37d7f8432a3e
 	github.com/fatih/structs v1.1.0
-	github.com/go-ini/ini v1.48.0
+	github.com/go-ini/ini v1.57.0
 	github.com/go-martini/martini v0.0.0-20140519164645-49411a5b6468
 	github.com/gocql/gocql v0.0.0-20190402132108-0e1d5de854df
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
-	github.com/golang/snappy v0.0.0-20180518054509-2e65f85255db
+	github.com/golang/snappy v0.0.1
 	github.com/gopherjs/gopherjs v0.0.0-20181017120253-0766667cb4d1
 	github.com/hailocab/go-hostpool v0.0.0-20160125115350-e80d13ce29ed
-	github.com/jetstack/cert-manager v0.12.0
+	github.com/jetstack/cert-manager v0.16.0
 	github.com/jmcvetta/napping v3.2.0+incompatible
-	github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af
+	github.com/jmespath/go-jmespath v0.3.0
 	github.com/jtolds/gls v4.20.0+incompatible
 	github.com/lib/pq v1.8.0
 	github.com/martini-contrib/auth v0.0.0-20150219114609-fa62c19b7ae8
@@ -34,7 +34,8 @@ require (
 	gopkg.in/guregu/null.v3 v3.5.0
 	gopkg.in/inf.v0 v0.9.1
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22
-	k8s.io/api v0.17.0
-	k8s.io/apimachinery v0.17.0
-	k8s.io/client-go v0.0.0-20191114101535-6c5935290e33
+	k8s.io/api v0.18.5
+	k8s.io/apimachinery v0.18.5
+	k8s.io/client-go v0.18.5
+	sigs.k8s.io/structured-merge-diff v0.0.0-20190525122527-15d366b2352e // indirect
 )
