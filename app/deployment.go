@@ -2,48 +2,58 @@ package app
 
 import (
 	"database/sql"
-	"github.com/go-martini/martini"
-	"github.com/martini-contrib/binding"
-	"github.com/martini-contrib/render"
+	"fmt"
 	"log"
 	"os"
 	config "region-api/config"
+	ingress "region-api/router"
 	runtime "region-api/runtime"
 	service "region-api/service"
 	structs "region-api/structs"
-	ingress "region-api/router"
 	utils "region-api/utils"
 	"strconv"
 	"strings"
-	"fmt"
 	"time"
+
+	"github.com/go-martini/martini"
+	"github.com/martini-contrib/binding"
+	"github.com/martini-contrib/render"
 )
+
+func GetPlanType(db *sql.DB, plan string) (*string, error) {
+	var plantype string
+	e := db.QueryRow("SELECT coalesce(type,'') from plans where name=$1", plan).Scan(&plantype)
+	if e != nil {
+		return nil, e
+	}
+	return &plantype, nil
+}
 
 func AddAkkerisConfigVars(appname string, space string) []structs.EnvVar {
 	elist := make([]structs.EnvVar, 0)
 	elist = append(elist, structs.EnvVar{
-		Name:"ALAMO_SPACE",
-		Value:space,
+		Name:  "ALAMO_SPACE",
+		Value: space,
 	})
 	elist = append(elist, structs.EnvVar{
-		Name:"AKKERIS_SPACE",
-		Value:space,
+		Name:  "AKKERIS_SPACE",
+		Value: space,
 	})
 	elist = append(elist, structs.EnvVar{
-		Name:"ALAMO_DEPLOYMENT",
-		Value:appname,
+		Name:  "ALAMO_DEPLOYMENT",
+		Value: appname,
 	})
 	elist = append(elist, structs.EnvVar{
-		Name:"AKKERIS_DEPLOYMENT",
-		Value:appname,
+		Name:  "AKKERIS_DEPLOYMENT",
+		Value: appname,
 	})
 	elist = append(elist, structs.EnvVar{
-		Name:"ALAMO_APPLICATION",
-		Value:appname + "-" + space,
+		Name:  "ALAMO_APPLICATION",
+		Value: appname + "-" + space,
 	})
 	elist = append(elist, structs.EnvVar{
-		Name:"AKKERIS_APPLICATION",
-		Value:appname + "-" + space,
+		Name:  "AKKERIS_APPLICATION",
+		Value: appname + "-" + space,
 	})
 	return elist
 }
@@ -201,7 +211,14 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 	if deploy1.Labels == nil {
 		deploy1.Labels = make(map[string]string)
 	}
-
+	plantype, err := GetPlanType(db, plan)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	if plantype != nil && *plantype != "" {
+		deploy1.Labels["akkeris.io/plan-type"] = *plantype
+	}
 	deploy1.Labels["akkeris.io/plan"] = plan
 	if internal {
 		deploy1.Labels["akkeris.io/internal"] = "true"
@@ -295,11 +312,26 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 		// Inject istio sidecar for http filters
 		deployment.Features.IstioInject = true
 	}
+
+	if plantype != nil && *plantype != "" && *plantype != "general" {
+		deployment.PlanType = *plantype
+	}
+
 	deploymentExists, err := rt.DeploymentExists(space, appname)
 	if err != nil {
 		utils.ReportError(err, r)
 		return
 	}
+	serviceExists, err := rt.ServiceExists(space, appname)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+
+	// Do not write to cluster above this line, everything below should apply changes,
+	// everything above should do sanity checks, this helps prevent "half" deployments
+	// by minimizing resource after the first write
+
 	if !deploymentExists {
 		if err = rt.CreateDeployment(&deployment); err != nil {
 			utils.ReportError(err, r)
@@ -326,13 +358,13 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 
 	// Create/update service
 	if finalport != -1 {
-		if !deploymentExists {
-			if _, err := rt.CreateService(space, appname, finalport, deploy1.Labels, deploy1.Features); err != nil {
+		if !serviceExists {
+			if err := rt.CreateService(space, appname, finalport, deploy1.Labels, deploy1.Features); err != nil {
 				utils.ReportError(err, r)
 				return
 			}
 		} else {
-			if _, err := rt.UpdateService(space, appname, finalport, deploy1.Labels, deploy1.Features); err != nil {
+			if err := rt.UpdateService(space, appname, finalport, deploy1.Labels, deploy1.Features); err != nil {
 				utils.ReportError(err, r)
 				return
 			}
@@ -341,6 +373,7 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 		// Apply the HTTP filters
 		foundJwtFilter := false
 		foundCorsFilter := false
+		foundCspFilter := false
 		for _, filter := range deploy1.Filters {
 			if filter.Type == "jwt" {
 				issuer := ""
@@ -404,7 +437,7 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 				}
 				if val, ok := filter.Data["expose_headers"]; ok {
 					if val != "" {
-						expose_headers = strings.Split(val, ",");
+						expose_headers = strings.Split(val, ",")
 					}
 				}
 				if val, ok := filter.Data["max_age"]; ok {
@@ -422,7 +455,7 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 						allow_credentials = false
 					}
 				}
-				if err := appIngress.InstallOrUpdateCORSAuthFilter(appname + "-" + space, "/", allow_origin, allow_methods, allow_headers, expose_headers, max_age, allow_credentials); err != nil {
+				if err := appIngress.InstallOrUpdateCORSAuthFilter(appname+"-"+space, "/", allow_origin, allow_methods, allow_headers, expose_headers, max_age, allow_credentials); err != nil {
 					fmt.Printf("WARNING: There was an error installing or updating CORS Auth filter: %s\n", err.Error())
 				} else {
 					foundCorsFilter = true
@@ -437,6 +470,31 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 				} else {
 					fmt.Printf("WARNING: There was an error trying to pull the routes for an app to install the CORS auth filters on: %s\n", err.Error())
 				}
+			} else if filter.Type == "csp" {
+				if os.Getenv("INGRESS_DEBUG") == "true" {
+					fmt.Printf("[ingress] Adding CSP filter %#+v\n", filter)
+				}
+				policy := ""
+				if val, ok := filter.Data["policy"]; ok {
+					policy = val
+				}
+				if policy != "" {
+					if err := appIngress.InstallOrUpdateCSPFilter(appname+"-"+space, "/", policy); err != nil {
+						fmt.Printf("WARNING: There was an error installing or updating CORS Auth filter: %s\n", err.Error())
+					} else {
+						foundCspFilter = true
+					}
+					routes, err := ingress.GetPathsByApp(db, appname, space)
+					if err == nil {
+						for _, route := range routes {
+							if err := siteIngress.InstallOrUpdateCSPFilter(route.Domain, route.Path, policy); err != nil {
+								fmt.Printf("WARNING: There was an error installing or updating CSP filter on site: %s: %s\n", route.Domain, err.Error())
+							}
+						}
+					} else {
+						fmt.Printf("WARNING: There was an error trying to pull the routes for an app to install the CSP filters on: %s\n", err.Error())
+					}
+				}
 			} else {
 				fmt.Printf("WARNING: Unknown filter type: %s\n", filter.Type)
 			}
@@ -445,7 +503,7 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 		// If we don't have a CORS filter remove it from the app and any sites it may be associated with.
 		// this is effectively a no-op if there is no CORS auth filter in the first place
 		if !foundCorsFilter {
-			if err := appIngress.DeleteCORSAuthFilter(appname + "-" + space, "/"); err != nil {
+			if err := appIngress.DeleteCORSAuthFilter(appname+"-"+space, "/"); err != nil {
 				fmt.Printf("WARNING: There was an error removing the CORS auth filter from the app: %s\n", err.Error())
 			}
 			routes, err := ingress.GetPathsByApp(db, appname, space)
@@ -457,6 +515,21 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 				}
 			} else {
 				fmt.Printf("WARNING: There was an error trying to pull the routes for an app to install the CORS auth filters on: %s\n", err.Error())
+			}
+		}
+		if !foundCspFilter {
+			if err := appIngress.DeleteCSPFilter(appname+"-"+space, "/"); err != nil {
+				fmt.Printf("WARNING: There was an error removing the CSP filter from the app: %s\n", err.Error())
+			}
+			routes, err := ingress.GetPathsByApp(db, appname, space)
+			if err == nil {
+				for _, route := range routes {
+					if err := siteIngress.DeleteCSPFilter(route.Domain, route.Path); err != nil {
+						fmt.Printf("WARNING: There was an error removing CSP filter on site: %s: %s\n", route.Domain, err.Error())
+					}
+				}
+			} else {
+				fmt.Printf("WARNING: There was an error trying to pull the routes for an app to install the CSP filters on: %s\n", err.Error())
 			}
 		}
 		if !foundJwtFilter {

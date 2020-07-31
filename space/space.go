@@ -2,11 +2,9 @@ package space
 
 import (
 	"database/sql"
-	"encoding/json"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
-	"io/ioutil"
 	"net/http"
 	"os"
 	runtime "region-api/runtime"
@@ -50,7 +48,7 @@ func Createspace(db *sql.DB, space structs.Spacespec, berr binding.Errors, r ren
 		return
 	}
 
-	if space.Name == "kube-system" || space.Name == "default" || space.Name == "kube-public" || space.Name == "akkeris" {
+	if space.Name == "kube-system" || space.Name == "default" || space.Name == "kube-public" || space.Name == "akkeris" || space.Name == "akkeris-system" {
 		utils.ReportInvalidRequest("The space name is invalid or reserved keywords", r)
 		return
 	}
@@ -83,16 +81,10 @@ func Createspace(db *sql.DB, space structs.Spacespec, berr binding.Errors, r ren
 		utils.ReportError(err, r)
 		return
 	}
-	if os.Getenv("FF_QUAY") == "true" || os.Getenv("IMAGE_PULL_SECRET") != "" {
-		vs, err := getPullSecret(space.Name)
-		if err != nil {
-			utils.ReportError(err, r)
-			return
-		}
-
+	if os.Getenv("IMAGE_PULL_SECRET") != "" {
 		// This secret created used to be passed in to AddImagePullSecretToSpace, but that method
 		// did nothing with it, so we don't in the refactor.
-		if _, err = rt.CreateSecret(space.Name, vs.Data.Name, vs.Data.Base64, "kubernetes.io/dockerconfigjson"); err != nil {
+		if err := rt.CopySecret(os.Getenv("IMAGE_PULL_SECRET"), "akkeris-system", space.Name); err != nil {
 			utils.ReportError(err, r)
 			return
 		}
@@ -119,25 +111,15 @@ func Deletespace(db *sql.DB, params martini.Params, r render.Render) {
 		return
 	}
 
-	if _, err = getSpace(db, space); err != nil {
-		if err.Error() == "sql: no rows in result set" {
-			r.JSON(http.StatusNotFound, structs.Messagespec{Status: http.StatusNotFound, Message: "The specified space does not exist"})
-			return
-		} else {
-			utils.ReportError(err, r)
-			return
-		}
-	}
-
 	pods, err := rt.GetPodsBySpace(space)
-	if err != nil {
+	if err != nil && err.Error() != "space does not exist" {
 		utils.ReportError(err, r)
 		return
-	}
-
-	if len(pods.Items) != 0 {
-		r.JSON(http.StatusConflict, structs.Messagespec{Status: http.StatusConflict, Message: "The space cannot be deleted as it still has pods in it."})
-		return
+	} else if err == nil {
+		if len(pods.Items) != 0 {
+			r.JSON(http.StatusConflict, structs.Messagespec{Status: http.StatusConflict, Message: "The space cannot be deleted as it still has pods in it."})
+			return
+		}
 	}
 
 	var appsCount int
@@ -152,13 +134,13 @@ func Deletespace(db *sql.DB, params martini.Params, r render.Render) {
 		return
 	}
 
-	if err = rt.DeleteSpace(space); err != nil {
+	// this must happen after GetRuntimeFor.
+	if _, err = db.Exec("delete from spaces where name = $1", space); err != nil {
 		utils.ReportError(err, r)
 		return
 	}
 
-	// this must happen after GetRuntimeFor.
-	if _, err = db.Exec("delete from spaces where name = $1", space); err != nil {
+	if err = rt.DeleteSpace(space); err != nil {
 		utils.ReportError(err, r)
 		return
 	}
@@ -166,28 +148,6 @@ func Deletespace(db *sql.DB, params martini.Params, r render.Render) {
 	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: "space deleted"})
 }
 
-func getPullSecret(datacenter string) (vs structs.Vaultsecretspec, err error) {
-	var vsecret structs.Vaultsecretspec
-	vaulttoken := os.Getenv("VAULT_TOKEN")
-	vaultaddr := os.Getenv("VAULT_ADDR")
-	secretPath := os.Getenv("QUAY_PULL_SECRET") // deprecated name
-	if secretPath == "" {
-		secretPath = os.Getenv("IMAGE_PULL_SECRET")
-	}
-	vaultaddruri := vaultaddr + "/v1/" + secretPath
-	vreq, err := http.NewRequest("GET", vaultaddruri, nil)
-	vreq.Header.Add("X-Vault-Token", vaulttoken)
-	vclient := &http.Client{}
-	vresp, err := vclient.Do(vreq)
-	if err != nil {
-		return vsecret, err
-	}
-	defer vresp.Body.Close()
-
-	bb, _ := ioutil.ReadAll(vresp.Body)
-	_ = json.Unmarshal(bb, &vsecret)
-	return vsecret, nil
-}
 
 func addSpace(db *sql.DB, space structs.Spacespec) (msg structs.Messagespec, err error) {
 	var name string

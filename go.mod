@@ -19,7 +19,7 @@ require (
 	github.com/jmcvetta/napping v3.2.0+incompatible
 	github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af
 	github.com/jtolds/gls v4.20.0+incompatible
-	github.com/lib/pq v1.2.0
+	github.com/lib/pq v1.8.0
 	github.com/martini-contrib/auth v0.0.0-20150219114609-fa62c19b7ae8
 	github.com/martini-contrib/binding v0.0.0-20160701174519-05d3e151b6cf
 	github.com/martini-contrib/render v0.0.0-20150707142108-ec18f8345a11
@@ -36,4 +36,5 @@ require (
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22
 	k8s.io/api v0.17.0
 	k8s.io/apimachinery v0.17.0
+	k8s.io/client-go v0.0.0-20191114101535-6c5935290e33
 )

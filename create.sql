@@ -301,5 +301,26 @@ begin
         insert into spacesapps(space,appname,instances,plan,healthcheck) values ('deck1','oct-apitest',1,'hobby',null);
     end if;
 
+    -- Add "appid" column to spacesapps table
+    if not exists 
+    (
+        SELECT NULL FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE table_name = 'spacesapps'
+            AND column_name = 'appid'
+            and table_schema = 'public'
+    ) then
+        alter table spacesapps add column appid UUID;
+    end if; 
+
+    -- Add "port" column to spacesapps table
+    if not exists 
+    (
+        SELECT NULL FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE table_name = 'spacesapps'
+            AND column_name = 'port'
+            and table_schema = 'public'
+    ) then
+        alter table spacesapps add column port integer;
+    end if;
 end
 $$;

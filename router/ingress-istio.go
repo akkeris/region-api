@@ -3,7 +3,6 @@ package router
 import (
 	"crypto/x509"
 	"database/sql"
-	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
@@ -139,7 +138,7 @@ type Port struct {
 
 type Destination struct {
 	Host string `json:"host"`
-	Subset string `json:"subset"`
+	Subset string `json:"subset,omitempty"`
 	Port Port `json:"port"`
 }
 
@@ -148,7 +147,7 @@ type Routes struct {
 }
 
 type HTTP struct {
-	Match      []Match      `json:"match"`
+	Match      []Match      `json:"match,omitempty"`
 	Route      []Routes 	`json:"route"`
 	Rewrite    *Rewrite 	`json:"rewrite,omitempty"`
 	Headers    *Headers 	`json:"headers,omitempty"`
@@ -683,25 +682,30 @@ func (ingress *IstioIngress) InstallOrUpdateUberSiteGateway(domain string, certi
 	return nil
 }
 
-func (ingress *IstioIngress) GetCertificateFromDomain(domain string) string {
+func (ingress *IstioIngress) GetCertificateFromDomain(domain string) (error, string) {
 	// See if any certificates are available, search is in this order:
 	//
 	// 1. See if a direct certificate exists for the domain name.
 	// 2. See if there's a wildcard certificate installed.
 	// 3. Default to the star certificate and hope it works.
 	//
-	var certName = "star-certificate"
 	certs, err := ingress.GetInstalledCertificates(domain)
-	if err == nil && len(certs) > 0 {
-		certName = strings.Replace(strings.Replace(domain, ".", "-", -1), "*", "star", -1) + "-tls"
+	if err != nil {
+		return err, ""
+	}
+	if len(certs) > 0 {
+		return nil, strings.Replace(strings.Replace(domain, ".", "-", -1), "*", "star", -1) + "-tls"
 	} else {
 		starCert := "*." + strings.Join(strings.Split(domain, ".")[1:], ".")
 		certs, err = ingress.GetInstalledCertificates(starCert)
-		if err == nil && len(certs) > 0 {
-			certName = strings.Replace(strings.Replace(starCert, ".", "-", -1), "*", "star", -1) + "-tls"
+		if err != nil {
+			return err, ""
+		}
+		if len(certs) > 0 {
+			return nil, strings.Replace(strings.Replace(starCert, ".", "-", -1), "*", "star", -1) + "-tls"
 		}
 	}
-	return certName
+	return nil, "star-certificate"
 }
 
 func createHTTPSpecForVS(app string, space string, domain string, adjustedPath string, rewritePath string, forwardedPath string, port int32, filters []structs.HttpFilters) HTTP {
@@ -870,8 +874,8 @@ func CertificateToSecret(server_name string, pem_cert []byte, pem_key []byte, na
 		"akkeris.k8s.io/certificate-name": main_server_name,
 	})
 	secret.Data = make(map[string][]byte, 0)
-	secret.Data["tls.key"] = []byte(base64.StdEncoding.EncodeToString(pem_key))
-	secret.Data["tls.crt"] = []byte(base64.StdEncoding.EncodeToString(pem_cert))
+	secret.Data["tls.key"] = []byte(pem_key)
+	secret.Data["tls.crt"] = []byte(pem_cert)
 	return &name, &secret, nil
 }
 
@@ -894,10 +898,26 @@ func (ingress *IstioIngress) CreateOrUpdateRouter(domain string, internal bool, 
 	if(exists && version != "") {
 		vs.SetResourceVersion(version)
 	}
-	if err = ingress.InstallOrUpdateUberSiteGateway(domain, ingress.GetCertificateFromDomain(domain), internal); err != nil {
+	err, cert_secret_name := ingress.GetCertificateFromDomain(domain)
+	if err != nil {
+		if os.Getenv("INGRESS_DEBUG") == "true" {
+			fmt.Printf("[ingress] Cannot obtain cert secret name (on push) for site %s because %s\n", domain, err.Error())
+		}
+		return err
+	}
+	if cert_secret_name == "" {
+		panic("We should never have a cert_secret_name thats blank.")
+	}
+	if err = ingress.InstallOrUpdateUberSiteGateway(domain, cert_secret_name, internal); err != nil {
+		if os.Getenv("INGRESS_DEBUG") == "true" {
+			fmt.Printf("[ingress] Cannot install or update uber site gateway for site %s using cert %s because %s\n", domain, cert_secret_name, err.Error())
+		}
 		return err
 	}
 	if err = ingress.InstallOrUpdateVirtualService(domain, vs, exists); err != nil {
+		if os.Getenv("INGRESS_DEBUG") == "true" {
+			fmt.Printf("[ingress] Cannot install or update virtualservice for site %s using cert %s using because %s, virtual service is %#+v\n", domain, cert_secret_name, err.Error(), vs)
+		}
 		return err
 	}
 	return nil
@@ -988,6 +1008,95 @@ func (ingress *IstioIngress) DeleteCORSAuthFilter(vsname string, path string) (e
 	return nil
 }
 
+func (ingress *IstioIngress) InstallOrUpdateCSPFilter(vsname string, path string, policy string) (error) {
+	virtualService, err := ingress.GetVirtualService(vsname)
+	if err != nil {
+		// not yet deployed
+		return nil
+	}
+	var dirty = false
+	for i, http := range virtualService.Spec.HTTP {
+		if http.Match == nil || len(http.Match) == 0 {
+			if virtualService.Spec.HTTP[0].Headers == nil {
+				virtualService.Spec.HTTP[0].Headers = &Headers{}
+			}
+			if virtualService.Spec.HTTP[0].Headers.Response.Set == nil {
+				virtualService.Spec.HTTP[0].Headers.Response.Set = make(map[string]string)
+			}
+			virtualService.Spec.HTTP[0].Headers.Response.Set["Content-Security-Policy"] = policy
+			dirty = true
+		} else {
+			for _, match := range http.Match {
+				if os.Getenv("INGRESS_DEBUG") == "true" {
+					fmt.Printf("[ingress] Looking to add CSP policy, comparing path: %s with match prefix %s and match exact %s\n", path, match.URI.Prefix, match.URI.Exact)
+				}
+				if strings.HasPrefix(match.URI.Prefix, path) || match.URI.Exact == path || match.URI.Prefix == path {
+					if virtualService.Spec.HTTP[i].Headers == nil {
+						virtualService.Spec.HTTP[i].Headers = &Headers{}
+					}
+					if virtualService.Spec.HTTP[i].Headers.Response.Set == nil {
+						virtualService.Spec.HTTP[i].Headers.Response.Set = make(map[string]string)
+					}
+					virtualService.Spec.HTTP[i].Headers.Response.Set["Content-Security-Policy"] = policy
+					dirty = true
+				}
+			}
+		}
+	}
+	if dirty == true {
+		if os.Getenv("INGRESS_DEBUG") == "true" {
+			fmt.Printf("[ingress] Istio - Installing or updating CSP policy for %s at path %s: %#+v\n", vsname, path, virtualService)
+		}
+		if err = ingress.UpdateVirtualService(virtualService, vsname); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+
+func (ingress *IstioIngress) DeleteCSPFilter(vsname string, path string) (error) {
+	virtualService, err := ingress.GetVirtualService(vsname)
+	if err != nil {
+		if err.Error() == "virtual service was not found" {
+			// Go ahead and ignore setting this.  We can't as there's no deployment yet.
+			return nil
+		}
+		return err
+	}
+	var dirty = false
+	for i, http := range virtualService.Spec.HTTP {
+		if http.Match == nil || len(http.Match) == 0 {
+			if virtualService.Spec.HTTP[i].Headers != nil && virtualService.Spec.HTTP[i].Headers.Response.Set != nil {
+				virtualService.Spec.HTTP[i].Headers.Response.Set["Content-Security-Policy"] = ""
+				dirty = true
+			}
+		} else {
+			for _, match := range http.Match {
+				if os.Getenv("INGRESS_DEBUG") == "true" {
+					fmt.Printf("[ingress] Looking to remove CSP policy, comparing path: %s with match prefix %s and match exact %s\n", path, match.URI.Prefix, match.URI.Exact)
+				}
+				if strings.HasPrefix(match.URI.Prefix, path) || match.URI.Exact == path || match.URI.Prefix == path {
+					if virtualService.Spec.HTTP[i].Headers != nil && virtualService.Spec.HTTP[i].Headers.Response.Set != nil {
+						virtualService.Spec.HTTP[i].Headers.Response.Set["Content-Security-Policy"] = ""
+						dirty = true
+					}
+				}
+			}
+		}
+	}
+	if dirty == true {
+		if os.Getenv("INGRESS_DEBUG") == "true" {
+			fmt.Printf("[ingress] Removing CSP policy for %s at path %s\n", vsname, path)
+		}
+		if err = ingress.UpdateVirtualService(virtualService, vsname); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+
 func (ingress *IstioIngress) SetMaintenancePage(app string, space string, value bool) error {
 	virtualService, err := ingress.AppVirtualService(space, app)
 	if err != nil {
@@ -1040,7 +1149,17 @@ func (ingress *IstioIngress) DeleteRouter(domain string, internal bool) error {
 		}
 		return err
 	}
-	return ingress.DeleteUberSiteGateway(domain, ingress.GetCertificateFromDomain(domain), internal)
+	err, cert_secret_name := ingress.GetCertificateFromDomain(domain)
+	if err != nil {
+		if os.Getenv("INGRESS_DEBUG") == "true" {
+			fmt.Printf("[ingress] Cannot obtain cert secret name for site %s because %s\n", domain, err.Error())
+		}
+		return err
+	}
+	if cert_secret_name == "" {
+		panic("We should never have a cert_secret_name thats blank.")
+	}
+	return ingress.DeleteUberSiteGateway(domain, cert_secret_name, internal)
 }
 
 func (ingress *IstioIngress) InstallCertificate(server_name string, pem_cert []byte, pem_key []byte) error {
@@ -1067,17 +1186,25 @@ func (ingress *IstioIngress) GetInstalledCertificates(site string) ([]Certificat
 		main_server_name := strings.Replace(site, "*.", "star.", -1)
 		main_certs_name := strings.Replace(main_server_name, ".", "-", -1) + "-tls"
 		body, code, err := ingress.runtime.GenericRequest("get", "/api/v1/namespaces/" + ingress.certificateNamespace + "/secrets/" + main_certs_name, nil)
-
 		if err != nil {
+			if os.Getenv("INGRESS_DEBUG") == "true" {
+				fmt.Printf("[ingress] Cannot obtain secret for site %s because %s\n", site, err.Error())
+			}
 			return nil, err
 		}
 		if code == http.StatusNotFound {
 			return []Certificate{}, nil
 		} else if code != http.StatusOK {
+			if os.Getenv("INGRESS_DEBUG") == "true" {
+				fmt.Printf("[ingress] Looking for certificate returned invalid code for site: %s, %d %s\n", site, code, err.Error())
+			}
 			return nil, errors.New("Failure to lookup certificate: " + string(body))
 		}
 		var t kube.Secret
 		if err = json.Unmarshal(body, &t); err != nil {
+			if os.Getenv("INGRESS_DEBUG") == "true" {
+				fmt.Printf("[ingress] Failed to unmarshal tls certificate: %s, %s, actually received: %s\n", site, err.Error(), string(body))
+			}
 			return nil, err
 		}
 		certList.Items = make([]kube.Secret, 0)
@@ -1099,12 +1226,11 @@ func (ingress *IstioIngress) GetInstalledCertificates(site string) ([]Certificat
 
 	certificates := make([]Certificate, 0)
 	for _, t := range certList.Items {
-		pem_certs, err := base64.StdEncoding.DecodeString(string(t.Data["tls.crt"]))
+		x509_decoded_cert, _, _, err := DecodeCertificateBundle(site, t.Data["tls.crt"])
 		if err != nil {
-			return nil, err
-		}
-		x509_decoded_cert, _, _, err := DecodeCertificateBundle(site, pem_certs)
-		if err != nil {
+			if os.Getenv("INGRESS_DEBUG") == "true" {
+				fmt.Printf("[ingress] Certificate bundle decode failed for %s: %s, original data body: %s\n", site, err.Error(), string(t.Data["tls.crt"]))
+			}
 			return nil, err
 		}
 		

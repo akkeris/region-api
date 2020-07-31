@@ -1,8 +1,8 @@
 package structs
 
 import (
-	"time"
 	"gopkg.in/guregu/null.v3/zero"
+	"time"
 )
 
 type Namespec struct {
@@ -15,26 +15,26 @@ type KV struct {
 }
 
 type HttpFilters struct {
-	Type string `json:"type"`
+	Type string            `json:"type"`
 	Data map[string]string `json:"data"`
 }
 
 //Deployspec deployment spec
 type Deployspec struct {
-	AppName  string   `json:"appname"`
-	Image    string   `json:"appimage"`
-	Space    string   `json:"space"`
-	Port     int      `json:"port"`
-	Command  []string `json:"command"`
-	Features Features `json:"features,omitempty"`
+	AppName  string            `json:"appname"`
+	Image    string            `json:"appimage"`
+	Space    string            `json:"space"`
+	Port     int               `json:"port"`
+	Command  []string          `json:"command"`
+	Features Features          `json:"features,omitempty"`
 	Labels   map[string]string `json:"labels,omitempty"`
-	Filters  []HttpFilters `json:"filters,omitempty"`
+	Filters  []HttpFilters     `json:"filters,omitempty"`
 }
 
 type Features struct {
-	ServiceMesh bool `json:"serviceMesh,omitempty"`
-	IstioInject bool `json:"istioInject,omitempty"`
-	Http2Service bool `json:"http2,omitempty"`
+	ServiceMesh          bool `json:"serviceMesh,omitempty"`
+	IstioInject          bool `json:"istioInject,omitempty"`
+	Http2Service         bool `json:"http2,omitempty"`
 	Http2EndToEndService bool `json:"http2-end-to-end,omitempty"`
 }
 
@@ -56,6 +56,11 @@ type Tagspec struct {
 	Resource string `json:"resource"`
 	Name     string `json:"name"`
 	Value    string `json:"value"`
+}
+
+type Exec struct {
+	Command []string `json:"command"`
+	Stdin   string   `json:"stdin"`
 }
 
 //Provisionspec provisionspec
@@ -136,12 +141,6 @@ type Postgresspec struct {
 	Spec        string `json:"spec"`
 }
 
-//Mongodbspec Postgres spec
-type Mongodbspec struct {
-	MongodbUrl string `json:"MONGODB_URL"`
-	Spec       string `json:"spec"`
-}
-
 //Auroramysqlspec mysql spec
 type Auroramysqlspec struct {
 	DatabaseUrl         string `json:"DATABASE_URL"`
@@ -166,14 +165,6 @@ type Influxdbspec struct {
 	Spec     string `json:"spec"`
 }
 
-type Cassandraspec struct {
-	Keyspace string `json:"CASSANDRA_KEYSPACE"`
-	Location string `json:"CASSANDRA_LOCATION"`
-	Password string `json:"CASSANDRA_PASSWORD"`
-	Username string `json:"CASSANDRA_USERNAME"`
-	Spec     string `json:"spec"`
-}
-
 type Deployment struct {
 	Space                string
 	App                  string
@@ -190,7 +181,8 @@ type Deployment struct {
 	ConfigVars           []EnvVar
 	Schedule             string
 	Features             Features
-	Labels				 map[string]string
+	Labels               map[string]string
+	PlanType             string
 }
 
 //Deployresponse deploy response

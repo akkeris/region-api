@@ -4,10 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/go-martini/martini"
-	"github.com/martini-contrib/binding"
-	"github.com/martini-contrib/render"
-	. "github.com/smartystreets/goconvey/convey"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -17,6 +13,11 @@ import (
 	"region-api/utils"
 	"strings"
 	"testing"
+
+	"github.com/go-martini/martini"
+	"github.com/martini-contrib/binding"
+	"github.com/martini-contrib/render"
+	. "github.com/smartystreets/goconvey/convey"
 )
 
 func Server() *martini.ClassicMartini {
@@ -46,14 +47,9 @@ func Server() *martini.ClassicMartini {
 	m.Get("/v1/space/:space/apps", app.Describespace)              //describeapp.go
 	m.Get("/v1/space/:space/app/:appname", app.DescribeappInSpace) //describeapp.go
 
-	m.Get("/v1/space/:space/app/:appname/deployments", app.GetDeployments) //replicasets.go
-	m.Post("/v1/space/:space/app/:appname/restart", app.Restart)           //restart.go
-	m.Get("/v1/space/:space/app/:app/status", app.Spaceappstatus)          //status.go
-	m.Get("/v1/kube/podstatus/:space/:app", app.PodStatus)                 //status.go
-
-	m.Get("/v1/space/:space/app/:app/subscribers", app.GetSubscribersDB)                                             //subscriber.go
-	m.Delete("/v1/space/:space/app/:app/subscriber", binding.Json(structs.Subscriberspec{}), app.RemoveSubscriberDB) //subscriber.go
-	m.Post("/v1/space/:space/app/:app/subscriber", binding.Json(structs.Subscriberspec{}), app.AddSubscriberDB)      //subscriber.go
+	m.Post("/v1/space/:space/app/:appname/restart", app.Restart)  //restart.go
+	m.Get("/v1/space/:space/app/:app/status", app.Spaceappstatus) //status.go
+	m.Get("/v1/kube/podstatus/:space/:app", app.PodStatus)        //status.go
 
 	//Helper endpoints for creating an app in a space these are not tested here
 	m.Delete("/v1/space/:space/app/:app", DeleteApp)
