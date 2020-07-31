@@ -35,7 +35,7 @@ require (
 	gopkg.in/inf.v0 v0.9.1
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22
 	k8s.io/api v0.18.5
-	k8s.io/apimachinery v0.18.5
+	k8s.io/apimachinery v0.18.6
 	k8s.io/client-go v0.18.5
 	sigs.k8s.io/structured-merge-diff v0.0.0-20190525122527-15d366b2352e // indirect
 )
