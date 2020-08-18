@@ -314,6 +314,9 @@ func (ingress *IstioIngress) DeleteVirtualService(name string) error {
 }
 
 func (ingress *IstioIngress) DeleteGateway(domain string) error {
+	if os.Getenv("INGRESS_DEBUG") == "true" {
+		fmt.Printf("[ingress] Istio - deleting gateway %s\n", domain)
+	}
 	newdomain := strings.Replace(domain, ".", "-", -1) + "-gateway"
 	body, code, err := ingress.runtime.GenericRequest("delete", "/apis/" + IstioNetworkingAPIVersion + "/namespaces/sites-system/gateways/"+newdomain, nil)
 	if err != nil {
@@ -366,8 +369,9 @@ func (ingress *IstioIngress) UpdateAppVirtualService(vs *VirtualService, space s
 }
 
 func (ingress *IstioIngress) InstallOrUpdateVirtualService(domain string, vs *VirtualService, exists bool) error {
-	var err error = nil
-
+	if os.Getenv("INGRESS_DEBUG") == "true" {
+		fmt.Printf("[ingress] Istio - starting install or update virtual service for %s\n", domain)
+	}
 	// Force good security practices
 	for i, _ := range vs.Spec.HTTP {
 		if vs.Spec.HTTP[i].Headers.Response.Set == nil {
@@ -379,6 +383,7 @@ func (ingress *IstioIngress) InstallOrUpdateVirtualService(domain string, vs *Vi
 	if !exists {
 		body, code, err := ingress.runtime.GenericRequest("post", "/apis/" + IstioNetworkingAPIVersion + "/namespaces/sites-system/virtualservices", vs)
 		if err != nil {
+			fmt.Printf("Failed to create virtual service due to protocol error %s: %#+v\n", err.Error(), vs)
 			return err
 		}
 		if code != http.StatusOK && code != http.StatusCreated {
@@ -388,6 +393,7 @@ func (ingress *IstioIngress) InstallOrUpdateVirtualService(domain string, vs *Vi
 	} else {
 		body, code, err := ingress.runtime.GenericRequest("put", "/apis/" + IstioNetworkingAPIVersion + "/namespaces/sites-system/virtualservices/" + domain, vs)
 		if err != nil {
+			fmt.Printf("Failed to update virtual service due to protocol error %s: %#+v\n", err.Error(), vs)
 			return err
 		}
 		if code != http.StatusOK && code != http.StatusCreated {
@@ -395,13 +401,13 @@ func (ingress *IstioIngress) InstallOrUpdateVirtualService(domain string, vs *Vi
 			return errors.New("Unable to update virtual service " + vs.GetName() + " due to error: " + strconv.Itoa(code) + " " + string(body))
 		}
 	}
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
 func (ingress *IstioIngress) InstallOrUpdateGateway(domain string, gateway *Gateway) error {
+	if os.Getenv("INGRESS_DEBUG") == "true" {
+		fmt.Printf("[ingress] Istio - starting install or update gateway for %s\n", domain)
+	}
 	_, code, err := ingress.runtime.GenericRequest("get", "/apis/" + IstioNetworkingAPIVersion + "/namespaces/sites-system/gateways/" + gateway.GetName(), nil)
 	if err != nil {
 		return err
@@ -975,12 +981,17 @@ func getDownPage() string {
 }
 
 func (ingress *IstioIngress) CreateOrUpdateRouter(domain string, internal bool, paths []Route) error {
+	if os.Getenv("INGRESS_DEBUG") == "true" {
+		fmt.Printf("[ingress] Istio - create or update router firing for %s\n", domain)
+	}
 	exists, version, err := ingress.VirtualServiceExists(domain)
 	if err != nil {
+		fmt.Printf("[ingress] Istio - an error received from virtual service exists during create/update router: %s: %s\n", err.Error(), domain)
 		return err
 	}
 	vs, err := PrepareVirtualServiceForCreateorUpdate(domain, internal, paths)
 	if err != nil {
+		fmt.Printf("[ingress] Istio - unable to prepare virtual service for create or update: %s: %s\n", err.Error(), domain)
 		return err
 	}
 	if(exists && version != "") {
