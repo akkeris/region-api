@@ -124,7 +124,7 @@ type Rewrite struct {
 }
 
 type CorsPolicy struct {
-	AllowOrigin []string 	`json:"allowOrigin"`
+	AllowOrigins []StringMatch `json:"allowOrigins"`
 	AllowMethods []string 	`json:"allowMethods"`
 	AllowHeaders []string 	`json:"allowHeaders"`
 	ExposeHeaders []string 	`json:"exposeHeaders"`
@@ -932,8 +932,12 @@ func (ingress *IstioIngress) InstallOrUpdateCORSAuthFilter(vsname string, path s
 	var dirty = false
 	for i, http := range virtualService.Spec.HTTP {
 		if http.Match == nil || len(http.Match) == 0 {
+			allowOrigins = make([]StringMatch, 0)
+			for _, origin := range allowOrigin {
+				allowOrigins = append(allowOrigins, StringMatch{Exact:origin})
+			}
 			virtualService.Spec.HTTP[0].CorsPolicy = &CorsPolicy{
-				AllowOrigin:allowOrigin,
+				AllowOrigins:allowOrigins,
 				AllowMethods:allowMethods,
 				AllowHeaders:allowHeaders,
 				ExposeHeaders:exposeHeaders,
