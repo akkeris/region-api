@@ -23,8 +23,8 @@ import (
 // but they just define the Spec field as a map[string]interface{}
 // so its all but useless, this sadly mimicks the structure used.
 
-const IstioNetworkingAPIVersion = "networking.istio.io/v1alpha3"
-const IstioAuthenticationAPIVersion = "authentication.istio.io/v1alpha1"
+const IstioNetworkingAPIVersion = "networking.istio.io/v1beta1"
+const IstioSecurityAPIVersion = "security.istio.io/v1beta1"
 
 // Policy types for istio (https://istio.io/docs/reference/config/security/istio.authentication.v1alpha1/#Policy)
 type StringMatch struct {
@@ -34,35 +34,64 @@ type StringMatch struct {
 	Regex string `json:"regex,omitempty"`
 }
 
-type TriggerRule struct {
-	ExcludedPaths []StringMatch `json:"excludedPaths,omitempty"`
-	IncludedPaths []StringMatch `json:"includedPaths,omitempty"`
-}
-
-type Jwt struct {
+type JWTRule struct {
 	Issuer string `json:"issuer,omitempty"`
 	Audiences []string `json:"audiences,omitempty"`
 	JwksUri string `json:"jwksUri"`
-	JwtHeaders []string `json:"jwtHeaders"`
-	JwtParams []string `json:"jwtParams"`
-	TriggerRules []TriggerRule `json:"triggerRules,omitempty"` 
 }
 
-type OriginAuthenticationMethod struct {
-	Jwt Jwt `json:"jwt"`
+type WorkloadSelector struct {
+	Labels map[string]string `json:"labels,omitempty"`
 }
 
-type TargetSelector struct {
-	Name string `json:"name"`
-}
-
-type Policy struct {
+type RequestAuthentication struct {
 	kubemetav1.TypeMeta 	`json:",inline"`
 	kubemetav1.ObjectMeta	`json:"metadata"`
 	Spec struct {
-		Origins []OriginAuthenticationMethod `json:"origins"`
-		PrincipalBinding string `json:"principalBinding"` /* Can be USE_PEER or USE_ORIGIN, set to USE_ORIGIN */
-		Targets []TargetSelector `json:"targets"`
+		Selector WorkloadSelector `json:"selector"`
+		JWTRules []JWTRule `json:"jwtRules"`
+	} `json:"spec"`
+}
+
+type From struct {
+	Source struct {
+		Principals []string `json:"principals,omitempty"`
+		NotPrincipals []string `json:"notPrincipals,omitempty"`
+		RequestPrincipals []string `json:"requestPrincipals,omitempty"`
+		NotRequestPrincipals []string `json:"notRequestPrincipals,omitempty"`
+		Namespaces []string `json:"namespaces"`
+		NotNamespaces []string `json:"notNamespaces"`
+		IpBlocks []string `json:"ipBlocks"`
+		NotIpBlocks []string `json:"notIpBlocks"`
+	} `json:"source"`
+}
+
+type Operation struct {
+	Hosts []string `json:"hosts,omitempty"`
+	NotHosts []string `json:"notHosts,omitempty"`
+	Ports []string `json:"ports,omitempty"`
+	NotPorts []string `json:"notPorts,omitempty"`
+	Methods []string `json:"methods,omitempty"`
+	NotMethods []string `json:"notMethods,omitempty"`
+	Paths []string `json:"paths,omitempty"`
+	NotPaths []string `json:"notPaths,omitempty"`
+}
+
+type To struct {
+	Operation Operation `json:"operation,omitempty"`
+}
+
+type Rule struct {
+	From []From `json:"from,omitempty"`
+	To []To `json:"to,omitempty"`
+}
+
+type AuthorizationPolicy struct {
+	kubemetav1.TypeMeta 	`json:",inline"`
+	kubemetav1.ObjectMeta	`json:"metadata"`
+	Spec struct {
+		Selector WorkloadSelector `json:"selector"`
+		Rules []Rule `json:"rules"`
 	} `json:"spec"`
 }
 
@@ -565,20 +594,15 @@ func (ingress *IstioIngress) DeleteUberSiteGateway(domain string, certificate st
 	return nil
 }
 
-func (ingress *IstioIngress) InstallOrUpdateJWTAuthFilter(appname string, space string, fqdn string, port int64, issuer string, jwksUri string, audiences []string, excludes []string, includes []string) (error) {
-	if os.Getenv("INGRESS_DEBUG") == "true" {
-		fmt.Printf("[ingress] Istio installing or updating JWT Auth filter for %s-%s with %s\n", appname, space, jwksUri)
-	}
-	
-	body, code, err := ingress.runtime.GenericRequest("get", "/apis/" + IstioAuthenticationAPIVersion +  "/namespaces/" + space + "/policies/" + appname, nil)
+func (ingress *IstioIngress) InstallOrUpdateIstioRequestAuthentication(appname string, space string, fqdn string, port int64, issuer string, jwksUri string, audiences []string, excludes []string, includes []string) (error) {
+	body, code, err := ingress.runtime.GenericRequest("get", "/apis/" + IstioSecurityAPIVersion +  "/namespaces/" + space + "/requestauthentications/" + appname, nil)
 	if err != nil {
 		return err
 	}
-
-	var jwtPolicy Policy
+	var jwtPolicy RequestAuthentication
 	if code == http.StatusNotFound {
-		jwtPolicy.Kind = "Policy"
-		jwtPolicy.APIVersion = IstioAuthenticationAPIVersion
+		jwtPolicy.Kind = "RequestAuthentication"
+		jwtPolicy.APIVersion = IstioSecurityAPIVersion
 		jwtPolicy.SetName(appname)
 		jwtPolicy.SetNamespace(space)
 	} else {
@@ -586,61 +610,122 @@ func (ingress *IstioIngress) InstallOrUpdateJWTAuthFilter(appname string, space 
 			return err
 		}
 	}
-	jwtPolicy.Spec.Origins = []OriginAuthenticationMethod{ 
-		OriginAuthenticationMethod{
-			Jwt:Jwt{
-				Issuer: issuer,
-				JwksUri: jwksUri,
-				Audiences: audiences,
-			},
+	jwtPolicy.Spec.JWTRules = []JWTRule{ 
+		JWTRule{
+			Issuer: issuer,
+			JwksUri: jwksUri,
+			Audiences: audiences,
 		},
 	}
-	jwtPolicy.Spec.PrincipalBinding = "USE_ORIGIN"
-	jwtPolicy.Spec.Targets = []TargetSelector{
-		TargetSelector{
-			Name: appname,
+	jwtPolicy.Spec.Selector = WorkloadSelector{
+		Labels: map[string]string{
+			"app":appname,
 		},
-	}
-	
-	if len(excludes) > 0 || len(includes) > 0 {
-		jwtPolicy.Spec.Origins[0].Jwt.TriggerRules = make([]TriggerRule, 1)
-		jwtPolicy.Spec.Origins[0].Jwt.TriggerRules[0].ExcludedPaths = make([]StringMatch, 0)
-		jwtPolicy.Spec.Origins[0].Jwt.TriggerRules[0].IncludedPaths = make([]StringMatch, 0)
-		for _, exclude := range excludes {
-			jwtPolicy.Spec.Origins[0].Jwt.TriggerRules[0].ExcludedPaths = append(jwtPolicy.Spec.Origins[0].Jwt.TriggerRules[0].ExcludedPaths, StringMatch{Prefix:exclude})
-		}
-		for _, include := range includes {
-			jwtPolicy.Spec.Origins[0].Jwt.TriggerRules[0].IncludedPaths = append(jwtPolicy.Spec.Origins[0].Jwt.TriggerRules[0].IncludedPaths, StringMatch{Prefix:include})
-		}
 	}
 	if code == http.StatusNotFound {
-		body, code, err = ingress.runtime.GenericRequest("post", "/apis/" + jwtPolicy.APIVersion +  "/namespaces/" + space + "/policies", jwtPolicy)
+		body, code, err = ingress.runtime.GenericRequest("post", "/apis/" + IstioSecurityAPIVersion +  "/namespaces/" + space + "/requestauthentications", jwtPolicy)
+		if code != http.StatusOK && code != http.StatusCreated {
+			return errors.New("The response for deleting a JWT auth policy failed: " + strconv.Itoa(code) + " " + string(body))
+		}
 	} else {
-		body, code, err = ingress.runtime.GenericRequest("put", "/apis/" + jwtPolicy.APIVersion +  "/namespaces/" + space + "/policies/" + appname, jwtPolicy)
+		body, code, err = ingress.runtime.GenericRequest("put", "/apis/" + IstioSecurityAPIVersion +  "/namespaces/" + space + "/requestauthentications/" + appname, jwtPolicy)
+		if code != http.StatusOK && code != http.StatusCreated {
+			return errors.New("The response for deleting a JWT auth policy failed: " + strconv.Itoa(code) + " " + string(body))
+		}
 	}
+	return nil
+}
+
+func (ingress *IstioIngress) InstallOrUpdateIstioAuthorizationPolicies(appname string, space string, fqdn string, port int64, issuer string, jwksUri string, audiences []string, excludes []string, includes []string) (error) {
+	body, code, err := ingress.runtime.GenericRequest("get", "/apis/" + IstioSecurityAPIVersion +  "/namespaces/" + space + "/authorizationpolicies/" + appname, nil)
 	if err != nil {
 		return err
 	}
-	if code == http.StatusOK || code == http.StatusCreated {
-		return nil
+
+	var authPolicy AuthorizationPolicy
+	if code == http.StatusNotFound {
+		authPolicy.Kind = "AuthorizationPolicy"
+		authPolicy.APIVersion = IstioSecurityAPIVersion
+		authPolicy.SetName(appname)
+		authPolicy.SetNamespace(space)
 	} else {
-		return errors.New("The response for creating/updating JWT auth policy failed: " + strconv.Itoa(code) + " " + string(body))
+		if err = json.Unmarshal(body, &authPolicy); err != nil {
+			return err
+		}
 	}
+	authPolicy.Spec.Selector = WorkloadSelector{
+		Labels: map[string]string{
+			"app":appname,
+		},
+	}
+	if len(excludes) > 0 {
+		authPolicy.Spec.Rules[0] = Rule{
+			To:[]To{
+				To{
+					Operation:Operation{
+						NotPaths:excludes,
+					},
+				},
+			},
+		}
+	}
+	if len(includes) > 0 {
+		authPolicy.Spec.Rules[len(authPolicy.Spec.Rules)] = Rule{
+			To:[]To{
+				To{
+					Operation:Operation{
+						Paths:excludes,
+					},
+				},
+			},
+		}
+	}
+	if code == http.StatusNotFound {
+		body, code, err = ingress.runtime.GenericRequest("post", "/apis/" + IstioSecurityAPIVersion +  "/namespaces/" + space + "/authorizationpolicies", authPolicy)
+		if err != nil {
+			return err
+		}
+		if code != http.StatusOK && code != http.StatusCreated {
+			return errors.New("The response for creating an JWT authorization policy failed: " + strconv.Itoa(code) + " " + string(body))
+		}
+	} else {
+		body, code, err = ingress.runtime.GenericRequest("put", "/apis/" + IstioSecurityAPIVersion +  "/namespaces/" + space + "/authorizationpolicies/" + appname, authPolicy)
+		if err != nil {
+			return err
+		}
+		if code != http.StatusOK && code != http.StatusCreated {
+			return errors.New("The response for updating a JWT authorization policy failed: " + strconv.Itoa(code) + " " + string(body))
+		}
+	}
+	return nil
+}
+
+func (ingress *IstioIngress) InstallOrUpdateJWTAuthFilter(appname string, space string, fqdn string, port int64, issuer string, jwksUri string, audiences []string, excludes []string, includes []string) (error) {
+	if os.Getenv("INGRESS_DEBUG") == "true" {
+		fmt.Printf("[ingress] Istio installing or updating JWT Auth filter for %s-%s with %s\n", appname, space, jwksUri)
+	}
+	if err := ingress.InstallOrUpdateIstioRequestAuthentication(appname, space, fqdn, port, issuer, jwksUri, audiences, excludes, includes); err != nil {
+		return err
+	}
+	if err := ingress.InstallOrUpdateIstioAuthorizationPolicies(appname, space, fqdn, port, issuer, jwksUri, audiences, excludes, includes); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (ingress *IstioIngress) DeleteJWTAuthFilter(appname string, space string, fqdn string, port int64) (error) {
 	if os.Getenv("INGRESS_DEBUG") == "true" {
 		fmt.Printf("[ingress] Istio - deleting any JWT Auth filter for %s-%s\n", appname, space)
 	}
-	body, code, err := ingress.runtime.GenericRequest("delete", "/apis/" + IstioAuthenticationAPIVersion + "/namespaces/" + space + "/policies/" + appname, nil)
+	_, _, err := ingress.runtime.GenericRequest("delete", "/apis/" + IstioSecurityAPIVersion + "/namespaces/" + space + "/requestauthentications/" + appname, nil)
 	if err != nil {
 		return err
 	}
-	if code == http.StatusOK {
-		return nil
-	} else {
-		return errors.New("The response for deleting a JWT auth policy failed: " + strconv.Itoa(code) + " " + string(body))
+	_, _, err = ingress.runtime.GenericRequest("delete", "/apis/" + IstioSecurityAPIVersion + "/namespaces/" + space + "/authorizationpolicies/" + appname, nil)
+	if err != nil {
+		return err
 	}
+	return nil
 }
 
 func (ingress *IstioIngress) InstallOrUpdateUberSiteGateway(domain string, certificate string, internal bool) error {
@@ -751,7 +836,7 @@ func createHTTPSpecForVS(app string, space string, domain string, adjustedPath s
 			if os.Getenv("INGRESS_DEBUG") == "true" {
 				fmt.Printf("[ingress] Adding CORS filter to site %#+v\n", filter)
 			}
-			allow_origin := make([]string, 0)
+			allow_origin := make([]StringMatch, 0)
 			allow_methods := make([]string, 0)
 			allow_headers := make([]string, 0)
 			expose_headers := make([]string, 0)
@@ -759,7 +844,10 @@ func createHTTPSpecForVS(app string, space string, domain string, adjustedPath s
 			allow_credentials := false
 			if val, ok := filter.Data["allow_origin"]; ok {
 				if val != "" {
-					allow_origin = strings.Split(val, ",")
+					origins := strings.Split(val, ",")
+					for _, origin := range origins {
+						allow_origin = append(allow_origin, StringMatch{Exact:origin})
+					}
 				}
 			}
 			if val, ok := filter.Data["allow_methods"]; ok {
@@ -793,7 +881,7 @@ func createHTTPSpecForVS(app string, space string, domain string, adjustedPath s
 				}
 			}
 			http.CorsPolicy = &CorsPolicy{
-				AllowOrigin:allow_origin,
+				AllowOrigins:allow_origin,
 				AllowMethods:allow_methods,
 				AllowHeaders:allow_headers,
 				ExposeHeaders:expose_headers,
@@ -930,12 +1018,12 @@ func (ingress *IstioIngress) InstallOrUpdateCORSAuthFilter(vsname string, path s
 		return nil
 	}
 	var dirty = false
+	allowOrigins := make([]StringMatch, 0)
+	for _, origin := range allowOrigin {
+		allowOrigins = append(allowOrigins, StringMatch{Exact:origin})
+	}
 	for i, http := range virtualService.Spec.HTTP {
 		if http.Match == nil || len(http.Match) == 0 {
-			allowOrigins = make([]StringMatch, 0)
-			for _, origin := range allowOrigin {
-				allowOrigins = append(allowOrigins, StringMatch{Exact:origin})
-			}
 			virtualService.Spec.HTTP[0].CorsPolicy = &CorsPolicy{
 				AllowOrigins:allowOrigins,
 				AllowMethods:allowMethods,
@@ -952,7 +1040,7 @@ func (ingress *IstioIngress) InstallOrUpdateCORSAuthFilter(vsname string, path s
 				}
 				if strings.HasPrefix(match.URI.Prefix, path) || match.URI.Exact == path || match.URI.Prefix == path {
 					virtualService.Spec.HTTP[i].CorsPolicy = &CorsPolicy{
-						AllowOrigin:allowOrigin,
+						AllowOrigins:allowOrigins,
 						AllowMethods:allowMethods,
 						AllowHeaders:allowHeaders,
 						ExposeHeaders:exposeHeaders,
@@ -1058,7 +1146,6 @@ func (ingress *IstioIngress) InstallOrUpdateCSPFilter(vsname string, path string
 	return nil
 }
 
-
 func (ingress *IstioIngress) DeleteCSPFilter(vsname string, path string) (error) {
 	virtualService, err := ingress.GetVirtualService(vsname)
 	if err != nil {
@@ -1099,7 +1186,6 @@ func (ingress *IstioIngress) DeleteCSPFilter(vsname string, path string) (error)
 	}
 	return nil
 }
-
 
 func (ingress *IstioIngress) SetMaintenancePage(app string, space string, value bool) error {
 	virtualService, err := ingress.AppVirtualService(space, app)
