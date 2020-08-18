@@ -664,8 +664,9 @@ func (ingress *IstioIngress) InstallOrUpdateIstioAuthorizationPolicies(appname s
 			"app":appname,
 		},
 	}
+	authPolicy.Spec.Rules = make([]Rule, 0)
 	if len(excludes) > 0 {
-		authPolicy.Spec.Rules[0] = Rule{
+		authPolicy.Spec.Rules = append(authPolicy.Spec.Rules, Rule{
 			To:[]To{
 				To{
 					Operation:Operation{
@@ -673,18 +674,18 @@ func (ingress *IstioIngress) InstallOrUpdateIstioAuthorizationPolicies(appname s
 					},
 				},
 			},
-		}
+		})
 	}
 	if len(includes) > 0 {
-		authPolicy.Spec.Rules[len(authPolicy.Spec.Rules)] = Rule{
+		authPolicy.Spec.Rules = append(authPolicy.Spec.Rules, Rule{
 			To:[]To{
 				To{
 					Operation:Operation{
-						Paths:excludes,
+						Paths:includes,
 					},
 				},
 			},
-		}
+		})
 	}
 	if code == http.StatusNotFound {
 		body, code, err = ingress.runtime.GenericRequest("post", "/apis/" + IstioSecurityAPIVersion +  "/namespaces/" + space + "/authorizationpolicies", authPolicy)
