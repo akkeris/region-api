@@ -251,7 +251,6 @@ type Deploymentspec struct {
 				Name        string            `json:"name"`
 				Labels      map[string]string `json:"labels,omitempty"`
 				Annotations struct {
-					SidecarIstioIoInject string `json:"sidecar.istio.io/inject"`
 					AkkerisIORestartTime string `json:"akkeris.io/restartTime,omitempty"`
 				} `json:"annotations,omitempty"`
 			} `json:"metadata"`
@@ -750,7 +749,9 @@ func deploymentToDeploymentSpec(deployment *structs.Deployment) (dp Deploymentsp
 	krc.Spec.Template.Metadata.Labels["version"] = "v1"        // unsure what this is used for.
 
 	if os.Getenv("FF_ISTIOINJECT") == "true" || deployment.Features.IstioInject || deployment.Features.ServiceMesh {
-		krc.Spec.Template.Metadata.Annotations.SidecarIstioIoInject = "true"
+		krc.Spec.Template.Metadata.Labels["sidecar.istio.io/inject"] = "true"
+	} else {
+		krc.Spec.Template.Metadata.Labels["sidecar.istio.io/inject"] = "false"
 	}
 
 	krc.Spec.Strategy.RollingUpdate.MaxUnavailable = 0
