@@ -251,7 +251,7 @@ type Deploymentspec struct {
 				Name        string            `json:"name"`
 				Labels      map[string]string `json:"labels,omitempty"`
 				Annotations struct {
-					SidecarIstioInject bool `json:"sidecar.istio.io/inject,omitempty"`
+					SidecarIstioInject string `json:"sidecar.istio.io/inject,omitempty"`
 					AkkerisIORestartTime string `json:"akkeris.io/restartTime,omitempty"`
 				} `json:"annotations,omitempty"`
 			} `json:"metadata"`
@@ -751,10 +751,10 @@ func deploymentToDeploymentSpec(deployment *structs.Deployment) (dp Deploymentsp
 
 	if os.Getenv("FF_ISTIOINJECT") == "true" || deployment.Features.IstioInject || deployment.Features.ServiceMesh {
 		krc.Spec.Template.Metadata.Labels["sidecar.istio.io/inject"] = "true"
-		krc.Spec.Template.Metadata.Annotations.SidecarIstioInject = true
+		krc.Spec.Template.Metadata.Annotations.SidecarIstioInject = "true"
 	} else {
 		krc.Spec.Template.Metadata.Labels["sidecar.istio.io/inject"] = "false"
-		krc.Spec.Template.Metadata.Annotations.SidecarIstioInject = false
+		krc.Spec.Template.Metadata.Annotations.SidecarIstioInject = "false"
 
 	}
 
