@@ -412,7 +412,7 @@ func (ingress *IstioIngress) InstallOrUpdateGateway(domain string, gateway *Gate
 	if err != nil {
 		return err
 	}
-	if code == http.StatusNotFound {
+	if code == http.StatusNotFound || code == http.StatusConflict {
 		body, code, err := ingress.runtime.GenericRequest("post", "/apis/" + IstioNetworkingAPIVersion + "/namespaces/sites-system/gateways", gateway)
 		if err != nil {
 			return err
