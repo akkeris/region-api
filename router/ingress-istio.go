@@ -126,7 +126,7 @@ type Gateway struct {
 	kubemetav1.ObjectMeta	`json:"metadata"`
 	Spec struct {
 		Selector map[string]string `json:"selector"`
-		Servers  []Server          `json:"servers"`
+		Servers []Server          `json:"servers"`
 	} `json:"spec"`
 }
 
@@ -408,20 +408,11 @@ func (ingress *IstioIngress) InstallOrUpdateGateway(domain string, gateway *Gate
 	if os.Getenv("INGRESS_DEBUG") == "true" {
 		fmt.Printf("[ingress] Istio - starting install or update gateway for %s\n", domain)
 	}
-	_, code, err := ingress.runtime.GenericRequest("get", "/apis/" + IstioNetworkingAPIVersion + "/namespaces/sites-system/gateways/" + gateway.GetName(), nil)
+	body, code, err := ingress.runtime.GenericRequest("put", "/apis/" + IstioNetworkingAPIVersion + "/namespaces/sites-system/gateways/" + gateway.GetName(), gateway)
 	if err != nil {
 		return err
 	}
-	if code == http.StatusOK {
-		body, code, err := ingress.runtime.GenericRequest("put", "/apis/" + IstioNetworkingAPIVersion + "/namespaces/sites-system/gateways/" + gateway.GetName(), gateway)
-		if err != nil {
-			return err
-		}
-		if code != http.StatusOK && code != http.StatusCreated {
-			fmt.Printf("Failed to update gateway %#+v due to %s - %s\n", gateway, strconv.Itoa(code), string(body))
-			return errors.New("Unable to update gateway " + gateway.GetName() + " due to error: " + strconv.Itoa(code) + " " + string(body))
-		}
-	} else {
+	if code == http.StatusNotFound {
 		body, code, err := ingress.runtime.GenericRequest("post", "/apis/" + IstioNetworkingAPIVersion + "/namespaces/sites-system/gateways", gateway)
 		if err != nil {
 			return err
@@ -430,6 +421,9 @@ func (ingress *IstioIngress) InstallOrUpdateGateway(domain string, gateway *Gate
 			fmt.Printf("Failed to create gateway %#+v due to %s - %s\n", gateway, strconv.Itoa(code), string(body))
 			return errors.New("Unable to create gateway " + gateway.GetName() + " due to error: " + strconv.Itoa(code) + " " + string(body))
 		}
+	} else if code != http.StatusOK && code != http.StatusCreated {
+		fmt.Printf("Failed to update gateway %#+v due to %s - %s\n", gateway, strconv.Itoa(code), string(body))
+		return errors.New("Unable to update gateway " + gateway.GetName() + " due to error: " + strconv.Itoa(code) + " " + string(body))
 	}
 	return nil
 }
