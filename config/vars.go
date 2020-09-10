@@ -42,7 +42,7 @@ func Addvar(db *sql.DB, spec structs.Varspec, berr binding.Errors, r render.Rend
 		utils.ReportInvalidRequest(berr[0].Message, r)
 		return
 	}
-	_, err := db.Exec("INSERT INTO configvars(setname,varname,varvalue) VALUES($1, $2, $3)", spec.Setname, spec.Varname, spec.Varvalue)
+	_, err := db.Exec("INSERT INTO configvars(setname,varname,varvalue) VALUES($1, $2, $3) ON CONFLICT configvars_pk DO UPDATE SET varvalue = $3", spec.Setname, spec.Varname, spec.Varvalue)
 	if err != nil {
 		utils.ReportError(err, r)
 		return
@@ -62,7 +62,7 @@ func Addvars(db *sql.DB, specs []structs.Varspec, berr binding.Errors, r render.
 		return
 	}
 	for _, spec := range specs {
-		_, err := tx.Exec("INSERT INTO configvars(setname,varname,varvalue) VALUES($1,$2,$3) returning varname;", spec.Setname, spec.Varname, spec.Varvalue)
+		_, err := tx.Exec("INSERT INTO configvars(setname,varname,varvalue) VALUES($1,$2,$3) ON CONFLICT configvars_pk DO UPDATE SET varvalue = $3 returning varname;", spec.Setname, spec.Varname, spec.Varvalue)
 		if err != nil {
 			rollbackerr := tx.Rollback()
 			if rollbackerr != nil {
