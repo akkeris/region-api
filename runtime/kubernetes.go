@@ -717,7 +717,7 @@ func deploymentToDeploymentSpec(deployment *structs.Deployment) (dp Deploymentsp
 	if len(deployment.Command) > 0 {
 		c1.Command = deployment.Command
 	}
-	c1.ImagePullPolicy = "Always"
+	c1.ImagePullPolicy = "IfNotPresent"
 
 	// assemble memory constraints
 	var resources structs.ResourceSpec
@@ -761,7 +761,7 @@ func deploymentToDeploymentSpec(deployment *structs.Deployment) (dp Deploymentsp
 	krc.Spec.Strategy.RollingUpdate.MaxUnavailable = 0
 	krc.Spec.Template.Spec.ImagePullSecrets = deployment.Secrets
 	krc.Spec.Template.Spec.Containers = clist
-	krc.Spec.Template.Spec.ImagePullPolicy = "Always"
+	krc.Spec.Template.Spec.ImagePullPolicy = "IfNotPresent"
 	krc.Spec.Template.Spec.TerminationGracePeriodSeconds = 60
 	if deployment.PlanType != "" && deployment.PlanType != "general" {
 		krc.Spec.Template.Spec.NodeSelector = &NodeSelector{
