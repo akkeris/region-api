@@ -35,7 +35,7 @@ type Ingress interface {
 	DeleteCORSAuthFilter(vsname string, path string) (error)
 	DeleteCSPFilter(vsname string, path string) (error)
 	DeleteJWTAuthFilter(appname string, space string, fqdn string, port int64) (error)
-	SetMaintenancePage(app string, space string, value bool) error
+	SetMaintenancePage(vsname string, app string, space string, path string, value bool) error
 	GetMaintenancePageStatus(app string, space string) (bool, error)
 	DeleteRouter(domain string, internal bool) error
 	CreateOrUpdateRouter(domain string, internal bool, paths []Route) (error)

@@ -249,6 +249,7 @@ func Server(db *sql.DB) *martini.ClassicMartini {
 	vault.AddToMartini(m)
 	router.AddToMartini(m)
 	certs.AddToMartini(m)
+	maintenance.AddToMartini(m)
 
 	m.Get("/v1/octhc/kube", utils.Octhc)
 	m.Get("/v1/octhc/service/rabbitmq", service.Getrabbitmqplans)
@@ -278,10 +279,6 @@ func Server(db *sql.DB) *martini.ClassicMartini {
 	m.Post("/v1beta1/space/:space/cronjobs/:jobName/run", binding.Json(structs.JobDeploy{}), jobs.DeployCronJob)
 	m.Put("/v1beta1/space/:space/cronjobs/:jobName/run", binding.Json(structs.JobDeploy{}), jobs.UpdatedDeployedCronJob)
 	m.Delete("/v1beta1/space/:space/cronjobs/:jobName/run", jobs.StopCronJob)
-
-	m.Post("/v1/space/:space/app/:app/maintenance", maintenance.EnableMaintenancePage)
-	m.Delete("/v1/space/:space/app/:app/maintenance", maintenance.DisableMaintenancePage)
-	m.Get("/v1/space/:space/app/:app/maintenance", maintenance.MaintenancePageStatus)
 
 	m.Get("/v1/utils/service/space/:space/app/:app", utils.GetService)
 	m.Get("/v1/utils/nodes", utils.GetNodes)
