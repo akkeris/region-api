@@ -1193,8 +1193,8 @@ func (ingress *IstioIngress) DeleteCSPFilter(vsname string, path string) (error)
 	return nil
 }
 
-func (ingress *IstioIngress) SetMaintenancePage(app string, space string, value bool) error {
-	virtualService, err := ingress.AppVirtualService(space, app)
+func (ingress *IstioIngress) SetMaintenancePage(vsname string, app string, space string, path string, value bool) error {
+	virtualService, err := ingress.GetVirtualService(vsname)
 	if err != nil {
 		if err.Error() == "virtual service was not found" {
 			// Go ahead and ignore setting the maintenace page.  We can't as there's no deployment yet.
@@ -1206,14 +1206,41 @@ func (ingress *IstioIngress) SetMaintenancePage(app string, space string, value 
 		return errors.New("The specified maintenance page could not be found or did not have a routable virtual service.")
 	}
 
-	if value {
-		virtualService.Spec.HTTP[0].Route[0].Destination.Host = getDownPage()
+	var dirty = false
+	if len(virtualService.Spec.HTTP) == 1 && (virtualService.Spec.HTTP[0].Match == nil || len(virtualService.Spec.HTTP[0].Match) == 0 && path == "") {
+		if value {
+			virtualService.Spec.HTTP[0].Route[0].Destination.Host = getDownPage()
+		} else {
+			virtualService.Spec.HTTP[0].Route[0].Destination.Host = app + "." + space + ".svc.cluster.local"
+		}
+		dirty = true
 	} else {
-		virtualService.Spec.HTTP[0].Route[0].Destination.Host = app + "." + space + ".svc.cluster.local"
+		for i, http := range virtualService.Spec.HTTP {
+			for _, match := range http.Match {
+				if os.Getenv("INGRESS_DEBUG") == "true" {
+					fmt.Printf("[ingress] Looking to set maintenance page, comparing path: %s with match prefix %s and match exact %s\n", path, match.URI.Prefix, match.URI.Exact)
+				}
+				if strings.HasPrefix(match.URI.Prefix, path) || match.URI.Exact == path || match.URI.Prefix == path {
+					if value {
+						virtualService.Spec.HTTP[i].Route[0].Destination.Host = getDownPage()
+					} else {
+						virtualService.Spec.HTTP[i].Route[0].Destination.Host = app + "." + space + ".svc.cluster.local"
+					}
+					dirty = true
+				}
+			}
+		}
 	}
-	if err = ingress.UpdateAppVirtualService(virtualService, space, app); err != nil {
-		return err
+
+	if dirty == true {
+		if os.Getenv("INGRESS_DEBUG") == "true" {
+			fmt.Printf("[ingress] update virtual services %s at path %s\n", vsname, path)
+		}
+		if err = ingress.UpdateVirtualService(virtualService, vsname); err != nil {
+			return err
+		}
 	}
+	
 	return nil
 }
 

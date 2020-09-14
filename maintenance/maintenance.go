@@ -21,10 +21,28 @@ func EnableMaintenancePage(db *sql.DB, params martini.Params, r render.Render) {
 		utils.ReportError(err, r)
 		return
 	}
-	if err = ingress.SetMaintenancePage(params["app"], params["space"], true); err != nil {
+	if err = ingress.SetMaintenancePage(params["app"] + "-" + params["space"], params["app"], params["space"],  "", true); err != nil {
 		utils.ReportError(err, r)
 		return
 	}
+
+	siteIngress, err := router.GetSiteIngress(db, internal)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	routes, err := router.GetPathsByApp(db, params["app"], params["space"])
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	for _, route := range routes {
+		if err := siteIngress.SetMaintenancePage(route.Domain, params["app"], params["space"], route.Path, true); err != nil {
+			utils.ReportError(err, r)
+			return
+		}
+	}
+
 	r.JSON(http.StatusCreated, structs.Messagespec{Status: http.StatusCreated, Message: "Maintenance Page Enabled"})
 }
 
@@ -39,9 +57,25 @@ func DisableMaintenancePage(db *sql.DB, params martini.Params, r render.Render) 
 		utils.ReportError(err, r)
 		return
 	}
-	if err = ingress.SetMaintenancePage(params["app"], params["space"], false); err != nil {
+	if err = ingress.SetMaintenancePage(params["app"] + "-" + params["space"], params["app"], params["space"],  "", false); err != nil {
 		utils.ReportError(err, r)
 		return
+	}
+	siteIngress, err := router.GetSiteIngress(db, internal)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	routes, err := router.GetPathsByApp(db, params["app"], params["space"])
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	for _, route := range routes {
+		if err := siteIngress.SetMaintenancePage(route.Domain, params["app"], params["space"], route.Path, false); err != nil {
+			utils.ReportError(err, r)
+			return
+		}
 	}
 	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: "Maintenance Page Disabled"})
 }
