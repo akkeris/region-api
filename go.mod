@@ -12,7 +12,7 @@ require (
 	github.com/go-martini/martini v0.0.0-20140519164645-49411a5b6468
 	github.com/gocql/gocql v0.0.0-20190402132108-0e1d5de854df
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
-	github.com/golang/snappy v0.0.1
+	github.com/golang/snappy v0.0.2
 	github.com/gopherjs/gopherjs v0.0.0-20181017120253-0766667cb4d1
 	github.com/hailocab/go-hostpool v0.0.0-20160125115350-e80d13ce29ed
 	github.com/jetstack/cert-manager v0.16.0
