@@ -17,7 +17,7 @@ require (
 	github.com/hailocab/go-hostpool v0.0.0-20160125115350-e80d13ce29ed
 	github.com/jetstack/cert-manager v0.16.0
 	github.com/jmcvetta/napping v3.2.0+incompatible
-	github.com/jmespath/go-jmespath v0.3.0
+	github.com/jmespath/go-jmespath v0.4.0
 	github.com/jtolds/gls v4.20.0+incompatible
 	github.com/lib/pq v1.8.0
 	github.com/martini-contrib/auth v0.0.0-20150219114609-fa62c19b7ae8
