@@ -21,6 +21,10 @@ func EnableMaintenancePage(db *sql.DB, params martini.Params, r render.Render) {
 		utils.ReportError(err, r)
 		return
 	}
+	if _, err := db.Exec("update routerpaths set maintenance=true where space=$1 and app=$2", params["space"], params["app"]); err != nil {
+		utils.ReportError(err, r)
+		return
+	}
 	if err = ingress.SetMaintenancePage(params["app"] + "-" + params["space"], params["app"], params["space"],  "", true); err != nil {
 		utils.ReportError(err, r)
 		return
@@ -54,6 +58,10 @@ func DisableMaintenancePage(db *sql.DB, params martini.Params, r render.Render) 
 	}
 	ingress, err := router.GetAppIngress(db, internal)
 	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	if _, err := db.Exec("update routerpaths set maintenance=false where space=$1 and app=$2", params["space"], params["app"]); err != nil {
 		utils.ReportError(err, r)
 		return
 	}

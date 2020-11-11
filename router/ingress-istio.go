@@ -794,7 +794,12 @@ func (ingress *IstioIngress) GetCertificateFromDomain(domain string) (error, str
 	return nil, "star-certificate"
 }
 
-func createHTTPSpecForVS(app string, space string, domain string, adjustedPath string, rewritePath string, forwardedPath string, port int32, filters []structs.HttpFilters) HTTP {
+func createHTTPSpecForVS(app string, space string, domain string, maintenance bool, adjustedPath string, rewritePath string, forwardedPath string, port int32, filters []structs.HttpFilters) HTTP {
+	destination := app + "." + space + ".svc.cluster.local"
+	if maintenance {
+		destination = getDownPage()
+	}
+
 	http := HTTP{
 		Match: []Match{Match{
 			URI:StringMatch{
@@ -807,7 +812,7 @@ func createHTTPSpecForVS(app string, space string, domain string, adjustedPath s
 		},
 		Route: []Routes{Routes{
 			Destination: Destination{
-				Host: app + "." + space + ".svc.cluster.local",
+				Host: destination,
 				Port: Port{
 					Number: port,
 				},
@@ -921,10 +926,10 @@ func PrepareVirtualServiceForCreateorUpdate(domain string, internal bool, paths 
 	for _, value := range paths {
 		path := removeLeadingSlash(value.Path)
 		vs.Spec.HTTP = append(vs.Spec.HTTP, 
-			createHTTPSpecForVS(value.App, value.Space, value.Domain, removeSlash(path), addSlash(value.ReplacePath), removeSlash(path) + "/", defaultPort, value.Filters))
+			createHTTPSpecForVS(value.App, value.Space, value.Domain, value.Maintenance, removeSlash(path), addSlash(value.ReplacePath), removeSlash(path) + "/", defaultPort, value.Filters))
 		if removeSlashSlash(value.Path) == removeSlash(value.Path) {
 			vs.Spec.HTTP = append(vs.Spec.HTTP, 
-				createHTTPSpecForVS(value.App, value.Space, value.Domain, removeSlashSlash(value.Path), value.ReplacePath, removeSlashSlash(path), defaultPort, value.Filters))
+				createHTTPSpecForVS(value.App, value.Space, value.Domain, value.Maintenance, removeSlashSlash(value.Path), value.ReplacePath, removeSlashSlash(path), defaultPort, value.Filters))
 		}
 	}
 	return &vs, nil
@@ -1220,7 +1225,10 @@ func (ingress *IstioIngress) SetMaintenancePage(vsname string, app string, space
 				if os.Getenv("INGRESS_DEBUG") == "true" {
 					fmt.Printf("[ingress] Looking to set maintenance page, comparing path: %s with match prefix %s and match exact %s\n", path, match.URI.Prefix, match.URI.Exact)
 				}
-				if strings.HasPrefix(match.URI.Prefix, path) || match.URI.Exact == path || match.URI.Prefix == path {
+				if (match.URI.Exact == path && path != "") || (match.URI.Prefix == path && path != "") || match.URI.Prefix == (path + "/") || match.URI.Exact == (path + "/") {
+					if os.Getenv("INGRESS_DEBUG") == "true" {
+						fmt.Printf("[ingress] Setting maintenance page, updated path: %s with match prefix %s and match exact %s\n", path, match.URI.Prefix, match.URI.Exact)
+					}
 					if value {
 						virtualService.Spec.HTTP[i].Route[0].Destination.Host = getDownPage()
 					} else {

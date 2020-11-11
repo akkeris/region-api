@@ -18,6 +18,7 @@ type Route struct {
 	ReplacePath string `json:"replacepath"`
 	Port        string `json:"port"`
 	Filters  	[]structs.HttpFilters `json:"filters,omitempty"`
+	Maintenance bool   `json:"maintenance"`
 }
 
 type Router struct {
