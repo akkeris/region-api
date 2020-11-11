@@ -223,65 +223,77 @@ begin
 
     if (select count(*) from plans) = 0 then
         INSERT INTO public.plans (name, memrequest, memlimit, price, "description") 
-            VALUES ('scout', '256Mi', '256Mi', 10, '256MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking');
+            VALUES ('gp1', '256Mi', '256Mi', 10, '256MB RAM, 3.1 Intel Xeon Platinum 8000 CPU, 10 Gbps Networking');
         INSERT INTO public.plans (name, memrequest, memlimit, price, "description") 
-            VALUES ('scout-prod', '256Mi', '256Mi', 15, '256MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking');
+            VALUES ('gp1-prod', '256Mi', '256Mi', 15, '256MB RAM, 3.1 Intel Xeon Platinum 8000 CPU, 10 Gbps Networking');
         INSERT INTO public.plans (name, memrequest, memlimit, price, "description") 
-            VALUES ('constellation', '256Mi', '512Mi', 20, '256MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking');
+            VALUES ('gp2', '256Mi', '512Mi', 20, '512MB RAM, 3.1 Intel Xeon Platinum 8000 CPU, 10 Gbps Networking');
         INSERT INTO public.plans (name, memrequest, memlimit, price, "description") 
-            VALUES ('constellation-prod', '512Mi', '512Mi', 25, '512MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking');
+            VALUES ('gp2-prod', '512Mi', '512Mi', 25, '512MB RAM, 3.1 Intel Xeon Platinum 8000 CPU, 10 Gbps Networking');
         INSERT INTO public.plans (name, memrequest, memlimit, price, "description") 
-            VALUES ('akira', '768Mi', '1024Mi', 30, '768MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking');
+            VALUES ('gp3', '768Mi', '1024Mi', 30, '1024MB RAM, 3.1 Intel Xeon Platinum 8000 CPU, 10 Gbps Networking');
         INSERT INTO public.plans (name, memrequest, memlimit, price, "description") 
-            VALUES ('akira-prod', '1024Mi', '1024Mi', 35, '1024MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking');
+            VALUES ('gp3-prod', '1024Mi', '1024Mi', 35, '1024MB RAM, 3.1 Intel Xeon Platinum 8000 CPU, 10 Gbps Networking');
         INSERT INTO public.plans (name, memrequest, memlimit, price, "description") 
-            VALUES ('galaxy', '1024Mi', '1536Mi', 40, '1024MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking');
+            VALUES ('gp4', '1024Mi', '1536Mi', 40, '1536MB RAM, 3.1 Intel Xeon Platinum 8000 CPU, 10 Gbps Networking');
         INSERT INTO public.plans (name, memrequest, memlimit, price, "description") 
-            VALUES ('galaxy-prod', '1536Mi', '1536Mi', 45, '1536MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking');
+            VALUES ('gp4-prod', '1536Mi', '1536Mi', 45, '1536MB RAM, 3.1 Intel Xeon Platinum 8000 CPU, 10 Gbps Networking');
         INSERT INTO public.plans (name, memrequest, memlimit, price, "description") 
-            VALUES ('sovereign', '1536Mi', '2048Mi', 50, '1536MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking');
+            VALUES ('mp1', '1536Mi', '2048Mi', 50, '2048MB RAM, 3.1 Intel Xeon Platinum 8000 CPU, 10 Gbps Networking');
         INSERT INTO public.plans (name, memrequest, memlimit, price, "description") 
-            VALUES ('sovereign-prod', '2048Mi', '2048Mi', 55, '2048MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking');
+            VALUES ('mp1-prod', '2048Mi', '2048Mi', 55, '2048MB RAM, 3.1 Intel Xeon Platinum 8000 CPU, 10 Gbps Networking');
+        INSERT INTO public.plans (name, memrequest, memlimit, price, "description") 
+            VALUES ('mp2', '3072Mi', '4096Mi', 55, '4096MB RAM, 3.1 Intel Xeon Platinum 8000 CPU, 10 Gbps Networking');
+        INSERT INTO public.plans (name, memrequest, memlimit, price, "description") 
+            VALUES ('mp2-prod', '4096Mi', '4096Mi', 55, '4096MB RAM, 3.1 Intel Xeon Platinum 8000 CPU, 10 Gbps Networking');    
     end if;
 
-    if (select count(*) from plans where name = 'scout' and description is null) > 0 then
-        update plans set description = '256MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking' where description is null and name = 'scout';
+    if (select count(*) from plans where name = 'gp1' and description is null) > 0 then
+        update plans set description = '256MB RAM, 3.1 Intel Xeon Platinum 8000 CPU, 10 Gbps Networking' where description is null and name = 'gp1';
     end if;
 
-    if (select count(*) from plans where name = 'scout-prod' and description is null) > 0 then
-        update plans set description = '256MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking' where description is null and name = 'scout-prod';
+    if (select count(*) from plans where name = 'gp1-prod' and description is null) > 0 then
+        update plans set description = '256MB RAM, 3.1 Intel Xeon Platinum 8000 CPU, 10 Gbps Networking' where description is null and name = 'gp1-prod';
     end if;
 
-    if (select count(*) from plans where name = 'constellation' and description is null) > 0 then
-        update plans set description = '256MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking' where description is null and name = 'constellation';
+    if (select count(*) from plans where name = 'gp2' and description is null) > 0 then
+        update plans set description = '512MB RAM, 3.1 Intel Xeon Platinum 8000 CPU, 10 Gbps Networking' where description is null and name = 'gp2';
     end if;
 
-    if (select count(*) from plans where name = 'constellation-prod' and description is null) > 0 then
-        update plans set description = '512MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking' where description is null and name = 'constellation-prod';
+    if (select count(*) from plans where name = 'gp2-prod' and description is null) > 0 then
+        update plans set description = '512MB RAM, 3.1 Intel Xeon Platinum 8000 CPU, 10 Gbps Networking' where description is null and name = 'gp2-prod';
     end if;
 
-    if (select count(*) from plans where name = 'akira' and description is null) > 0 then
-        update plans set description = '768MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking' where description is null and name = 'akira';
+    if (select count(*) from plans where name = 'gp3' and description is null) > 0 then
+        update plans set description = '1024MB RAM, 3.1 Intel Xeon Platinum 8000 CPU, 10 Gbps Networking' where description is null and name = 'gp3';
     end if;
 
-    if (select count(*) from plans where name = 'akira-prod' and description is null) > 0 then
-        update plans set description = '1024MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking' where description is null and name = 'akira-prod';
+    if (select count(*) from plans where name = 'gp3-prod' and description is null) > 0 then
+        update plans set description = '1024MB RAM, 3.1 Intel Xeon Platinum 8000 CPU, 10 Gbps Networking' where description is null and name = 'gp3-prod';
     end if;
 
-    if (select count(*) from plans where name = 'galaxy' and description is null) > 0 then
-        update plans set description = '1024MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking' where description is null and name = 'galaxy';
+    if (select count(*) from plans where name = 'gp4' and description is null) > 0 then
+        update plans set description = '1536MB RAM, 3.1 Intel Xeon Platinum 8000 CPU, 10 Gbps Networking' where description is null and name = 'gp4';
     end if;
 
-    if (select count(*) from plans where name = 'galaxy-prod' and description is null) > 0 then
-        update plans set description = '1536MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking' where description is null and name = 'galaxy-prod';
+    if (select count(*) from plans where name = 'gp4-prod' and description is null) > 0 then
+        update plans set description = '1536MB RAM, 3.1 Intel Xeon Platinum 8000 CPU, 10 Gbps Networking' where description is null and name = 'gp4-prod';
     end if;
 
-    if (select count(*) from plans where name = 'sovereign' and description is null) > 0 then
-        update plans set description = '1536MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking' where description is null and name = 'sovereign';
+    if (select count(*) from plans where name = 'mp1' and description is null) > 0 then
+        update plans set description = '2048MB RAM, 3.1 Intel Xeon Platinum 8000 CPU, 10 Gbps Networking' where description is null and name = 'mp1';
     end if;
 
-    if (select count(*) from plans where name = 'sovereign-prod' and description is null) > 0 then
-        update plans set description = '2048MB RAM, 2.4 GHz Intel Xeon E5-2676 v3 CPU, 750Mbps Networking' where description is null and name = 'sovereign-prod';
+    if (select count(*) from plans where name = 'mp1-prod' and description is null) > 0 then
+        update plans set description = '2048MB RAM, 3.1 Intel Xeon Platinum 8000 CPU, 10 Gbps Networking' where description is null and name = 'mp1-prod';
+    end if;
+
+    if (select count(*) from plans where name = 'mp2' and description is null) > 0 then
+        update plans set description = '4096MB RAM, 3.1 Intel Xeon Platinum 8000 CPU, 10 Gbps Networking' where description is null and name = 'mp2';
+    end if;
+
+    if (select count(*) from plans where name = 'mp2-prod' and description is null) > 0 then
+        update plans set description = '4096MB RAM, 3.1 Intel Xeon Platinum 8000 CPU, 10 Gbps Networking' where description is null and name = 'mp2-prod';
     end if;
 
 
