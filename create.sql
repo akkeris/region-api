@@ -148,6 +148,14 @@ begin
         alter table routerpaths add column filters text;
     end if; 
 
+    if not exists (SELECT NULL 
+              FROM INFORMATION_SCHEMA.COLUMNS
+             WHERE table_name = 'routerpaths'
+              AND column_name = 'maintenance'
+              and table_schema = 'public') then
+        alter table routerpaths add column maintenance boolean default false not null;
+    end if; 
+
     create table if not exists routers
     (
         routerid UUID PRIMARY KEY NOT NULL,

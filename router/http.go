@@ -16,7 +16,7 @@ import (
 )
 
 func GetPaths(db *sql.DB, domain string) ([]Route, error) {
-	stmt, err := db.Prepare("select distinct regexp_replace(path, '/$', '') as path, space, app, replacepath, filters from routerpaths where domain=$1 order by path desc")
+	stmt, err := db.Prepare("select distinct regexp_replace(path, '/$', '') as path, space, app, replacepath, filters, maintenance from routerpaths where domain=$1 order by path desc")
 	if err != nil {
 		return nil, err
 	}
@@ -28,7 +28,7 @@ func GetPaths(db *sql.DB, domain string) ([]Route, error) {
 		pathspec := Route{Domain: domain}
 		filters := make([]structs.HttpFilters, 0)
 		filtersBytes := make([]byte, 0)
-		if err := rows.Scan(&pathspec.Path, &pathspec.Space, &pathspec.App, &pathspec.ReplacePath, &filtersBytes); err != nil {
+		if err := rows.Scan(&pathspec.Path, &pathspec.Space, &pathspec.App, &pathspec.ReplacePath, &filtersBytes, &pathspec.Maintenance); err != nil {
 			fmt.Printf("Error: cannot pull database records: " + err.Error())
 			return nil, err
 		}
@@ -39,13 +39,14 @@ func GetPaths(db *sql.DB, domain string) ([]Route, error) {
 			}
 		}
 		pathspec.Filters = filters
+		pathspec.Domain = domain
 		pathspecs = append(pathspecs, pathspec)
 	}
 	return pathspecs, nil
 }
 
 func GetPathsByApp(db *sql.DB, app string, space string) ([]Route, error) {
-	stmt, err := db.Prepare("select distinct regexp_replace(path, '/$', '') as path, domain, space, app, replacepath, filters from routerpaths where app=$1 and space=$2 order by path desc")
+	stmt, err := db.Prepare("select distinct regexp_replace(path, '/$', '') as path, domain, space, app, replacepath, filters, maintenance from routerpaths where app=$1 and space=$2 order by path desc")
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +58,7 @@ func GetPathsByApp(db *sql.DB, app string, space string) ([]Route, error) {
 		pathspec := Route{}
 		filters := make([]structs.HttpFilters, 0)
 		filtersBytes := make([]byte, 0)
-		if err := rows.Scan(&pathspec.Path, &pathspec.Domain, &pathspec.Space, &pathspec.App, &pathspec.ReplacePath, &filtersBytes); err != nil {
+		if err := rows.Scan(&pathspec.Path, &pathspec.Domain, &pathspec.Space, &pathspec.App, &pathspec.ReplacePath, &filtersBytes, &pathspec.Maintenance); err != nil {
 			return nil, err
 		}
 		if filtersBytes != nil && string(filtersBytes) != "" {
