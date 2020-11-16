@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"math"
 	"os"
 	"region-api/runtime"
 	"strconv"
@@ -412,7 +413,7 @@ func (ingress *IstioIngress) InstallOrUpdateGateway(domain string, gateway *Gate
 	if err != nil {
 		return err
 	}
-	if code == http.StatusNotFound || code == http.StatusConflict {
+	if code == http.StatusNotFound {
 		body, code, err := ingress.runtime.GenericRequest("post", "/apis/" + IstioNetworkingAPIVersion + "/namespaces/sites-system/gateways", gateway)
 		if err != nil {
 			return err
@@ -421,6 +422,8 @@ func (ingress *IstioIngress) InstallOrUpdateGateway(domain string, gateway *Gate
 			fmt.Printf("Failed to create gateway %#+v due to %s - %s\n", gateway, strconv.Itoa(code), string(body))
 			return errors.New("Unable to create gateway " + gateway.GetName() + " due to error: " + strconv.Itoa(code) + " " + string(body))
 		}
+	} else if code == http.StatusConflict {
+		return errors.New("conflict")
 	} else if code != http.StatusOK && code != http.StatusCreated {
 		fmt.Printf("Failed to update gateway %#+v due to %s - %s\n", gateway, strconv.Itoa(code), string(body))
 		return errors.New("Unable to update gateway " + gateway.GetName() + " due to error: " + strconv.Itoa(code) + " " + string(body))
@@ -566,7 +569,12 @@ func AddHostsAndServers(domain string, certificate string, gateway *Gateway) (er
 	return nil, dirty, out
 }
 
-func (ingress *IstioIngress) DeleteUberSiteGateway(domain string, certificate string, internal bool) error {
+func (ingress *IstioIngress) DeleteUberSiteGateway(domain string, certificate string, internal bool, retryNumber int) error {
+	if retryNumber == 7 {
+		return errors.New("failed to install or update gateway due to conflict, out of retries")
+	}
+	<-time.NewTicker(time.Second * (time.Duration(math.Pow(2, float64(retryNumber)) - 1))).C // wait progressively longer on each retry, 0, 1, 3, 7, 15, 31
+
 	var gateway Gateway
 	gatewayType := "public"
 	if internal {
@@ -589,7 +597,14 @@ func (ingress *IstioIngress) DeleteUberSiteGateway(domain string, certificate st
 		return err
 	}
 	if dirty {
-		return ingress.InstallOrUpdateGateway(domain, updated_gateway)
+		if err := ingress.InstallOrUpdateGateway(domain, updated_gateway); err != nil {
+			if err.Error() == "conflict" {
+				// try again
+				return ingress.DeleteUberSiteGateway(domain, certificate, internal, retryNumber + 1)
+			} else {
+				return err
+			}
+		}
 	}
 	return nil
 }
@@ -729,7 +744,13 @@ func (ingress *IstioIngress) DeleteJWTAuthFilter(appname string, space string, f
 	return nil
 }
 
-func (ingress *IstioIngress) InstallOrUpdateUberSiteGateway(domain string, certificate string, internal bool) error {
+// retryNumber should always be 0, except for when executed from within this function recursively.
+func (ingress *IstioIngress) InstallOrUpdateUberSiteGateway(domain string, certificate string, internal bool, retryNumber int) error {
+	if retryNumber == 7 {
+		return errors.New("failed to install or update gateway due to conflict, out of retries")
+	}
+	<-time.NewTicker(time.Second * (time.Duration(math.Pow(2, float64(retryNumber)) - 1))).C // wait progressively longer on each retry, 0, 1, 3, 7, 15, 31
+
 	var gateway Gateway
 	gatewayType := "public"
 	if internal {
@@ -763,7 +784,14 @@ func (ingress *IstioIngress) InstallOrUpdateUberSiteGateway(domain string, certi
 		return err
 	}
 	if dirty {
-		return ingress.InstallOrUpdateGateway(domain, updated_gateway)
+		if err := ingress.InstallOrUpdateGateway(domain, updated_gateway); err != nil {
+			if err.Error() == "conflict" {
+				// try again
+				return ingress.InstallOrUpdateUberSiteGateway(domain, certificate, internal, retryNumber + 1)
+			} else {
+				return err
+			}
+		}
 	}
 	return nil
 }
@@ -981,9 +1009,29 @@ func getDownPage() string {
 }
 
 func (ingress *IstioIngress) CreateOrUpdateRouter(domain string, internal bool, paths []Route) error {
+	
+	// Ensure a certificate exists and a hosts entry is registered with the gateway
 	if os.Getenv("INGRESS_DEBUG") == "true" {
 		fmt.Printf("[ingress] Istio - create or update router firing for %s\n", domain)
 	}
+	err, cert_secret_name := ingress.GetCertificateFromDomain(domain)
+	if err != nil {
+		if os.Getenv("INGRESS_DEBUG") == "true" {
+			fmt.Printf("[ingress] Cannot obtain cert secret name (on push) for site %s because %s\n", domain, err.Error())
+		}
+		return err
+	}
+	if cert_secret_name == "" {
+		panic("We should never have a cert_secret_name thats blank.")
+	}
+	if err = ingress.InstallOrUpdateUberSiteGateway(domain, cert_secret_name, internal, 0); err != nil {
+		if os.Getenv("INGRESS_DEBUG") == "true" {
+			fmt.Printf("[ingress] Cannot install or update uber site gateway for site %s using cert %s because %s\n", domain, cert_secret_name, err.Error())
+		}
+		return err
+	}
+
+	// Ensure a virtual services exists
 	exists, version, err := ingress.VirtualServiceExists(domain)
 	if err != nil {
 		fmt.Printf("[ingress] Istio - an error received from virtual service exists during create/update router: %s: %s\n", err.Error(), domain)
@@ -996,22 +1044,6 @@ func (ingress *IstioIngress) CreateOrUpdateRouter(domain string, internal bool, 
 	}
 	if(exists && version != "") {
 		vs.SetResourceVersion(version)
-	}
-	err, cert_secret_name := ingress.GetCertificateFromDomain(domain)
-	if err != nil {
-		if os.Getenv("INGRESS_DEBUG") == "true" {
-			fmt.Printf("[ingress] Cannot obtain cert secret name (on push) for site %s because %s\n", domain, err.Error())
-		}
-		return err
-	}
-	if cert_secret_name == "" {
-		panic("We should never have a cert_secret_name thats blank.")
-	}
-	if err = ingress.InstallOrUpdateUberSiteGateway(domain, cert_secret_name, internal); err != nil {
-		if os.Getenv("INGRESS_DEBUG") == "true" {
-			fmt.Printf("[ingress] Cannot install or update uber site gateway for site %s using cert %s because %s\n", domain, cert_secret_name, err.Error())
-		}
-		return err
 	}
 	if err = ingress.InstallOrUpdateVirtualService(domain, vs, exists); err != nil {
 		if os.Getenv("INGRESS_DEBUG") == "true" {
@@ -1290,7 +1322,7 @@ func (ingress *IstioIngress) DeleteRouter(domain string, internal bool) error {
 	if cert_secret_name == "" {
 		panic("We should never have a cert_secret_name thats blank.")
 	}
-	return ingress.DeleteUberSiteGateway(domain, cert_secret_name, internal)
+	return ingress.DeleteUberSiteGateway(domain, cert_secret_name, internal, 0)
 }
 
 func (ingress *IstioIngress) InstallCertificate(server_name string, pem_cert []byte, pem_key []byte) error {
