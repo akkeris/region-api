@@ -572,9 +572,9 @@ func AddHostsAndServers(domain string, certificate string, gateway *Gateway) (er
 func (ingress *IstioIngress) DeleteUberSiteGateway(domain string, certificate string, internal bool, retryNumber int) error {
 	if retryNumber == 7 {
 		return errors.New("failed to install or update gateway due to conflict, out of retries")
+	} else if retryNumber != 0 {
+		<-time.NewTicker(time.Second * (time.Duration(math.Pow(2, float64(retryNumber)) - 1))).C // wait progressively longer on each retry, 0, 1, 3, 7, 15, 31
 	}
-	<-time.NewTicker(time.Second * (time.Duration(math.Pow(2, float64(retryNumber)) - 1))).C // wait progressively longer on each retry, 0, 1, 3, 7, 15, 31
-
 	var gateway Gateway
 	gatewayType := "public"
 	if internal {
@@ -748,9 +748,9 @@ func (ingress *IstioIngress) DeleteJWTAuthFilter(appname string, space string, f
 func (ingress *IstioIngress) InstallOrUpdateUberSiteGateway(domain string, certificate string, internal bool, retryNumber int) error {
 	if retryNumber == 7 {
 		return errors.New("failed to install or update gateway due to conflict, out of retries")
+	} else if retryNumber != 0 {
+		<-time.NewTicker(time.Second * (time.Duration(math.Pow(2, float64(retryNumber)) - 1))).C // wait progressively longer on each retry, 0, 1, 3, 7, 15, 31
 	}
-	<-time.NewTicker(time.Second * (time.Duration(math.Pow(2, float64(retryNumber)) - 1))).C // wait progressively longer on each retry, 0, 1, 3, 7, 15, 31
-
 	var gateway Gateway
 	gatewayType := "public"
 	if internal {
