@@ -575,6 +575,7 @@ func (ingress *IstioIngress) DeleteUberSiteGateway(domain string, certificate st
 	} else if retryNumber != 0 {
 		<-time.NewTicker(time.Second * (time.Duration(math.Pow(2, float64(retryNumber)) - 1))).C // wait progressively longer on each retry, 0, 1, 3, 7, 15, 31
 	}
+
 	var gateway Gateway
 	gatewayType := "public"
 	if internal {
