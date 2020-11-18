@@ -4,7 +4,7 @@ go 1.12
 
 require (
 	github.com/akkeris/vault-client v0.0.0-20180727165111-6788ec8d1925
-	github.com/aws/aws-sdk-go v1.31.3
+	github.com/aws/aws-sdk-go v1.35.30
 	github.com/bitly/go-simplejson v0.5.0
 	github.com/codegangsta/inject v0.0.0-20140425184007-37d7f8432a3e
 	github.com/fatih/structs v1.1.0
@@ -17,7 +17,7 @@ require (
 	github.com/hailocab/go-hostpool v0.0.0-20160125115350-e80d13ce29ed
 	github.com/jetstack/cert-manager v0.16.0
 	github.com/jmcvetta/napping v3.2.0+incompatible
-	github.com/jmespath/go-jmespath v0.3.0
+	github.com/jmespath/go-jmespath v0.4.0
 	github.com/jtolds/gls v4.20.0+incompatible
 	github.com/lib/pq v1.8.0
 	github.com/martini-contrib/auth v0.0.0-20150219114609-fa62c19b7ae8
