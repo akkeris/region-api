@@ -6,24 +6,24 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"io/ioutil"
+	kube "k8s.io/api/core/v1"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/remotecommand"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"reflect"
 	structs "region-api/structs"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
-	"flag"
-	"path/filepath"
-	kube "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/remotecommand"
-	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/rest"
 )
 
 type KubeRequest struct {
@@ -39,7 +39,7 @@ type Kubernetes struct {
 	defaultApiServerVersion string
 	clientToken             string
 	imagePullSecret         string
-	config					*rest.Config
+	config                  *rest.Config
 	client                  *http.Client
 	mutex                   *sync.Mutex
 	debug                   bool
@@ -212,10 +212,10 @@ type NodeSelector struct {
 }
 
 type Tolerations struct {
-	Key string `json:"key"`
+	Key      string `json:"key"`
 	Operator string `json:"operator"`
-	Effect string `json:"effect"`
-	Value string `json:"value"`
+	Effect   string `json:"effect"`
+	Value    string `json:"value"`
 }
 
 type Deploymentspec struct {
@@ -251,7 +251,7 @@ type Deploymentspec struct {
 				Name        string            `json:"name"`
 				Labels      map[string]string `json:"labels,omitempty"`
 				Annotations struct {
-					SidecarIstioInject string `json:"sidecar.istio.io/inject,omitempty"`
+					SidecarIstioInject   string `json:"sidecar.istio.io/inject,omitempty"`
 					AkkerisIORestartTime string `json:"akkeris.io/restartTime,omitempty"`
 				} `json:"annotations,omitempty"`
 			} `json:"metadata"`
@@ -557,12 +557,24 @@ type JobScaleGet struct {
 	} `json:"spec"`
 }
 
-
 func homeDir() string {
 	if h := os.Getenv("HOME"); h != "" {
 		return h
 	}
 	return os.Getenv("USERPROFILE") // windows
+}
+
+func (rt Kubernetes) AssembleImagePullSecrets(imagePullSecrets []structs.Namespec) []structs.Namespec {
+	if os.Getenv("IMAGE_PULL_SECRET") != "" {
+		ipss := strings.Split(os.Getenv("IMAGE_PULL_SECRET"), ",")
+		for _, n := range ipss {
+			ips := structs.Namespec{
+				Name: n,
+			}
+			imagePullSecrets = append(imagePullSecrets, ips)
+		}
+	}
+	return imagePullSecrets
 }
 
 func NewKubernetes(name string, imagePullSecret string) (r Runtime) {
@@ -572,14 +584,14 @@ func NewKubernetes(name string, imagePullSecret string) (r Runtime) {
 	defaultKubeConfig := filepath.Join(home, ".kube", "config")
 	kubeconfig = flag.String("kubeconfig", defaultKubeConfig, "absolute path to the kubeconfig file")
 	flag.Parse()
-	
+
 	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
 	if err != nil {
 		config, err = rest.InClusterConfig()
 		if err != nil {
 			panic(err.Error())
 		}
-	}	
+	}
 
 	var rt Kubernetes
 	if strings.HasPrefix(config.Host, "https://") {
@@ -600,7 +612,7 @@ func NewKubernetes(name string, imagePullSecret string) (r Runtime) {
 	if config.TLSClientConfig.CAData != nil && len(config.TLSClientConfig.CAData) != 0 {
 		certs := x509.NewCertPool()
 		if ok := certs.AppendCertsFromPEM([]byte(config.TLSClientConfig.CAData)); ok {
-			tlsConfig.RootCAs = certs;
+			tlsConfig.RootCAs = certs
 			tlsConfig.BuildNameToCertificate()
 		}
 	}
@@ -617,7 +629,7 @@ func NewKubernetes(name string, imagePullSecret string) (r Runtime) {
 		rt.clientType = "token"
 		rt.clientToken = config.BearerToken
 	}
-	
+
 	fmt.Printf("Connecting to kubernetes cluster at %s\n", config.Host)
 	rt.client = &http.Client{Transport: &http.Transport{TLSClientConfig: tlsConfig}}
 	rt.config = config
@@ -769,11 +781,11 @@ func deploymentToDeploymentSpec(deployment *structs.Deployment) (dp Deploymentsp
 		}
 		t := make([]Tolerations, 0)
 		t = append(t, Tolerations{
-			Key:"akkeris.io/plan-type",
-			Operator:"Equal",
-			Value:deployment.PlanType,
-			Effect:"NoSchedule",
-		});
+			Key:      "akkeris.io/plan-type",
+			Operator: "Equal",
+			Value:    deployment.PlanType,
+			Effect:   "NoSchedule",
+		})
 		krc.Spec.Template.Spec.Tolerations = &t
 	}
 	return krc
@@ -788,9 +800,7 @@ func (rt Kubernetes) UpdateDeployment(deployment *structs.Deployment) (err error
 	}
 
 	// Assemble secrets
-	if os.Getenv("FF_QUAY") == "true" || os.Getenv("IMAGE_PULL_SECRET") != "" {
-		deployment.Secrets = append(deployment.Secrets, structs.Namespec{Name: rt.imagePullSecret})
-	}
+	deployment.Secrets = rt.AssembleImagePullSecrets(deployment.Secrets)
 
 	resp, err := rt.k8sRequest("PUT", "/apis/apps/v1/namespaces/"+deployment.Space+"/deployments/"+deployment.App,
 		deploymentToDeploymentSpec(deployment))
@@ -806,9 +816,8 @@ func (rt Kubernetes) UpdateDeployment(deployment *structs.Deployment) (err error
 func (rt Kubernetes) CreateDeployment(deployment *structs.Deployment) (err error) {
 
 	// Assemble secrets
-	if os.Getenv("FF_QUAY") == "true" || os.Getenv("IMAGE_PULL_SECRET") != "" {
-		deployment.Secrets = append(deployment.Secrets, structs.Namespec{Name: rt.imagePullSecret})
-	}
+	deployment.Secrets = rt.AssembleImagePullSecrets(deployment.Secrets)
+
 	resp, err := rt.k8sRequest("POST", "/apis/apps/v1/namespaces/"+deployment.Space+"/deployments", deploymentToDeploymentSpec(deployment))
 	if err != nil {
 		return err
@@ -995,9 +1004,7 @@ func (rt Kubernetes) CreateOneOffPod(deployment *structs.Deployment) (e error) {
 		return errors.New("FATAL ERROR: Unable to create one off deployment, the app is blank.")
 	}
 	// Assemble secrets
-	if os.Getenv("FF_QUAY") == "true" || os.Getenv("IMAGE_PULL_SECRET") != "" {
-		deployment.Secrets = append(deployment.Secrets, structs.Namespec{Name: rt.imagePullSecret})
-	}
+	deployment.Secrets = rt.AssembleImagePullSecrets(deployment.Secrets)
 
 	var koneoff OneOffPod
 	koneoff.Metadata.Name = deployment.App
@@ -1134,16 +1141,17 @@ func (rt Kubernetes) CreateSecret(space string, name string, data string, mimety
 	return &secret, nil
 }
 
-func (rt Kubernetes)  CopySecret(secretName string, fromNamespace string, toNamespace string) (error) {
+func (rt Kubernetes) CopySecret(imagePullSecret structs.Namespec, fromNamespace string, toNamespace string) error {
 	if fromNamespace == "" {
 		return errors.New("FATAL ERROR: Unable to get service, space is blank.")
 	}
 	if toNamespace == "" {
 		return errors.New("FATAL ERROR: Unable to get service, the app is blank.")
 	}
-	
+
 	var secret kube.Secret
-	resp, err := rt.k8sRequest("get", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+fromNamespace+"/secrets/" + secretName, nil)
+
+	resp, err := rt.k8sRequest("get", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+fromNamespace+"/secrets/"+imagePullSecret.Name, nil)
 	if err != nil {
 		return err
 	}
@@ -1155,9 +1163,9 @@ func (rt Kubernetes)  CopySecret(secretName string, fromNamespace string, toName
 		return err
 	}
 
-	secret.SetResourceVersion("");
+	secret.SetResourceVersion("")
 	secret.SetNamespace(toNamespace)
-	
+
 	resp, err = rt.k8sRequest("post", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+toNamespace+"/secrets", secret)
 	if err != nil {
 		return err
@@ -1170,9 +1178,8 @@ func (rt Kubernetes)  CopySecret(secretName string, fromNamespace string, toName
 
 func (rt Kubernetes) AddImagePullSecretToSpace(space string) (e error) {
 	var sa Serviceaccountspec = Serviceaccountspec{Metadata: structs.Namespec{Name: "default"}}
-	var ipss []structs.Namespec
-	ipss = append(ipss, structs.Namespec{Name: rt.imagePullSecret})
-	sa.ImagePullSecrets = ipss
+
+	sa.ImagePullSecrets = rt.AssembleImagePullSecrets(sa.ImagePullSecrets)
 	resp, err := rt.k8sRequest("put", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+space+"/serviceaccounts/default", sa)
 	if resp.StatusCode != 201 && resp.StatusCode != 200 {
 		return errors.New("Unable to add secret to space, invalid response code from kubernetes: " + resp.Status)
@@ -1343,9 +1350,9 @@ func (rt Kubernetes) Exec(space string, app string, instance string, command []s
 	for _, arg := range command {
 		commandQuery += "command=" + url.QueryEscape(arg) + "&"
 	}
-	var path = "/api/" + rt.defaultApiServerVersion + "/namespaces/" + space + "/pods/" + instance + "/exec?" + commandQuery +  "container=" + app + "&stdin=true&stdout=true&stderr=true&tty=false"
-	uri, err := url.Parse("https://"+rt.apiServer+path)
-	
+	var path = "/api/" + rt.defaultApiServerVersion + "/namespaces/" + space + "/pods/" + instance + "/exec?" + commandQuery + "container=" + app + "&stdin=true&stdout=true&stderr=true&tty=false"
+	uri, err := url.Parse("https://" + rt.apiServer + path)
+
 	if rt.debug {
 		log.Printf("-> k8 (stream): %s %s with command [%#+v]\n", "POST", "https://"+rt.apiServer+path, command)
 	}
@@ -1364,10 +1371,10 @@ func (rt Kubernetes) Exec(space string, app string, instance string, command []s
 	timeout := make(chan error, 1)
 	go func() {
 		timeout <- stream.Stream(remotecommand.StreamOptions{
-			Tty:false,
-			Stdin:stdinBuf,
-			Stdout:&stdout,
-			Stderr:&stderr,
+			Tty:    false,
+			Stdin:  stdinBuf,
+			Stdout: &stdout,
+			Stderr: &stderr,
 		})
 	}()
 
@@ -1376,7 +1383,7 @@ func (rt Kubernetes) Exec(space string, app string, instance string, command []s
 		return nil, nil, errors.New("The program failed to return in the specified time alloted.")
 	case res := <-timeout:
 		if rt.debug {
-			log.Printf("<- k8: %s %s - %s\n", "POST", "https://"+rt.apiServer+path)
+			log.Printf("<- k8: %s %s - %s\n", "POST", "https://"+rt.apiServer+path, command)
 		}
 		if res != nil {
 			return nil, nil, err
@@ -1411,7 +1418,6 @@ func (rt Kubernetes) GetService(space string, app string) (KubeService, error) {
 	}
 	return response, nil
 }
-
 
 func (rt Kubernetes) ServiceExists(space string, app string) (bool, error) {
 	if space == "" {
@@ -1607,9 +1613,8 @@ func (rt Kubernetes) CreateCronJob(deployment *structs.Deployment) (*structs.Cro
 		return nil, errors.New("FATAL ERROR: Unable to create cronjob, space is blank.")
 	}
 
-	if os.Getenv("FF_QUAY") == "true" || os.Getenv("IMAGE_PULL_SECRET") != "" {
-		deployment.Secrets = append(deployment.Secrets, structs.Namespec{Name: rt.imagePullSecret})
-	}
+	// Assemble secrets
+	deployment.Secrets = rt.AssembleImagePullSecrets(deployment.Secrets)
 
 	// Update or Create Job
 	resp, err := rt.k8sRequest("post", "/apis/batch/v2alpha1/namespaces/"+deployment.Space+"/cronjobs", deploymentToCronJob(deployment))
@@ -1635,9 +1640,8 @@ func (rt Kubernetes) UpdateCronJob(deployment *structs.Deployment) (*structs.Cro
 		return nil, errors.New("FATAL ERROR: Unable to update cron job, the app is blank.")
 	}
 
-	if os.Getenv("FF_QUAY") == "true" || os.Getenv("IMAGE_PULL_SECRET") != "" {
-		deployment.Secrets = append(deployment.Secrets, structs.Namespec{Name: rt.imagePullSecret})
-	}
+	// Assemble secrets
+	deployment.Secrets = rt.AssembleImagePullSecrets(deployment.Secrets)
 
 	resp, err := rt.k8sRequest("put", "/apis/batch/v2alpha1/namespaces/"+deployment.Space+"/cronjobs/"+deployment.App, deploymentToCronJob(deployment))
 	if err != nil {
@@ -1662,10 +1666,8 @@ func (rt Kubernetes) CreateJob(deployment *structs.Deployment) (*structs.JobStat
 		return nil, errors.New("FATAL ERROR: Unable to create job, the job name is blank.")
 	}
 
-	// Image Secret
-	if os.Getenv("FF_QUAY") == "true" || os.Getenv("IMAGE_PULL_SECRET") != "" {
-		deployment.Secrets = append(deployment.Secrets, structs.Namespec{Name: rt.imagePullSecret})
-	}
+	// Assemble Secrets
+	deployment.Secrets = rt.AssembleImagePullSecrets(deployment.Secrets)
 
 	var resources structs.ResourceSpec
 	resources.Requests.Memory = deployment.MemoryRequest

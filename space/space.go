@@ -81,19 +81,20 @@ func Createspace(db *sql.DB, space structs.Spacespec, berr binding.Errors, r ren
 		utils.ReportError(err, r)
 		return
 	}
-	if os.Getenv("IMAGE_PULL_SECRET") != "" {
-		// This secret created used to be passed in to AddImagePullSecretToSpace, but that method
-		// did nothing with it, so we don't in the refactor.
-		if err := rt.CopySecret(os.Getenv("IMAGE_PULL_SECRET"), "akkeris-system", space.Name); err != nil {
+
+	ipss := []structs.Namespec{}
+	ipss = rt.AssembleImagePullSecrets(ipss)
+	for _, ips := range ipss {
+		if err := rt.CopySecret(ips, "akkeris-system", space.Name); err != nil {
 			utils.ReportError(err, r)
 			return
 		}
-
 		if err = rt.AddImagePullSecretToSpace(space.Name); err != nil {
 			utils.ReportError(err, r)
 			return
 		}
 	}
+
 	r.JSON(http.StatusCreated, structs.Messagespec{Status: http.StatusCreated, Message: "space created"})
 }
 
@@ -147,7 +148,6 @@ func Deletespace(db *sql.DB, params martini.Params, r render.Render) {
 
 	r.JSON(http.StatusOK, structs.Messagespec{Status: http.StatusOK, Message: "space deleted"})
 }
-
 
 func addSpace(db *sql.DB, space structs.Spacespec) (msg structs.Messagespec, err error) {
 	var name string
@@ -231,4 +231,3 @@ func Listspaces(db *sql.DB, params martini.Params, r render.Render) {
 	}
 	r.JSON(200, spaces)
 }
-
