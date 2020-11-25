@@ -2,8 +2,8 @@ package runtime
 
 import (
 	"database/sql"
-	structs "region-api/structs"
 	"os"
+	structs "region-api/structs"
 )
 
 type Runtime interface {
@@ -52,7 +52,8 @@ type Runtime interface {
 	CreateJob(deployment *structs.Deployment) (*structs.JobStatus, error)
 	GetPodsBySpace(space string) (*PodStatus, error)
 	GetNodes() (*structs.KubeNodes, error)
-	CopySecret(secretName string, fromNamespace string, toNamespace string) (error)
+	CopySecret(imagePullSecret structs.Namespec, fromNamespace string, toNamespace string) error
+	AssembleImagePullSecrets(imagePullSecrets []structs.Namespec) []structs.Namespec
 }
 
 var stackRuntimeCache map[string]Runtime = make(map[string]Runtime)
@@ -68,7 +69,7 @@ func GetRuntimeStack(db *sql.DB, stack string) (rt Runtime, e error) {
 	if ok {
 		return i, nil
 	}
-	// At the moment we only support kubernetes, but incase this 
+	// At the moment we only support kubernetes, but incase this
 	// should change this would be an opportune time to grab an interface
 	// to a different runtime.
 	stackRuntimeCache[stack] = NewKubernetes(stack, os.Getenv("IMAGE_PULL_SECRET"))
