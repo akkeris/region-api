@@ -78,8 +78,8 @@ func Proxy(uri string, message string) *httputil.ReverseProxy {
 }
 
 func ProxyToLogTrain(res http.ResponseWriter, req *http.Request) {
-	logshuttle_url := "http://" + os.Getenv("LOGTRAIN_SERVICE_HOST") + ":" + os.Getenv("LOGTRAIN_SERVICE_PORT")
-	rp := Proxy(logshuttle_url, "logtrain")
+	logs_url := "http://" + os.Getenv("LOGTRAIN_SERVICE_HOST") + ":" + os.Getenv("LOGTRAIN_SERVICE_PORT")
+	rp := Proxy(logs_url, "logtrain")
 	if rp == nil {
 		return
 	}
@@ -88,8 +88,8 @@ func ProxyToLogTrain(res http.ResponseWriter, req *http.Request) {
 
 
 func ProxyToLogTail(res http.ResponseWriter, req *http.Request) {
-	logshuttle_url := "http://" + os.Getenv("LOGTAIL_SERVICE_HOST") + ":" + os.Getenv("LOGTAIL_SERVICE_PORT")
-	rp := Proxy(logshuttle_url, "logtail")
+	logs_url := "http://" + os.Getenv("LOGTAIL_SERVICE_HOST") + ":" + os.Getenv("LOGTAIL_SERVICE_PORT")
+	rp := Proxy(logs_url, "logtail")
 	if rp == nil {
 		return
 	}
