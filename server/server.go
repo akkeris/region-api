@@ -77,6 +77,26 @@ func Proxy(uri string, message string) *httputil.ReverseProxy {
 	return &httputil.ReverseProxy{Director: director}
 }
 
+func ProxyToLogTrain(res http.ResponseWriter, req *http.Request) {
+	logs_url := "http://" + os.Getenv("LOGTRAIN_SERVICE_HOST") + ":" + os.Getenv("LOGTRAIN_SERVICE_PORT")
+	rp := Proxy(logs_url, "logtrain")
+	if rp == nil {
+		return
+	}
+	rp.ServeHTTP(res, req)
+}
+
+
+func ProxyToLogTail(res http.ResponseWriter, req *http.Request) {
+	logs_url := "http://" + os.Getenv("LOGTAIL_SERVICE_HOST") + ":" + os.Getenv("LOGTAIL_SERVICE_PORT")
+	rp := Proxy(logs_url, "logtail")
+	if rp == nil {
+		return
+	}
+	rp.ServeHTTP(res, req)
+}
+
+
 func ProxyToShuttle(res http.ResponseWriter, req *http.Request) {
 	logshuttle_url := "http://" + os.Getenv("LOGSHUTTLE_SERVICE_HOST") + ":" + os.Getenv("LOGSHUTTLE_SERVICE_PORT")
 	rp := Proxy(logshuttle_url, "logshuttle")
@@ -310,6 +330,14 @@ func Server(db *sql.DB) *martini.ClassicMartini {
 		m.Post("/log-events", ProxyToShuttle)
 	} else {
 		log.Println("No LOGSHUTTLE_SERVICE_HOST and LOGSHUTTLE_SERVICE_PORT environment variables found, log shuttle functionality was disabled.")
+	}
+	// proxy to logtrain
+	if os.Getenv("LOGTRAIN_SERVICE_HOST") != "" && os.Getenv("LOGTRAIN_SERVICE_PORT") != "" {
+		m.Post("/events", ProxyToLogTrain)
+	}
+	// proxy to logtail
+	if os.Getenv("LOGTAIL_SERVICE_HOST") != "" && os.Getenv("LOGTAIL_SERVICE_PORT") != "" {
+		m.Post("/tails/:app", ProxyToLogTail)
 	}
 	// proxy to log session
 	if os.Getenv("LOGSESSION_SERVICE_HOST") != "" && os.Getenv("LOGSESSION_SERVICE_PORT") != "" {
