@@ -923,6 +923,21 @@ func createHTTPSpecForVS(app string, space string, domain string, maintenance bo
 				MaxAge:max_age.String(),
 				AllowCredentials:allow_credentials,
 			}
+		} else if filter.Type == "csp" {
+			if os.Getenv("INGRESS_DEBUG") == "true" {
+				fmt.Printf("[ingress] Adding CSP filter %#+v\n", filter)
+			}
+			policy := ""
+			if val, ok := filter.Data["policy"]; ok {
+				policy = val
+			}
+			if policy != "" {
+
+				if http.Headers.Response.Set == nil {
+					http.Headers.Response.Set = make(map[string]string)
+				}
+				http.Headers.Response.Set["Content-Security-Policy"] = policy
+			}
 		}
 	}
 
