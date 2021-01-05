@@ -96,7 +96,7 @@ func ProxyToLogTail(res http.ResponseWriter, req *http.Request) {
 	rp.ServeHTTP(res, req)
 }
 
-
+///// deprecated /////
 func ProxyToShuttle(res http.ResponseWriter, req *http.Request) {
 	logshuttle_url := "http://" + os.Getenv("LOGSHUTTLE_SERVICE_HOST") + ":" + os.Getenv("LOGSHUTTLE_SERVICE_PORT")
 	rp := Proxy(logshuttle_url, "logshuttle")
@@ -106,6 +106,7 @@ func ProxyToShuttle(res http.ResponseWriter, req *http.Request) {
 	rp.ServeHTTP(res, req)
 }
 
+///// deprecated /////
 func ProxyToSession(res http.ResponseWriter, req *http.Request) {
 	logsession_url := "http://" + os.Getenv("LOGSESSION_SERVICE_HOST") + ":" + os.Getenv("LOGSESSION_SERVICE_PORT")
 	rp := Proxy(logsession_url, "logsession")
@@ -337,7 +338,9 @@ func Server(db *sql.DB) *martini.ClassicMartini {
 	}
 	// proxy to logtail
 	if os.Getenv("LOGTAIL_SERVICE_HOST") != "" && os.Getenv("LOGTAIL_SERVICE_PORT") != "" {
-		m.Post("/tails/:app", ProxyToLogTail)
+		m.Post("/tails", ProxyToLogTail)
+		m.Post("/tails/:id", ProxyToLogTail)
+		m.Get("/tails/:id", ProxyToLogTail)
 	}
 	// proxy to log session
 	if os.Getenv("LOGSESSION_SERVICE_HOST") != "" && os.Getenv("LOGSESSION_SERVICE_PORT") != "" {
