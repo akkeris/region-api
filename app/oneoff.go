@@ -3,8 +3,6 @@ package app
 import (
 	"database/sql"
 	"fmt"
-	"github.com/martini-contrib/binding"
-	"github.com/martini-contrib/render"
 	"net/http"
 	config "region-api/config"
 	runtime "region-api/runtime"
@@ -12,6 +10,9 @@ import (
 	structs "region-api/structs"
 	utils "region-api/utils"
 	"strings"
+
+	"github.com/martini-contrib/binding"
+	"github.com/martini-contrib/render"
 )
 
 func OneOffDeployment(db *sql.DB, oneoff1 structs.OneOffSpec, berr binding.Errors, r render.Render) {
@@ -85,6 +86,31 @@ func OneOffDeployment(db *sql.DB, oneoff1 structs.OneOffSpec, berr binding.Error
 		return
 	}
 
+	internal, err := utils.IsInternalSpace(db, space)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+
+	if oneoff1.Labels == nil {
+		oneoff1.Labels = make(map[string]string)
+	}
+	plantype, err := GetPlanType(db, plan)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+	if plantype != nil && *plantype != "" {
+		oneoff1.Labels["akkeris.io/plan-type"] = *plantype
+	}
+	oneoff1.Labels["akkeris.io/plan"] = plan
+	oneoff1.Labels["akkeris.io/oneoff"] = "true"
+	if internal {
+		oneoff1.Labels["akkeris.io/internal"] = "true"
+	} else {
+		oneoff1.Labels["akkeris.io/internal"] = "false"
+	}
+
 	// Assembly config
 	elist := AddAkkerisConfigVars(appname, space)
 	// add user specific vars
@@ -100,6 +126,21 @@ func OneOffDeployment(db *sql.DB, oneoff1 structs.OneOffSpec, berr binding.Error
 	for _, e := range servicevars {
 		elist = append(elist, e)
 	}
+
+	// Override config vars with any one-off env overrides
+	for _, override := range oneoff1.Env {
+		found := false
+		for _, env := range elist {
+			if env.Name == override.Name {
+				env.Value = override.Value
+				found = true
+			}
+		}
+		if !found {
+			elist = append(elist, override)
+		}
+	}
+
 	// Create deployment
 	var deployment structs.Deployment
 	deployment.Space = space
