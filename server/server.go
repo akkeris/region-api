@@ -97,6 +97,7 @@ func ProxyToLogTail(res http.ResponseWriter, req *http.Request) {
 }
 
 ///// deprecated /////
+
 func ProxyToShuttle(res http.ResponseWriter, req *http.Request) {
 	logshuttle_url := "http://" + os.Getenv("LOGSHUTTLE_SERVICE_HOST") + ":" + os.Getenv("LOGSHUTTLE_SERVICE_PORT")
 	rp := Proxy(logshuttle_url, "logshuttle")
