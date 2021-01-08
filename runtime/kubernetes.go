@@ -9,10 +9,6 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	kube "k8s.io/api/core/v1"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/tools/remotecommand"
 	"log"
 	"net/http"
 	"net/url"
@@ -24,6 +20,11 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	kube "k8s.io/api/core/v1"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/remotecommand"
 )
 
 type KubeRequest struct {
@@ -308,6 +309,9 @@ type OneOffPod struct {
 			Name  string `json:"name"`
 			Space string `json:"space"`
 		} `json:"labels"`
+		Annotations struct {
+			LogtrainDrainEndpoint string `json:"logtrain.akkeris.io/drains"`
+		} `json:"annotations,omitempty"`
 		Namespace string `json:"namespace"`
 	} `json:"metadata"`
 	Spec struct {
@@ -1016,6 +1020,10 @@ func (rt Kubernetes) CreateOneOffPod(deployment *structs.Deployment) (e error) {
 	koneoff.Spec.RestartPolicy = "Never"
 	koneoff.Spec.ImagePullPolicy = "Always"
 	koneoff.Spec.DnsPolicy = "Default"
+
+	if deployment.Annotations != nil && deployment.Annotations["logtrain.akkeris.io/drains"] != "" {
+		koneoff.Metadata.Annotations.LogtrainDrainEndpoint = deployment.Annotations["logtrain.akkeris.io/drains"]
+	}
 
 	var container ContainerItem
 	container.ImagePullPolicy = "Always"

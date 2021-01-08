@@ -40,6 +40,10 @@ func OneOffDeployment(db *sql.DB, oneoff1 structs.OneOffSpec, berr binding.Error
 		utils.ReportInvalidRequest("Image must contain tag", r)
 		return
 	}
+	if oneoff1.Image == "" {
+		utils.ReportInvalidRequest("Image must be specified", r)
+		return
+	}
 
 	rt, err := runtime.GetRuntimeFor(db, oneoff1.Space)
 	if err != nil {
@@ -57,18 +61,7 @@ func OneOffDeployment(db *sql.DB, oneoff1 structs.OneOffSpec, berr binding.Error
 		repo = strings.Split(oneoff1.Image, ":")[0]
 		tag = strings.Split(oneoff1.Image, ":")[1]
 	}
-	var (
-		appport     int
-		instances   int
-		plan        string
-		healthcheck string
-	)
 
-	err = db.QueryRow("SELECT apps.port,spacesapps.instances,COALESCE(spacesapps.plan,'noplan') AS plan,COALESCE(spacesapps.healthcheck,'tcp') AS healthcheck from apps,spacesapps where apps.name=$1 and apps.name=spacesapps.appname and spacesapps.space=$2", name, space).Scan(&appport, &instances, &plan, &healthcheck)
-	if err != nil {
-		utils.ReportError(err, r)
-		return
-	}
 	appname := name
 	appimage := repo
 	apptag := tag
@@ -77,7 +70,7 @@ func OneOffDeployment(db *sql.DB, oneoff1 structs.OneOffSpec, berr binding.Error
 	appconfigset, appbindings, err := config.GetBindings(db, space, appname)
 
 	// Get memory limits
-	memorylimit, memoryrequest, err := GetMemoryLimits(db, plan)
+	memorylimit, memoryrequest, err := GetMemoryLimits(db, oneoff1.Plan)
 
 	// Get user defined config vars
 	configvars, err := config.GetConfigVars(db, appconfigset)
@@ -95,7 +88,8 @@ func OneOffDeployment(db *sql.DB, oneoff1 structs.OneOffSpec, berr binding.Error
 	if oneoff1.Labels == nil {
 		oneoff1.Labels = make(map[string]string)
 	}
-	plantype, err := GetPlanType(db, plan)
+
+	plantype, err := GetPlanType(db, oneoff1.Plan)
 	if err != nil {
 		utils.ReportError(err, r)
 		return
@@ -103,7 +97,7 @@ func OneOffDeployment(db *sql.DB, oneoff1 structs.OneOffSpec, berr binding.Error
 	if plantype != nil && *plantype != "" {
 		oneoff1.Labels["akkeris.io/plan-type"] = *plantype
 	}
-	oneoff1.Labels["akkeris.io/plan"] = plan
+	oneoff1.Labels["akkeris.io/plan"] = oneoff1.Plan
 	oneoff1.Labels["akkeris.io/oneoff"] = "true"
 	if internal {
 		oneoff1.Labels["akkeris.io/internal"] = "true"
@@ -145,13 +139,18 @@ func OneOffDeployment(db *sql.DB, oneoff1 structs.OneOffSpec, berr binding.Error
 	var deployment structs.Deployment
 	deployment.Space = space
 	deployment.App = appname
-	deployment.Amount = instances
+	// deployment.Amount = instances
 	deployment.ConfigVars = elist
-	deployment.HealthCheck = healthcheck
+	// deployment.HealthCheck = healthcheck
 	deployment.MemoryRequest = memoryrequest
 	deployment.MemoryLimit = memorylimit
 	deployment.Image = appimage
 	deployment.Tag = apptag
+
+	if oneoff1.RunID != "" {
+		deployment.Annotations = make(map[string]string)
+		deployment.Annotations["logtrain.akkeris.io/drains"] = "persistent://" + oneoff1.RunID
+	}
 
 	err = rt.CreateOneOffPod(&deployment)
 	if err != nil {
