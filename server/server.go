@@ -86,7 +86,6 @@ func ProxyToLogTrain(res http.ResponseWriter, req *http.Request) {
 	rp.ServeHTTP(res, req)
 }
 
-
 func ProxyToLogTail(res http.ResponseWriter, req *http.Request) {
 	logs_url := "http://" + os.Getenv("LOGTAIL_SERVICE_HOST") + ":" + os.Getenv("LOGTAIL_SERVICE_PORT")
 	rp := Proxy(logs_url, "logtail")
@@ -233,6 +232,7 @@ func Server(db *sql.DB) *martini.ClassicMartini {
 	m.Delete("/v1/app/:appname", app.Deleteapp)
 	m.Post("/v1/app/deploy", binding.Json(structs.Deployspec{}), app.Deployment)
 	m.Post("/v1/app/deploy/oneoff", binding.Json(structs.OneOffSpec{}), app.OneOffDeployment)
+	m.Delete("/v1/space/:space/oneoff/:oneoff", app.StopOneOffPod)
 	m.Post("/v1/app/bind", binding.Json(structs.Bindspec{}), app.Createbind)
 	m.Delete("/v1/app/:appname/bind/:bindspec", app.Unbindapp)
 	m.Get("/v1/app/:appname", app.Describeapp)

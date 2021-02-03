@@ -11,6 +11,7 @@ import (
 	utils "region-api/utils"
 	"strings"
 
+	"github.com/go-martini/martini"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
 )
@@ -159,4 +160,21 @@ func OneOffDeployment(db *sql.DB, oneoff1 structs.OneOffSpec, berr binding.Error
 	}
 
 	r.JSON(http.StatusCreated, map[string]string{"Status": "Created"})
+}
+
+func StopOneOffPod(db *sql.DB, params martini.Params, r render.Render) {
+	space := params["space"]
+	oneoff := params["oneoff"]
+
+	rt, err := runtime.GetRuntimeFor(db, space)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+
+	if rt.OneOffExists(space, oneoff) {
+		rt.DeletePod(space, oneoff)
+	}
+
+	r.JSON(http.StatusCreated, map[string]string{"Status": "OK"})
 }

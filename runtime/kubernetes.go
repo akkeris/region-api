@@ -1261,7 +1261,7 @@ func (rt Kubernetes) GetPodDetails(space string, app string) []structs.Instance 
 	}
 	resp, err := rt.k8sRequest("GET", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+space+"/pods?labelSelector=name="+app, nil)
 	if err != nil {
-		log.Println("Cannot get pod from kuberenetes:")
+		log.Println("Cannot get pod from kubernetes:")
 		log.Println(err)
 	}
 	var podstatus PodStatus
