@@ -176,5 +176,5 @@ func StopOneOffPod(db *sql.DB, params martini.Params, r render.Render) {
 		rt.DeletePod(space, oneoff)
 	}
 
-	r.JSON(http.StatusCreated, map[string]string{"Status": "OK"})
+	r.JSON(http.StatusOK, map[string]string{"Status": "OK"})
 }
