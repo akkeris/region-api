@@ -1,8 +1,9 @@
 package structs
 
 import (
-	"gopkg.in/guregu/null.v3/zero"
 	"time"
+
+	"gopkg.in/guregu/null.v3/zero"
 )
 
 type Namespec struct {
@@ -183,6 +184,7 @@ type Deployment struct {
 	Features             Features
 	Labels               map[string]string
 	PlanType             string
+	Annotations          map[string]string
 }
 
 //Deployresponse deploy response
@@ -411,11 +413,14 @@ type QoS struct {
 }
 
 type OneOffSpec struct {
-	Space   string   `json:"space"`
-	Podname string   `json:"podname"`
-	Image   string   `json:"image"`
-	Command string   `json:"command,omitempty"`
-	Env     []EnvVar `json:"env"`
+	Space   string            `json:"space"`
+	Podname string            `json:"podname"`
+	Image   string            `json:"image"`
+	Plan    string            `json:"plan"`
+	Command string            `json:"command,omitempty"`
+	Env     []EnvVar          `json:"env,omitempty"`
+	Labels  map[string]string `json:"labels,omitempty"`
+	RunID   string            `json:"runid,omitempty"`
 }
 
 type JobList struct {
