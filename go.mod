@@ -3,7 +3,7 @@ module region-api
 go 1.12
 
 require (
-	github.com/aws/aws-sdk-go v1.36.13
+	github.com/aws/aws-sdk-go v1.37.21
 	github.com/bitly/go-simplejson v0.5.0
 	github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869 // indirect
 	github.com/codegangsta/inject v0.0.0-20140425184007-37d7f8432a3e // indirect
