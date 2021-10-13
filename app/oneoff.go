@@ -148,6 +148,10 @@ func OneOffDeployment(db *sql.DB, oneoff1 structs.OneOffSpec, berr binding.Error
 	deployment.Image = appimage
 	deployment.Tag = apptag
 
+	if len(oneoff1.Command) > 0 {
+		deployment.Command = oneoff1.Command
+	}
+
 	if oneoff1.RunID != "" {
 		deployment.Annotations = make(map[string]string)
 		deployment.Annotations["logtrain.akkeris.io/drains"] = "persistent://" + oneoff1.RunID

@@ -417,7 +417,7 @@ type OneOffSpec struct {
 	Podname string            `json:"podname"`
 	Image   string            `json:"image"`
 	Plan    string            `json:"plan"`
-	Command string            `json:"command,omitempty"`
+	Command []string          `json:"command,omitempty"`
 	Env     []EnvVar          `json:"env,omitempty"`
 	Labels  map[string]string `json:"labels,omitempty"`
 	RunID   string            `json:"runid,omitempty"`
