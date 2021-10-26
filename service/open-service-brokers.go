@@ -3,16 +3,19 @@ package service
 import (
 	"database/sql"
 	"errors"
-	"github.com/go-martini/martini"
-	"github.com/martini-contrib/binding"
-	"github.com/martini-contrib/render"
-	osb "github.com/pmorie/go-open-service-broker-client/v2"
+	"fmt"
 	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	utils "region-api/utils"
 	"time"
+
+	"github.com/go-martini/martini"
+	"github.com/martini-contrib/binding"
+	"github.com/martini-contrib/render"
+	osb "github.com/pmorie/go-open-service-broker-client/v2"
 )
 
 type providerInfo struct {
@@ -103,36 +106,66 @@ func (cserv *OSBClientServices) init() {
 	})()
 }
 
+func getProvider(serviceUrl string) (*providerInfo, error) {
+	config := osb.DefaultClientConfiguration()
+	sUrl, err := url.Parse(serviceUrl)
+	if err == nil {
+		config.URL = serviceUrl
+		if sUrl.User != nil && sUrl.User.Username() != "" {
+			pwd, _ := sUrl.User.Password()
+			config.AuthConfig = &osb.AuthConfig{BasicAuthConfig: &osb.BasicAuthConfig{Username: sUrl.User.Username(), Password: pwd}}
+		} else if sUrl.User != nil && sUrl.User.Username() == "" {
+			pwd, _ := sUrl.User.Password()
+			config.AuthConfig = &osb.AuthConfig{BearerConfig: &osb.BearerConfig{Token: pwd}}
+		}
+		config.EnableAlphaFeatures = true // necessary for GetBinding
+
+		if os.Getenv("OSB_DEBUG") == "true" {
+			fmt.Printf("[osb] Connecting to OSB provider at %s...\n", config.URL)
+		}
+
+		client, err := osb.NewClient(config)
+		if err != nil {
+			if os.Getenv("OSB_DEBUG") == "true" {
+				fmt.Printf("[osb] Error creating OSB client!\n[osb]    %v\n", err)
+			}
+			return nil, err
+		}
+		s, err := client.GetCatalog()
+		if err != nil {
+			if os.Getenv("OSB_DEBUG") == "true" {
+				fmt.Printf("[osb] Error getting OSB catalog!\n[osb]    %v\n", err)
+			}
+			return nil, err
+		}
+		service := providerInfo{serviceUrl: serviceUrl, client: client, services: s.Services}
+
+		if os.Getenv("OSB_DEBUG") == "true" {
+			fmt.Printf("[osb] Found services:\n")
+			for _, svc := range s.Services {
+				fmt.Printf("[osb]    %s (%v plans) - %v\n", svc.Name, len(svc.Plans), svc.Description)
+			}
+		}
+
+		return &service, nil
+	} else {
+		return nil, errors.New(fmt.Sprintf("ERROR: Unable to parse service url %s\n", serviceUrl))
+	}
+}
+
 func (cserv *OSBClientServices) GetProviders() ([]providerInfo, error) {
 	if cserv.providersCache != nil {
 		return cserv.providersCache, nil
 	}
 	services := make([]providerInfo, 0)
+
+	// Don't cache a problematic service, but allow working ones to be cached
 	for _, serviceUrl := range cserv.serviceUrls {
-		config := osb.DefaultClientConfiguration()
-		sUrl, err := url.Parse(serviceUrl)
-		if err == nil {
-			config.URL = serviceUrl
-			if sUrl.User != nil && sUrl.User.Username() != "" {
-				pwd, _ := sUrl.User.Password()
-				config.AuthConfig = &osb.AuthConfig{BasicAuthConfig: &osb.BasicAuthConfig{Username: sUrl.User.Username(), Password: pwd}}
-			} else if sUrl.User != nil && sUrl.User.Username() == "" {
-				pwd, _ := sUrl.User.Password()
-				config.AuthConfig = &osb.AuthConfig{BearerConfig: &osb.BearerConfig{Token: pwd}}
-			}
-			config.EnableAlphaFeatures = true // necessary for GetBinding
-			client, err := osb.NewClient(config)
-			if err != nil {
-				return nil, err
-			}
-			s, err := client.GetCatalog()
-			if err != nil {
-				return nil, err
-			}
-			service := providerInfo{serviceUrl: serviceUrl, client: client, services: s.Services}
-			services = append(services, service)
+		service, err := getProvider(serviceUrl)
+		if err != nil {
+			log.Println(err.Error())
 		} else {
-			log.Printf("ERROR: Unable to parse service url %s\n", serviceUrl)
+			services = append(services, *service)
 		}
 	}
 	cserv.providersCache = services
