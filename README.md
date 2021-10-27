@@ -89,6 +89,7 @@ This uses jetstack's cert-manager (if installed) to issue certificates. By defau
 * `DEBUG_K8S` - print out all k8s calls, set to true
 * `INGRESS_DEBUG` - print out debug information on ingress, set to true
 * `MARTINI_ENV` - Always set this to `production`. See https://github.com/go-martini/martini#martini-env
+* `DEBUG_OSB` - Print out debug information on OSB calls
 
 Note that dependencies are managed via `dep` command line tool, run `dep ensure` before building.
 

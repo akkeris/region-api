@@ -120,30 +120,30 @@ func getProvider(serviceUrl string) (*providerInfo, error) {
 		}
 		config.EnableAlphaFeatures = true // necessary for GetBinding
 
-		if os.Getenv("OSB_DEBUG") == "true" {
-			fmt.Printf("[osb] Connecting to OSB provider at %s...\n", config.URL)
+		if os.Getenv("DEBUG_OSB") == "true" {
+			log.Printf("[osb] Connecting to OSB provider at %s...\n", config.URL)
 		}
 
 		client, err := osb.NewClient(config)
 		if err != nil {
-			if os.Getenv("OSB_DEBUG") == "true" {
-				fmt.Printf("[osb] Error creating OSB client!\n[osb]    %v\n", err)
+			if os.Getenv("DEBUG_OSB") == "true" {
+				log.Printf("[osb] Error creating OSB client!\n[osb]    %v\n", err)
 			}
 			return nil, err
 		}
 		s, err := client.GetCatalog()
 		if err != nil {
-			if os.Getenv("OSB_DEBUG") == "true" {
-				fmt.Printf("[osb] Error getting OSB catalog!\n[osb]    %v\n", err)
+			if os.Getenv("DEBUG_OSB") == "true" {
+				log.Printf("[osb] Error getting OSB catalog!\n[osb]    %v\n", err)
 			}
 			return nil, err
 		}
 		service := providerInfo{serviceUrl: serviceUrl, client: client, services: s.Services}
 
-		if os.Getenv("OSB_DEBUG") == "true" {
-			fmt.Printf("[osb] Found services:\n")
+		if os.Getenv("DEBUG_OSB") == "true" {
+			log.Printf("[osb] Found services:\n")
 			for _, svc := range s.Services {
-				fmt.Printf("[osb]    %s (%v plans) - %v\n", svc.Name, len(svc.Plans), svc.Description)
+				log.Printf("[osb]    %s (%v plans) - %v\n", svc.Name, len(svc.Plans), svc.Description)
 			}
 		}
 
