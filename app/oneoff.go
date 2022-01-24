@@ -147,6 +147,7 @@ func OneOffDeployment(db *sql.DB, oneoff1 structs.OneOffSpec, berr binding.Error
 	deployment.MemoryLimit = memorylimit
 	deployment.Image = appimage
 	deployment.Tag = apptag
+	deployment.Labels = oneoff1.Labels
 
 	if len(oneoff1.Command) > 0 {
 		deployment.Command = oneoff1.Command
