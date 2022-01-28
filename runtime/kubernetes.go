@@ -304,11 +304,8 @@ type OneOffPod struct {
 	APIVersion string `json:"apiVersion"`
 	Kind       string `json:"kind"`
 	Metadata   struct {
-		Name   string `json:"name"`
-		Labels struct {
-			Name  string `json:"name"`
-			Space string `json:"space"`
-		} `json:"labels"`
+		Name        string            `json:"name"`
+		Labels      map[string]string `json:"labels,omitempty"`
 		Annotations struct {
 			LogtrainDrainEndpoint string `json:"logtrain.akkeris.io/drains"`
 		} `json:"annotations,omitempty"`
@@ -1015,11 +1012,13 @@ func (rt Kubernetes) CreateOneOffPod(deployment *structs.Deployment) (e error) {
 	koneoff.Metadata.Namespace = deployment.Space
 	koneoff.APIVersion = "v1"
 	koneoff.Kind = "Pod"
-	koneoff.Metadata.Labels.Name = deployment.App
-	koneoff.Metadata.Labels.Space = deployment.Space
 	koneoff.Spec.RestartPolicy = "Never"
 	koneoff.Spec.ImagePullPolicy = "Always"
 	koneoff.Spec.DnsPolicy = "Default"
+
+	koneoff.Metadata.Labels = deployment.Labels
+	koneoff.Metadata.Labels["Name"] = deployment.App
+	koneoff.Metadata.Labels["Space"] = deployment.Space
 
 	if deployment.Annotations != nil && deployment.Annotations["logtrain.akkeris.io/drains"] != "" {
 		koneoff.Metadata.Annotations.LogtrainDrainEndpoint = deployment.Annotations["logtrain.akkeris.io/drains"]
