@@ -1318,6 +1318,11 @@ func (ingress *IstioIngress) SetMaintenancePage(vsname string, app string, space
 			} else {
 				return err
 			}
+		} else {
+			return nil
+		}
+		if os.Getenv("INGRESS_DEBUG") == "true" {
+			fmt.Printf("[ingress] Istio - retrying update to virtual service %s (%d)\n", vsname, i)
 		}
 	}
 	return nil
