@@ -1307,7 +1307,7 @@ func (ingress *IstioIngress) SetMaintenancePage(vsname string, app string, space
 	// If we encounter this race condition (409 Conflict), retry this up to VS_RETRY_COUNT times before giving up
 	// In the future, we could only update one VirtualService at a time or something like that via a semaphore or some sort of lock
 
-	for i := 0; i < 20; i++ {
+	for i := 0; i < VS_RETRY_COUNT; i++ {
 		err := setMaintenancePage(ingress, vsname, app, space, path, value)
 		if err != nil {
 			// If 409 conflict, retry (unless at end of loop)
