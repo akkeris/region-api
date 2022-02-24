@@ -7,18 +7,20 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"net/http"
 	"math"
+	"net/http"
 	"os"
 	"region-api/runtime"
+	"region-api/structs"
 	"strconv"
 	"strings"
 	"time"
-	"region-api/structs"
+
 	kube "k8s.io/api/core/v1"
 	kubemetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const VS_RETRY_COUNT = 20
 
 // Istio does not expose their internal structures, well, they do
 // but they just define the Spec field as a map[string]interface{}
@@ -29,16 +31,16 @@ const IstioSecurityAPIVersion = "security.istio.io/v1beta1"
 
 // Policy types for istio (https://istio.io/docs/reference/config/security/istio.authentication.v1alpha1/#Policy)
 type StringMatch struct {
-	Exact string `json:"exact,omitempty"`
+	Exact  string `json:"exact,omitempty"`
 	Prefix string `json:"prefix,omitempty"`
 	Suffix string `json:"suffix,omitempty"`
-	Regex string `json:"regex,omitempty"`
+	Regex  string `json:"regex,omitempty"`
 }
 
 type JWTRule struct {
-	Issuer string `json:"issuer,omitempty"`
+	Issuer    string   `json:"issuer,omitempty"`
 	Audiences []string `json:"audiences,omitempty"`
-	JwksUri string `json:"jwksUri"`
+	JwksUri   string   `json:"jwksUri"`
 }
 
 type WorkloadSelector struct {
@@ -46,36 +48,36 @@ type WorkloadSelector struct {
 }
 
 type RequestAuthentication struct {
-	kubemetav1.TypeMeta 	`json:",inline"`
-	kubemetav1.ObjectMeta	`json:"metadata"`
-	Spec struct {
+	kubemetav1.TypeMeta   `json:",inline"`
+	kubemetav1.ObjectMeta `json:"metadata"`
+	Spec                  struct {
 		Selector WorkloadSelector `json:"selector"`
-		JWTRules []JWTRule `json:"jwtRules"`
+		JWTRules []JWTRule        `json:"jwtRules"`
 	} `json:"spec"`
 }
 
 type From struct {
 	Source struct {
-		Principals []string `json:"principals,omitempty"`
-		NotPrincipals []string `json:"notPrincipals,omitempty"`
-		RequestPrincipals []string `json:"requestPrincipals,omitempty"`
+		Principals           []string `json:"principals,omitempty"`
+		NotPrincipals        []string `json:"notPrincipals,omitempty"`
+		RequestPrincipals    []string `json:"requestPrincipals,omitempty"`
 		NotRequestPrincipals []string `json:"notRequestPrincipals,omitempty"`
-		Namespaces []string `json:"namespaces"`
-		NotNamespaces []string `json:"notNamespaces"`
-		IpBlocks []string `json:"ipBlocks"`
-		NotIpBlocks []string `json:"notIpBlocks"`
+		Namespaces           []string `json:"namespaces"`
+		NotNamespaces        []string `json:"notNamespaces"`
+		IpBlocks             []string `json:"ipBlocks"`
+		NotIpBlocks          []string `json:"notIpBlocks"`
 	} `json:"source"`
 }
 
 type Operation struct {
-	Hosts []string `json:"hosts,omitempty"`
-	NotHosts []string `json:"notHosts,omitempty"`
-	Ports []string `json:"ports,omitempty"`
-	NotPorts []string `json:"notPorts,omitempty"`
-	Methods []string `json:"methods,omitempty"`
+	Hosts      []string `json:"hosts,omitempty"`
+	NotHosts   []string `json:"notHosts,omitempty"`
+	Ports      []string `json:"ports,omitempty"`
+	NotPorts   []string `json:"notPorts,omitempty"`
+	Methods    []string `json:"methods,omitempty"`
 	NotMethods []string `json:"notMethods,omitempty"`
-	Paths []string `json:"paths,omitempty"`
-	NotPaths []string `json:"notPaths,omitempty"`
+	Paths      []string `json:"paths,omitempty"`
+	NotPaths   []string `json:"notPaths,omitempty"`
 }
 
 type To struct {
@@ -84,18 +86,17 @@ type To struct {
 
 type Rule struct {
 	From []From `json:"from,omitempty"`
-	To []To `json:"to,omitempty"`
+	To   []To   `json:"to,omitempty"`
 }
 
 type AuthorizationPolicy struct {
-	kubemetav1.TypeMeta 	`json:",inline"`
-	kubemetav1.ObjectMeta	`json:"metadata"`
-	Spec struct {
+	kubemetav1.TypeMeta   `json:",inline"`
+	kubemetav1.ObjectMeta `json:"metadata"`
+	Spec                  struct {
 		Selector WorkloadSelector `json:"selector"`
-		Rules []Rule `json:"rules"`
+		Rules    []Rule           `json:"rules"`
 	} `json:"spec"`
 }
-
 
 // Gateway types for istio (https://istio.io/docs/reference/config/networking/gateway/)
 type TLSOptions struct {
@@ -118,19 +119,18 @@ type Server struct {
 		Number   int    `json:"number"`
 		Protocol string `json:"protocol"`
 	} `json:"port"`
-	TLS TLSOptions `json:"tls,omitempty"`
-	DefaultEndpoint string `json:"defaultEndpoint,omitempty"`
+	TLS             TLSOptions `json:"tls,omitempty"`
+	DefaultEndpoint string     `json:"defaultEndpoint,omitempty"`
 }
 
 type Gateway struct {
-	kubemetav1.TypeMeta 	`json:",inline"`
-	kubemetav1.ObjectMeta	`json:"metadata"`
-	Spec struct {
+	kubemetav1.TypeMeta   `json:",inline"`
+	kubemetav1.ObjectMeta `json:"metadata"`
+	Spec                  struct {
 		Selector map[string]string `json:"selector"`
-		Servers []Server          `json:"servers"`
+		Servers  []Server          `json:"servers"`
 	} `json:"spec"`
 }
-
 
 // Virtual Service Types for istio (https://istio.io/docs/reference/config/networking/virtual-service/)
 type HeaderOperations struct {
@@ -145,8 +145,8 @@ type Headers struct {
 }
 
 type Match struct {
-	URI StringMatch `json:"uri"`
-	IgnoreUriCase bool `json:"ignoreUriCase"`
+	URI           StringMatch `json:"uri"`
+	IgnoreUriCase bool        `json:"ignoreUriCase"`
 }
 
 type Rewrite struct {
@@ -154,12 +154,12 @@ type Rewrite struct {
 }
 
 type CorsPolicy struct {
-	AllowOrigins []StringMatch `json:"allowOrigins"`
-	AllowMethods []string 	`json:"allowMethods"`
-	AllowHeaders []string 	`json:"allowHeaders"`
-	ExposeHeaders []string 	`json:"exposeHeaders"`
-	MaxAge string `json:"maxAge"`
-	AllowCredentials bool 	`json:"allowCredentials"`
+	AllowOrigins     []StringMatch `json:"allowOrigins"`
+	AllowMethods     []string      `json:"allowMethods"`
+	AllowHeaders     []string      `json:"allowHeaders"`
+	ExposeHeaders    []string      `json:"exposeHeaders"`
+	MaxAge           string        `json:"maxAge"`
+	AllowCredentials bool          `json:"allowCredentials"`
 }
 
 type Port struct {
@@ -167,9 +167,9 @@ type Port struct {
 }
 
 type Destination struct {
-	Host string `json:"host"`
+	Host   string `json:"host"`
 	Subset string `json:"subset,omitempty"`
-	Port Port `json:"port"`
+	Port   Port   `json:"port"`
 }
 
 type Routes struct {
@@ -177,20 +177,20 @@ type Routes struct {
 }
 
 type HTTP struct {
-	Match      []Match      `json:"match,omitempty"`
-	Route      []Routes 	`json:"route"`
-	Rewrite    *Rewrite 	`json:"rewrite,omitempty"`
-	Headers    *Headers 	`json:"headers,omitempty"`
-	CorsPolicy *CorsPolicy 	`json:"corsPolicy,omitempty"`
+	Match      []Match     `json:"match,omitempty"`
+	Route      []Routes    `json:"route"`
+	Rewrite    *Rewrite    `json:"rewrite,omitempty"`
+	Headers    *Headers    `json:"headers,omitempty"`
+	CorsPolicy *CorsPolicy `json:"corsPolicy,omitempty"`
 }
 
 type VirtualService struct {
-	kubemetav1.TypeMeta 	`json:",inline"`
-	kubemetav1.ObjectMeta	`json:"metadata"`
-	Spec struct {
-		Hosts    []string   `json:"hosts"`
-		Gateways []string   `json:"gateways"`
-		HTTP     []HTTP `json:"http"`
+	kubemetav1.TypeMeta   `json:",inline"`
+	kubemetav1.ObjectMeta `json:"metadata"`
+	Spec                  struct {
+		Hosts    []string `json:"hosts"`
+		Gateways []string `json:"gateways"`
+		HTTP     []HTTP   `json:"http"`
 	} `json:"spec"`
 }
 
@@ -210,7 +210,7 @@ func removeSlash(input string) string {
 }
 
 func addSlash(input string) string {
-	if input[len(input) - 1] == '/' {
+	if input[len(input)-1] == '/' {
 		return input
 	}
 	return input + "/"
@@ -220,16 +220,16 @@ func removeLeadingSlash(input string) string {
 	if input == "" {
 		return input
 	}
-	if input[len(input) - 1] == '/' {
-		return input[:len(input) - 1]
+	if input[len(input)-1] == '/' {
+		return input[:len(input)-1]
 	}
 	return input
 }
 
 type IstioIngress struct {
-	runtime runtime.Runtime
-	config  *IngressConfig
-	db      *sql.DB
+	runtime              runtime.Runtime
+	config               *IngressConfig
+	db                   *sql.DB
 	certificateNamespace string
 }
 
@@ -257,9 +257,9 @@ func GetIstioIngress(db *sql.DB, config *IngressConfig) (*IstioIngress, error) {
 		certificateNamespace = "istio-system"
 	}
 	return &IstioIngress{
-		runtime: runtime,
-		config:  config,
-		db:      db,
+		runtime:              runtime,
+		config:               config,
+		db:                   db,
 		certificateNamespace: certificateNamespace,
 	}, nil
 }
@@ -268,7 +268,7 @@ func (ingress *IstioIngress) VirtualServiceExists(name string) (bool, string, er
 	if os.Getenv("INGRESS_DEBUG") == "true" {
 		fmt.Printf("[ingress] Istio - checking if virtual service exists %s\n", name)
 	}
-	body, code, err := ingress.runtime.GenericRequest("get", "/apis/" + IstioNetworkingAPIVersion + "/namespaces/sites-system/virtualservices/" + name, nil)
+	body, code, err := ingress.runtime.GenericRequest("get", "/apis/"+IstioNetworkingAPIVersion+"/namespaces/sites-system/virtualservices/"+name, nil)
 	if err != nil {
 		return false, "", err
 	}
@@ -286,7 +286,7 @@ func (ingress *IstioIngress) VirtualServiceExists(name string) (bool, string, er
 
 func (ingress *IstioIngress) GatewayExists(domain string) (bool, error) {
 	newdomain := strings.Replace(domain, ".", "-", -1) + "-gateway"
-	_, code, err := ingress.runtime.GenericRequest("get", "/apis/" + IstioNetworkingAPIVersion + "/namespaces/sites-system/gateways/"+newdomain, nil)
+	_, code, err := ingress.runtime.GenericRequest("get", "/apis/"+IstioNetworkingAPIVersion+"/namespaces/sites-system/gateways/"+newdomain, nil)
 	if err != nil {
 		return false, err
 	}
@@ -301,7 +301,7 @@ func (ingress *IstioIngress) DeleteVirtualService(name string) error {
 	if os.Getenv("INGRESS_DEBUG") == "true" {
 		fmt.Printf("[ingress] Istio - deleting virtual service for %s\n", name)
 	}
-	body, code, err := ingress.runtime.GenericRequest("delete", "/apis/" + IstioNetworkingAPIVersion + "/namespaces/sites-system/virtualservices/" + name, nil)
+	body, code, err := ingress.runtime.GenericRequest("delete", "/apis/"+IstioNetworkingAPIVersion+"/namespaces/sites-system/virtualservices/"+name, nil)
 	if err != nil {
 		return err
 	}
@@ -319,7 +319,7 @@ func (ingress *IstioIngress) DeleteGateway(domain string) error {
 		fmt.Printf("[ingress] Istio - deleting gateway %s\n", domain)
 	}
 	newdomain := strings.Replace(domain, ".", "-", -1) + "-gateway"
-	body, code, err := ingress.runtime.GenericRequest("delete", "/apis/" + IstioNetworkingAPIVersion + "/namespaces/sites-system/gateways/"+newdomain, nil)
+	body, code, err := ingress.runtime.GenericRequest("delete", "/apis/"+IstioNetworkingAPIVersion+"/namespaces/sites-system/gateways/"+newdomain, nil)
 	if err != nil {
 		return err
 	}
@@ -334,7 +334,7 @@ func (ingress *IstioIngress) GetVirtualService(name string) (*VirtualService, er
 		fmt.Printf("[ingress] Istio - getting virtual service %s\n", name)
 	}
 	var vs *VirtualService
-	body, code, err := ingress.runtime.GenericRequest("get", "/apis/" + IstioNetworkingAPIVersion + "/namespaces/sites-system/virtualservices/" + name, nil)
+	body, code, err := ingress.runtime.GenericRequest("get", "/apis/"+IstioNetworkingAPIVersion+"/namespaces/sites-system/virtualservices/"+name, nil)
 	if err != nil {
 		return vs, err
 	}
@@ -347,11 +347,11 @@ func (ingress *IstioIngress) GetVirtualService(name string) (*VirtualService, er
 	return vs, nil
 }
 
-func (ingress *IstioIngress) UpdateVirtualService(vs *VirtualService, name string) (error) {
+func (ingress *IstioIngress) UpdateVirtualService(vs *VirtualService, name string) error {
 	if os.Getenv("INGRESS_DEBUG") == "true" {
 		fmt.Printf("[ingress] Istio - updating virtual service %s\n", name)
 	}
-	body, code, err := ingress.runtime.GenericRequest("put", "/apis/" + IstioNetworkingAPIVersion + "/namespaces/sites-system/virtualservices/" + name, vs)
+	body, code, err := ingress.runtime.GenericRequest("put", "/apis/"+IstioNetworkingAPIVersion+"/namespaces/sites-system/virtualservices/"+name, vs)
 	if err != nil {
 		return err
 	}
@@ -366,7 +366,7 @@ func (ingress *IstioIngress) AppVirtualService(space string, app string) (*Virtu
 }
 
 func (ingress *IstioIngress) UpdateAppVirtualService(vs *VirtualService, space string, app string) error {
-	return ingress.UpdateVirtualService(vs, app + "-" + space)
+	return ingress.UpdateVirtualService(vs, app+"-"+space)
 }
 
 func (ingress *IstioIngress) InstallOrUpdateVirtualService(domain string, vs *VirtualService, exists bool) error {
@@ -382,7 +382,7 @@ func (ingress *IstioIngress) InstallOrUpdateVirtualService(domain string, vs *Vi
 	}
 
 	if !exists {
-		body, code, err := ingress.runtime.GenericRequest("post", "/apis/" + IstioNetworkingAPIVersion + "/namespaces/sites-system/virtualservices", vs)
+		body, code, err := ingress.runtime.GenericRequest("post", "/apis/"+IstioNetworkingAPIVersion+"/namespaces/sites-system/virtualservices", vs)
 		if err != nil {
 			fmt.Printf("Failed to create virtual service due to protocol error %s: %#+v\n", err.Error(), vs)
 			return err
@@ -392,7 +392,7 @@ func (ingress *IstioIngress) InstallOrUpdateVirtualService(domain string, vs *Vi
 			return errors.New("Unable to create virtual service " + vs.GetName() + " due to error: " + strconv.Itoa(code) + " " + string(body))
 		}
 	} else {
-		body, code, err := ingress.runtime.GenericRequest("put", "/apis/" + IstioNetworkingAPIVersion + "/namespaces/sites-system/virtualservices/" + domain, vs)
+		body, code, err := ingress.runtime.GenericRequest("put", "/apis/"+IstioNetworkingAPIVersion+"/namespaces/sites-system/virtualservices/"+domain, vs)
 		if err != nil {
 			fmt.Printf("Failed to update virtual service due to protocol error %s: %#+v\n", err.Error(), vs)
 			return err
@@ -409,12 +409,12 @@ func (ingress *IstioIngress) InstallOrUpdateGateway(domain string, gateway *Gate
 	if os.Getenv("INGRESS_DEBUG") == "true" {
 		fmt.Printf("[ingress] Istio - starting install or update gateway for %s\n", domain)
 	}
-	body, code, err := ingress.runtime.GenericRequest("put", "/apis/" + IstioNetworkingAPIVersion + "/namespaces/sites-system/gateways/" + gateway.GetName(), gateway)
+	body, code, err := ingress.runtime.GenericRequest("put", "/apis/"+IstioNetworkingAPIVersion+"/namespaces/sites-system/gateways/"+gateway.GetName(), gateway)
 	if err != nil {
 		return err
 	}
 	if code == http.StatusNotFound {
-		body, code, err := ingress.runtime.GenericRequest("post", "/apis/" + IstioNetworkingAPIVersion + "/namespaces/sites-system/gateways", gateway)
+		body, code, err := ingress.runtime.GenericRequest("post", "/apis/"+IstioNetworkingAPIVersion+"/namespaces/sites-system/gateways", gateway)
 		if err != nil {
 			return err
 		}
@@ -581,7 +581,7 @@ func (ingress *IstioIngress) DeleteUberSiteGateway(domain string, certificate st
 	if internal {
 		gatewayType = "private"
 	}
-	body, code, err := ingress.runtime.GenericRequest("get", "/apis/" + IstioNetworkingAPIVersion + "/namespaces/sites-system/gateways/sites-" + gatewayType, nil)
+	body, code, err := ingress.runtime.GenericRequest("get", "/apis/"+IstioNetworkingAPIVersion+"/namespaces/sites-system/gateways/sites-"+gatewayType, nil)
 	if err != nil {
 		return err
 	}
@@ -601,7 +601,7 @@ func (ingress *IstioIngress) DeleteUberSiteGateway(domain string, certificate st
 		if err := ingress.InstallOrUpdateGateway(domain, updated_gateway); err != nil {
 			if err.Error() == "conflict" {
 				// try again
-				return ingress.DeleteUberSiteGateway(domain, certificate, internal, retryNumber + 1)
+				return ingress.DeleteUberSiteGateway(domain, certificate, internal, retryNumber+1)
 			} else {
 				return err
 			}
@@ -610,8 +610,8 @@ func (ingress *IstioIngress) DeleteUberSiteGateway(domain string, certificate st
 	return nil
 }
 
-func (ingress *IstioIngress) InstallOrUpdateIstioRequestAuthentication(appname string, space string, fqdn string, port int64, issuer string, jwksUri string, audiences []string, excludes []string, includes []string) (error) {
-	body, code, err := ingress.runtime.GenericRequest("get", "/apis/" + IstioSecurityAPIVersion +  "/namespaces/" + space + "/requestauthentications/" + appname, nil)
+func (ingress *IstioIngress) InstallOrUpdateIstioRequestAuthentication(appname string, space string, fqdn string, port int64, issuer string, jwksUri string, audiences []string, excludes []string, includes []string) error {
+	body, code, err := ingress.runtime.GenericRequest("get", "/apis/"+IstioSecurityAPIVersion+"/namespaces/"+space+"/requestauthentications/"+appname, nil)
 	if err != nil {
 		return err
 	}
@@ -626,25 +626,25 @@ func (ingress *IstioIngress) InstallOrUpdateIstioRequestAuthentication(appname s
 			return err
 		}
 	}
-	jwtPolicy.Spec.JWTRules = []JWTRule{ 
+	jwtPolicy.Spec.JWTRules = []JWTRule{
 		JWTRule{
-			Issuer: issuer,
-			JwksUri: jwksUri,
+			Issuer:    issuer,
+			JwksUri:   jwksUri,
 			Audiences: audiences,
 		},
 	}
 	jwtPolicy.Spec.Selector = WorkloadSelector{
 		Labels: map[string]string{
-			"app":appname,
+			"app": appname,
 		},
 	}
 	if code == http.StatusNotFound {
-		body, code, err = ingress.runtime.GenericRequest("post", "/apis/" + IstioSecurityAPIVersion +  "/namespaces/" + space + "/requestauthentications", jwtPolicy)
+		body, code, err = ingress.runtime.GenericRequest("post", "/apis/"+IstioSecurityAPIVersion+"/namespaces/"+space+"/requestauthentications", jwtPolicy)
 		if code != http.StatusOK && code != http.StatusCreated {
 			return errors.New("The response for deleting a JWT auth policy failed: " + strconv.Itoa(code) + " " + string(body))
 		}
 	} else {
-		body, code, err = ingress.runtime.GenericRequest("put", "/apis/" + IstioSecurityAPIVersion +  "/namespaces/" + space + "/requestauthentications/" + appname, jwtPolicy)
+		body, code, err = ingress.runtime.GenericRequest("put", "/apis/"+IstioSecurityAPIVersion+"/namespaces/"+space+"/requestauthentications/"+appname, jwtPolicy)
 		if code != http.StatusOK && code != http.StatusCreated {
 			return errors.New("The response for deleting a JWT auth policy failed: " + strconv.Itoa(code) + " " + string(body))
 		}
@@ -652,8 +652,8 @@ func (ingress *IstioIngress) InstallOrUpdateIstioRequestAuthentication(appname s
 	return nil
 }
 
-func (ingress *IstioIngress) InstallOrUpdateIstioAuthorizationPolicies(appname string, space string, fqdn string, port int64, issuer string, jwksUri string, audiences []string, excludes []string, includes []string) (error) {
-	body, code, err := ingress.runtime.GenericRequest("get", "/apis/" + IstioSecurityAPIVersion +  "/namespaces/" + space + "/authorizationpolicies/" + appname, nil)
+func (ingress *IstioIngress) InstallOrUpdateIstioAuthorizationPolicies(appname string, space string, fqdn string, port int64, issuer string, jwksUri string, audiences []string, excludes []string, includes []string) error {
+	body, code, err := ingress.runtime.GenericRequest("get", "/apis/"+IstioSecurityAPIVersion+"/namespaces/"+space+"/authorizationpolicies/"+appname, nil)
 	if err != nil {
 		return err
 	}
@@ -671,16 +671,16 @@ func (ingress *IstioIngress) InstallOrUpdateIstioAuthorizationPolicies(appname s
 	}
 	authPolicy.Spec.Selector = WorkloadSelector{
 		Labels: map[string]string{
-			"app":appname,
+			"app": appname,
 		},
 	}
 	authPolicy.Spec.Rules = make([]Rule, 0)
 	if len(excludes) > 0 {
 		authPolicy.Spec.Rules = append(authPolicy.Spec.Rules, Rule{
-			To:[]To{
+			To: []To{
 				To{
-					Operation:Operation{
-						NotPaths:excludes,
+					Operation: Operation{
+						NotPaths: excludes,
 					},
 				},
 			},
@@ -688,17 +688,17 @@ func (ingress *IstioIngress) InstallOrUpdateIstioAuthorizationPolicies(appname s
 	}
 	if len(includes) > 0 {
 		authPolicy.Spec.Rules = append(authPolicy.Spec.Rules, Rule{
-			To:[]To{
+			To: []To{
 				To{
-					Operation:Operation{
-						Paths:includes,
+					Operation: Operation{
+						Paths: includes,
 					},
 				},
 			},
 		})
 	}
 	if code == http.StatusNotFound {
-		body, code, err = ingress.runtime.GenericRequest("post", "/apis/" + IstioSecurityAPIVersion +  "/namespaces/" + space + "/authorizationpolicies", authPolicy)
+		body, code, err = ingress.runtime.GenericRequest("post", "/apis/"+IstioSecurityAPIVersion+"/namespaces/"+space+"/authorizationpolicies", authPolicy)
 		if err != nil {
 			return err
 		}
@@ -706,7 +706,7 @@ func (ingress *IstioIngress) InstallOrUpdateIstioAuthorizationPolicies(appname s
 			return errors.New("The response for creating an JWT authorization policy failed: " + strconv.Itoa(code) + " " + string(body))
 		}
 	} else {
-		body, code, err = ingress.runtime.GenericRequest("put", "/apis/" + IstioSecurityAPIVersion +  "/namespaces/" + space + "/authorizationpolicies/" + appname, authPolicy)
+		body, code, err = ingress.runtime.GenericRequest("put", "/apis/"+IstioSecurityAPIVersion+"/namespaces/"+space+"/authorizationpolicies/"+appname, authPolicy)
 		if err != nil {
 			return err
 		}
@@ -717,7 +717,7 @@ func (ingress *IstioIngress) InstallOrUpdateIstioAuthorizationPolicies(appname s
 	return nil
 }
 
-func (ingress *IstioIngress) InstallOrUpdateJWTAuthFilter(appname string, space string, fqdn string, port int64, issuer string, jwksUri string, audiences []string, excludes []string, includes []string) (error) {
+func (ingress *IstioIngress) InstallOrUpdateJWTAuthFilter(appname string, space string, fqdn string, port int64, issuer string, jwksUri string, audiences []string, excludes []string, includes []string) error {
 	if os.Getenv("INGRESS_DEBUG") == "true" {
 		fmt.Printf("[ingress] Istio installing or updating JWT Auth filter for %s-%s with %s\n", appname, space, jwksUri)
 	}
@@ -730,15 +730,15 @@ func (ingress *IstioIngress) InstallOrUpdateJWTAuthFilter(appname string, space 
 	return nil
 }
 
-func (ingress *IstioIngress) DeleteJWTAuthFilter(appname string, space string, fqdn string, port int64) (error) {
+func (ingress *IstioIngress) DeleteJWTAuthFilter(appname string, space string, fqdn string, port int64) error {
 	if os.Getenv("INGRESS_DEBUG") == "true" {
 		fmt.Printf("[ingress] Istio - deleting any JWT Auth filter for %s-%s\n", appname, space)
 	}
-	_, _, err := ingress.runtime.GenericRequest("delete", "/apis/" + IstioSecurityAPIVersion + "/namespaces/" + space + "/requestauthentications/" + appname, nil)
+	_, _, err := ingress.runtime.GenericRequest("delete", "/apis/"+IstioSecurityAPIVersion+"/namespaces/"+space+"/requestauthentications/"+appname, nil)
 	if err != nil {
 		return err
 	}
-	_, _, err = ingress.runtime.GenericRequest("delete", "/apis/" + IstioSecurityAPIVersion + "/namespaces/" + space + "/authorizationpolicies/" + appname, nil)
+	_, _, err = ingress.runtime.GenericRequest("delete", "/apis/"+IstioSecurityAPIVersion+"/namespaces/"+space+"/authorizationpolicies/"+appname, nil)
 	if err != nil {
 		return err
 	}
@@ -757,7 +757,7 @@ func (ingress *IstioIngress) InstallOrUpdateUberSiteGateway(domain string, certi
 	if internal {
 		gatewayType = "private"
 	}
-	body, code, err := ingress.runtime.GenericRequest("get", "/apis/" + IstioNetworkingAPIVersion + "/namespaces/sites-system/gateways/sites-" + gatewayType, nil)
+	body, code, err := ingress.runtime.GenericRequest("get", "/apis/"+IstioNetworkingAPIVersion+"/namespaces/sites-system/gateways/sites-"+gatewayType, nil)
 	if err != nil {
 		return err
 	}
@@ -788,7 +788,7 @@ func (ingress *IstioIngress) InstallOrUpdateUberSiteGateway(domain string, certi
 		if err := ingress.InstallOrUpdateGateway(domain, updated_gateway); err != nil {
 			if err.Error() == "conflict" {
 				// try again
-				return ingress.InstallOrUpdateUberSiteGateway(domain, certificate, internal, retryNumber + 1)
+				return ingress.InstallOrUpdateUberSiteGateway(domain, certificate, internal, retryNumber+1)
 			} else {
 				return err
 			}
@@ -831,7 +831,7 @@ func createHTTPSpecForVS(app string, space string, domain string, maintenance bo
 
 	http := HTTP{
 		Match: []Match{Match{
-			URI:StringMatch{
+			URI: StringMatch{
 				Prefix: forwardedPath,
 			},
 			IgnoreUriCase: true,
@@ -850,17 +850,17 @@ func createHTTPSpecForVS(app string, space string, domain string, maintenance bo
 		Headers: &Headers{
 			Response: HeaderOperations{
 				Set: map[string]string{
-					"Strict-Transport-Security":"max-age=31536000; includeSubDomains",
+					"Strict-Transport-Security": "max-age=31536000; includeSubDomains",
 				},
 			},
 			Request: HeaderOperations{
 				Set: map[string]string{
 					"X-Forwarded-Path": forwardedPath,
-					"X-Orig-Path": removeLeadingSlash(adjustedPath),
-					"X-Orig-Host": domain,
-					"X-Orig-Port": "443",
-					"X-Orig-Proto": "https",
-					"X-Request-Start": "t=%START_TIME(%s.%3f)%",
+					"X-Orig-Path":      removeLeadingSlash(adjustedPath),
+					"X-Orig-Host":      domain,
+					"X-Orig-Port":      "443",
+					"X-Orig-Proto":     "https",
+					"X-Request-Start":  "t=%START_TIME(%s.%3f)%",
 				},
 			},
 		},
@@ -881,7 +881,7 @@ func createHTTPSpecForVS(app string, space string, domain string, maintenance bo
 				if val != "" {
 					origins := strings.Split(val, ",")
 					for _, origin := range origins {
-						allow_origin = append(allow_origin, StringMatch{Exact:origin})
+						allow_origin = append(allow_origin, StringMatch{Exact: origin})
 					}
 				}
 			}
@@ -916,12 +916,12 @@ func createHTTPSpecForVS(app string, space string, domain string, maintenance bo
 				}
 			}
 			http.CorsPolicy = &CorsPolicy{
-				AllowOrigins:allow_origin,
-				AllowMethods:allow_methods,
-				AllowHeaders:allow_headers,
-				ExposeHeaders:expose_headers,
-				MaxAge:max_age.String(),
-				AllowCredentials:allow_credentials,
+				AllowOrigins:     allow_origin,
+				AllowMethods:     allow_methods,
+				AllowHeaders:     allow_headers,
+				ExposeHeaders:    expose_headers,
+				MaxAge:           max_age.String(),
+				AllowCredentials: allow_credentials,
 			}
 		} else if filter.Type == "csp" {
 			if os.Getenv("INGRESS_DEBUG") == "true" {
@@ -959,8 +959,8 @@ func PrepareVirtualServiceForCreateorUpdate(domain string, internal bool, paths 
 	vs.Kind = "VirtualService"
 	vs.SetName(domain)
 	vs.SetNamespace("sites-system")
-	
-	if(internal) {
+
+	if internal {
 		vs.Spec.Gateways = []string{"sites-private"}
 	} else {
 		vs.Spec.Gateways = []string{"sites-public"}
@@ -969,10 +969,10 @@ func PrepareVirtualServiceForCreateorUpdate(domain string, internal bool, paths 
 	vs.Spec.HTTP = make([]HTTP, 0)
 	for _, value := range paths {
 		path := removeLeadingSlash(value.Path)
-		vs.Spec.HTTP = append(vs.Spec.HTTP, 
-			createHTTPSpecForVS(value.App, value.Space, value.Domain, value.Maintenance, removeSlash(path), addSlash(value.ReplacePath), removeSlash(path) + "/", defaultPort, value.Filters))
+		vs.Spec.HTTP = append(vs.Spec.HTTP,
+			createHTTPSpecForVS(value.App, value.Space, value.Domain, value.Maintenance, removeSlash(path), addSlash(value.ReplacePath), removeSlash(path)+"/", defaultPort, value.Filters))
 		if removeSlashSlash(value.Path) == removeSlash(value.Path) {
-			vs.Spec.HTTP = append(vs.Spec.HTTP, 
+			vs.Spec.HTTP = append(vs.Spec.HTTP,
 				createHTTPSpecForVS(value.App, value.Space, value.Domain, value.Maintenance, removeSlashSlash(value.Path), value.ReplacePath, removeSlashSlash(path), defaultPort, value.Filters))
 		}
 	}
@@ -1005,7 +1005,7 @@ func CertificateToSecret(server_name string, pem_cert []byte, pem_key []byte, na
 	secret.SetName(name)
 	secret.SetNamespace(namespace)
 	secret.SetAnnotations(map[string]string{
-		"akkeris.k8s.io/alt-names": main_server_name,
+		"akkeris.k8s.io/alt-names":   main_server_name,
 		"akkeris.k8s.io/common-name": main_server_name,
 	})
 	secret.SetLabels(map[string]string{
@@ -1025,7 +1025,7 @@ func getDownPage() string {
 }
 
 func (ingress *IstioIngress) CreateOrUpdateRouter(domain string, internal bool, paths []Route) error {
-	
+
 	// Ensure a certificate exists and a hosts entry is registered with the gateway
 	if os.Getenv("INGRESS_DEBUG") == "true" {
 		fmt.Printf("[ingress] Istio - create or update router firing for %s\n", domain)
@@ -1058,7 +1058,7 @@ func (ingress *IstioIngress) CreateOrUpdateRouter(domain string, internal bool, 
 		fmt.Printf("[ingress] Istio - unable to prepare virtual service for create or update: %s: %s\n", err.Error(), domain)
 		return err
 	}
-	if(exists && version != "") {
+	if exists && version != "" {
 		vs.SetResourceVersion(version)
 	}
 	if err = ingress.InstallOrUpdateVirtualService(domain, vs, exists); err != nil {
@@ -1070,7 +1070,7 @@ func (ingress *IstioIngress) CreateOrUpdateRouter(domain string, internal bool, 
 	return nil
 }
 
-func (ingress *IstioIngress) InstallOrUpdateCORSAuthFilter(vsname string, path string, allowOrigin []string, allowMethods []string, allowHeaders []string, exposeHeaders []string, maxAge time.Duration, allowCredentials bool) (error) {
+func (ingress *IstioIngress) InstallOrUpdateCORSAuthFilter(vsname string, path string, allowOrigin []string, allowMethods []string, allowHeaders []string, exposeHeaders []string, maxAge time.Duration, allowCredentials bool) error {
 	virtualService, err := ingress.GetVirtualService(vsname)
 	if err != nil {
 		// not yet deployed
@@ -1079,17 +1079,17 @@ func (ingress *IstioIngress) InstallOrUpdateCORSAuthFilter(vsname string, path s
 	var dirty = false
 	allowOrigins := make([]StringMatch, 0)
 	for _, origin := range allowOrigin {
-		allowOrigins = append(allowOrigins, StringMatch{Exact:origin})
+		allowOrigins = append(allowOrigins, StringMatch{Exact: origin})
 	}
 	for i, http := range virtualService.Spec.HTTP {
 		if http.Match == nil || len(http.Match) == 0 {
 			virtualService.Spec.HTTP[0].CorsPolicy = &CorsPolicy{
-				AllowOrigins:allowOrigins,
-				AllowMethods:allowMethods,
-				AllowHeaders:allowHeaders,
-				ExposeHeaders:exposeHeaders,
-				MaxAge:maxAge.String(),
-				AllowCredentials:allowCredentials,
+				AllowOrigins:     allowOrigins,
+				AllowMethods:     allowMethods,
+				AllowHeaders:     allowHeaders,
+				ExposeHeaders:    exposeHeaders,
+				MaxAge:           maxAge.String(),
+				AllowCredentials: allowCredentials,
 			}
 			dirty = true
 		} else {
@@ -1099,12 +1099,12 @@ func (ingress *IstioIngress) InstallOrUpdateCORSAuthFilter(vsname string, path s
 				}
 				if strings.HasPrefix(match.URI.Prefix, path) || match.URI.Exact == path || match.URI.Prefix == path {
 					virtualService.Spec.HTTP[i].CorsPolicy = &CorsPolicy{
-						AllowOrigins:allowOrigins,
-						AllowMethods:allowMethods,
-						AllowHeaders:allowHeaders,
-						ExposeHeaders:exposeHeaders,
-						MaxAge:maxAge.String(),
-						AllowCredentials:allowCredentials,
+						AllowOrigins:     allowOrigins,
+						AllowMethods:     allowMethods,
+						AllowHeaders:     allowHeaders,
+						ExposeHeaders:    exposeHeaders,
+						MaxAge:           maxAge.String(),
+						AllowCredentials: allowCredentials,
 					}
 					dirty = true
 				}
@@ -1122,7 +1122,7 @@ func (ingress *IstioIngress) InstallOrUpdateCORSAuthFilter(vsname string, path s
 	return nil
 }
 
-func (ingress *IstioIngress) DeleteCORSAuthFilter(vsname string, path string) (error) {
+func (ingress *IstioIngress) DeleteCORSAuthFilter(vsname string, path string) error {
 	virtualService, err := ingress.GetVirtualService(vsname)
 	if err != nil {
 		if err.Error() == "virtual service was not found" {
@@ -1159,7 +1159,7 @@ func (ingress *IstioIngress) DeleteCORSAuthFilter(vsname string, path string) (e
 	return nil
 }
 
-func (ingress *IstioIngress) InstallOrUpdateCSPFilter(vsname string, path string, policy string) (error) {
+func (ingress *IstioIngress) InstallOrUpdateCSPFilter(vsname string, path string, policy string) error {
 	virtualService, err := ingress.GetVirtualService(vsname)
 	if err != nil {
 		// not yet deployed
@@ -1205,7 +1205,7 @@ func (ingress *IstioIngress) InstallOrUpdateCSPFilter(vsname string, path string
 	return nil
 }
 
-func (ingress *IstioIngress) DeleteCSPFilter(vsname string, path string) (error) {
+func (ingress *IstioIngress) DeleteCSPFilter(vsname string, path string) error {
 	virtualService, err := ingress.GetVirtualService(vsname)
 	if err != nil {
 		if err.Error() == "virtual service was not found" {
@@ -1246,7 +1246,7 @@ func (ingress *IstioIngress) DeleteCSPFilter(vsname string, path string) (error)
 	return nil
 }
 
-func (ingress *IstioIngress) SetMaintenancePage(vsname string, app string, space string, path string, value bool) error {
+func setMaintenancePage(ingress *IstioIngress, vsname string, app string, space string, path string, value bool) error {
 	virtualService, err := ingress.GetVirtualService(vsname)
 	if err != nil {
 		if err.Error() == "virtual service was not found" {
@@ -1273,7 +1273,7 @@ func (ingress *IstioIngress) SetMaintenancePage(vsname string, app string, space
 				if os.Getenv("INGRESS_DEBUG") == "true" {
 					fmt.Printf("[ingress] Looking to set maintenance page, comparing path: %s with match prefix %s and match exact %s\n", path, match.URI.Prefix, match.URI.Exact)
 				}
-				if (match.URI.Exact == path && path != "") || (match.URI.Prefix == path && path != "") || match.URI.Prefix == (path + "/") || match.URI.Exact == (path + "/") {
+				if (match.URI.Exact == path && path != "") || (match.URI.Prefix == path && path != "") || match.URI.Prefix == (path+"/") || match.URI.Exact == (path+"/") {
 					if os.Getenv("INGRESS_DEBUG") == "true" {
 						fmt.Printf("[ingress] Setting maintenance page, updated path: %s with match prefix %s and match exact %s\n", path, match.URI.Prefix, match.URI.Exact)
 					}
@@ -1296,7 +1296,38 @@ func (ingress *IstioIngress) SetMaintenancePage(vsname string, app string, space
 			return err
 		}
 	}
-	
+
+	return nil
+}
+
+func (ingress *IstioIngress) SetMaintenancePage(vsname string, app string, space string, path string, value bool) error {
+
+	// There could be a bit of a race condition here.
+	// If another service updates the virtualservice after we retrieve it, but before we modify it, Kubernetes will throw an error
+	// If we encounter this race condition (409 Conflict), retry this up to VS_RETRY_COUNT times before giving up
+	// In the future, we could only update one VirtualService at a time or something like that via a semaphore or some sort of lock
+
+	for i := 0; i < VS_RETRY_COUNT; i++ {
+		err := setMaintenancePage(ingress, vsname, app, space, path, value)
+		if err == nil {
+			// Successful update!
+			return nil
+		} else {
+			if strings.Contains(err.Error(), "\"code\":409") && strings.Contains(err.Error(), "\"reason\":\"Conflict\"") {
+				// If 409 conflict and at end of loop, return "limit reached" error message
+				if i == VS_RETRY_COUNT-1 {
+					return errors.New(fmt.Sprintf("Retry limit (%d) for 409 Conflict errors reached on creating virtual service %s", VS_RETRY_COUNT, vsname))
+				}
+				// Otherwise, print debug message and retry
+				if os.Getenv("INGRESS_DEBUG") == "true" {
+					fmt.Printf("[ingress] Istio - retrying update to virtual service %s (%d)\n", vsname, i)
+				}
+			} else {
+				// Other unexpected error
+				return err
+			}
+		}
+	}
 	return nil
 }
 
@@ -1346,15 +1377,15 @@ func (ingress *IstioIngress) InstallCertificate(server_name string, pem_cert []b
 	if err != nil {
 		return err
 	}
-	_, code, err := ingress.runtime.GenericRequest("get", "/api/v1/namespaces/" + ingress.certificateNamespace + "/secrets/" + *name, nil)
+	_, code, err := ingress.runtime.GenericRequest("get", "/api/v1/namespaces/"+ingress.certificateNamespace+"/secrets/"+*name, nil)
 	if err != nil {
 		return err
 	}
 	if code == http.StatusOK {
-		_, _, err = ingress.runtime.GenericRequest("put", "/api/v1/namespaces/" + ingress.certificateNamespace + "/secrets/" + *name, secret)
+		_, _, err = ingress.runtime.GenericRequest("put", "/api/v1/namespaces/"+ingress.certificateNamespace+"/secrets/"+*name, secret)
 		return err
 	} else {
-		_, _, err = ingress.runtime.GenericRequest("post", "/api/v1/namespaces/" + ingress.certificateNamespace + "/secrets", secret)
+		_, _, err = ingress.runtime.GenericRequest("post", "/api/v1/namespaces/"+ingress.certificateNamespace+"/secrets", secret)
 		return err
 	}
 }
@@ -1364,7 +1395,7 @@ func (ingress *IstioIngress) GetInstalledCertificates(site string) ([]Certificat
 	if site != "*" {
 		main_server_name := strings.Replace(site, "*.", "star.", -1)
 		main_certs_name := strings.Replace(main_server_name, ".", "-", -1) + "-tls"
-		body, code, err := ingress.runtime.GenericRequest("get", "/api/v1/namespaces/" + ingress.certificateNamespace + "/secrets/" + main_certs_name, nil)
+		body, code, err := ingress.runtime.GenericRequest("get", "/api/v1/namespaces/"+ingress.certificateNamespace+"/secrets/"+main_certs_name, nil)
 		if err != nil {
 			if os.Getenv("INGRESS_DEBUG") == "true" {
 				fmt.Printf("[ingress] Cannot obtain secret for site %s because %s\n", site, err.Error())
@@ -1389,7 +1420,7 @@ func (ingress *IstioIngress) GetInstalledCertificates(site string) ([]Certificat
 		certList.Items = make([]kube.Secret, 0)
 		certList.Items = append(certList.Items, t)
 	} else {
-		body, code, err := ingress.runtime.GenericRequest("get", "/api/v1/namespaces/" + ingress.certificateNamespace + "/secrets?fieldSelector=type%3Dkubernetes.io%2Ftls", nil)
+		body, code, err := ingress.runtime.GenericRequest("get", "/api/v1/namespaces/"+ingress.certificateNamespace+"/secrets?fieldSelector=type%3Dkubernetes.io%2Ftls", nil)
 		if err != nil {
 			return nil, err
 		}
@@ -1412,7 +1443,7 @@ func (ingress *IstioIngress) GetInstalledCertificates(site string) ([]Certificat
 			}
 			return nil, err
 		}
-		
+
 		main_server_name := strings.Replace(x509_decoded_cert.Subject.CommonName, "*.", "star.", -1)
 		main_certs_name := strings.Replace(main_server_name, ".", "-", -1) + "-tls"
 
