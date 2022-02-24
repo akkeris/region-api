@@ -1309,20 +1309,23 @@ func (ingress *IstioIngress) SetMaintenancePage(vsname string, app string, space
 
 	for i := 0; i < VS_RETRY_COUNT; i++ {
 		err := setMaintenancePage(ingress, vsname, app, space, path, value)
-		if err != nil {
-			// If 409 conflict, retry (unless at end of loop)
+		if err == nil {
+			// Successful update!
+			return nil
+		} else {
 			if strings.Contains(err.Error(), "\"code\":409") && strings.Contains(err.Error(), "\"reason\":\"Conflict\"") {
+				// If 409 conflict and at end of loop, return "limit reached" error message
 				if i == VS_RETRY_COUNT-1 {
-					return err
+					return errors.New(fmt.Sprintf("Retry limit (%d) for 409 Conflict errors reached on creating virtual service %s", VS_RETRY_COUNT, vsname))
+				}
+				// Otherwise, print debug message and retry
+				if os.Getenv("INGRESS_DEBUG") == "true" {
+					fmt.Printf("[ingress] Istio - retrying update to virtual service %s (%d)\n", vsname, i)
 				}
 			} else {
+				// Other unexpected error
 				return err
 			}
-		} else {
-			return nil
-		}
-		if os.Getenv("INGRESS_DEBUG") == "true" {
-			fmt.Printf("[ingress] Istio - retrying update to virtual service %s (%d)\n", vsname, i)
 		}
 	}
 	return nil
