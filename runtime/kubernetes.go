@@ -724,6 +724,13 @@ func deploymentToDeploymentSpec(deployment *structs.Deployment) (dp Deploymentsp
 		c1.Ports = append(cportlist, cp1)
 	}
 
+	// add additional ports (Akkeris beta feature)
+	if deployment.ContainerPorts != nil && len(deployment.ContainerPorts) > 0 {
+		for _, containerPort := range deployment.ContainerPorts {
+			c1.Ports = append(c1.Ports, ContainerPort{ContainerPort: containerPort})
+		}
+	}
+
 	// assemble image
 	c1.Name = deployment.App
 	c1.Image = deployment.Image + ":" + deployment.Tag

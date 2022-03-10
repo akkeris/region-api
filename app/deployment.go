@@ -328,6 +328,32 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 		return
 	}
 
+	// Akkeris beta feature - "container-ports":
+	//		When enabled, add all ports in the comma-separated environment variable "CONTAINER_PORTS" (if exists) to deployment
+	// 		Eventually make this a fully-integrated configuration-based "first-class citizen"
+	//		Ports are only accessible to other apps and not exposed through a Kubernetes service
+	//		This is a feature while we evaluate how useful this is and how widely it would be used
+	if deploy1.Features.ContainerPorts {
+		for _, cv := range deployment.ConfigVars {
+			// Find config var CONTAINER_PORTS
+			if cv.Name == "CONTAINER_PORTS" && cv.Value != "" {
+				stringPorts := strings.Split(cv.Value, ",")
+				var ports []int
+				for _, sp := range stringPorts {
+					port, err := strconv.Atoi(sp)
+					// Skip any non-integer entries
+					if err != nil {
+						continue
+					}
+					ports = append(ports, port)
+				}
+				// Add to deployment.ContainerPorts
+				deployment.ContainerPorts = ports
+			}
+			break
+		}
+	}
+
 	// Do not write to cluster above this line, everything below should apply changes,
 	// everything above should do sanity checks, this helps prevent "half" deployments
 	// by minimizing resource after the first write

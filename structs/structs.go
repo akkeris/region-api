@@ -37,6 +37,7 @@ type Features struct {
 	IstioInject          bool `json:"istioInject,omitempty"`
 	Http2Service         bool `json:"http2,omitempty"`
 	Http2EndToEndService bool `json:"http2-end-to-end,omitempty"`
+	ContainerPorts       bool `json:"container-ports,omitempty"`
 }
 
 //Setspec setspec
@@ -185,6 +186,7 @@ type Deployment struct {
 	Labels               map[string]string
 	PlanType             string
 	Annotations          map[string]string
+	ContainerPorts       []int
 }
 
 //Deployresponse deploy response
