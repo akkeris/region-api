@@ -1453,6 +1453,26 @@ func (rt Kubernetes) ServiceExists(space string, app string) (bool, error) {
 	}
 }
 
+func (rt Kubernetes) InternalServiceExists(space string, app string) (bool, error) {
+	if space == "" {
+		return false, errors.New("FATAL ERROR: Unable to get service, space is blank.")
+	}
+	if app == "" {
+		return false, errors.New("FATAL ERROR: Unable to get service, the app is blank.")
+	}
+	resp, e := rt.k8sRequest("get", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+space+"/services/"+app+"-cp", nil)
+	if e != nil {
+		return false, e
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		return false, nil
+	} else if resp.StatusCode == http.StatusOK {
+		return true, nil
+	} else {
+		return false, errors.New("Failed fetching status code: " + resp.Status)
+	}
+}
+
 func (rt Kubernetes) CreateService(space string, app string, port int, labels map[string]string, features structs.Features) (e error) {
 	if space == "" {
 		return errors.New("FATAL ERROR: Unable to create service, space is blank.")
@@ -1486,6 +1506,46 @@ func (rt Kubernetes) CreateService(space string, app string, port int, labels ma
 	portlist = append(portlist, portitem)
 	service.Spec.Ports = portlist
 	service.Spec.Type = "NodePort"
+
+	resp, e := rt.k8sRequest("post", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+space+"/services", service)
+	if e != nil {
+		return e
+	}
+	var response Createspec
+	e = json.Unmarshal(resp.Body, &response)
+	if e != nil {
+		return e
+	}
+	return nil
+}
+
+// Used for beta feature -- "container-ports"
+// Creates a ClusterIP service "appname-cp"
+func (rt Kubernetes) CreateInternalService(space string, app string, ports []int) (e error) {
+	if space == "" {
+		return errors.New("FATAL ERROR: Unable to create service, space is blank.")
+	}
+	if app == "" {
+		return errors.New("FATAL ERROR: Unable to create service, the app is blank.")
+	}
+
+	var service Service
+	service.Kind = "Service"
+	service.Metadata.Name = app + "-cp"
+	service.Metadata.Labels = map[string]string{"app": app, "name": app + "-cp"}
+	service.Spec.Selector.Name = app
+	service.Spec.Type = "ClusterIP"
+
+	portlist := []PortItem{}
+	for _, p := range ports {
+		var portitem PortItem
+		portitem.Protocol = "TCP"
+		portitem.Port = p
+		portitem.TargetPort = p
+		portitem.Name = "cp-" + strconv.Itoa(p)
+		portlist = append(portlist, portitem)
+	}
+	service.Spec.Ports = portlist
 
 	resp, e := rt.k8sRequest("post", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+space+"/services", service)
 	if e != nil {
@@ -1537,6 +1597,52 @@ func (rt Kubernetes) UpdateService(space string, app string, port int, labels ma
 	return nil
 }
 
+// Used for beta feature -- "container-ports"
+// Updates a ClusterIP service "appname-cp"
+func (rt Kubernetes) UpdateInternalService(space string, app string, ports []int) (e error) {
+	if space == "" {
+		return errors.New("Unable to update service, space is blank.")
+	}
+	if app == "" {
+		return errors.New("Unable to update create service, the app is blank.")
+	}
+
+	existingservice, e := rt.GetService(space, app+"-cp")
+	if e != nil {
+		return e
+	}
+
+	// Replace all ports
+	type Ports []struct {
+		Name       string "json:\"name,omitempty\""
+		Protocol   string "json:\"protocol\""
+		Port       int    "json:\"port\""
+		TargetPort int    "json:\"targetPort\""
+		NodePort   int    "json:\"nodePort\""
+	}
+	portlist := Ports{}
+	for _, p := range ports {
+		var portitem PortItem
+		portitem.Protocol = "TCP"
+		portitem.Port = p
+		portitem.TargetPort = p
+		portitem.Name = "cp-" + strconv.Itoa(p)
+		portlist = append(portlist, portitem)
+	}
+	existingservice.Spec.Ports = portlist
+
+	resp, e := rt.k8sRequest("put", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+space+"/services/"+app+"-cp", existingservice)
+	if e != nil {
+		return e
+	}
+	var response Createspec
+	e = json.Unmarshal(resp.Body, &response)
+	if e != nil {
+		return e
+	}
+	return nil
+}
+
 func (rt Kubernetes) DeleteService(space string, app string) (e error) {
 	if space == "" {
 		return errors.New("Unable to delete service, space is blank.")
@@ -1545,6 +1651,27 @@ func (rt Kubernetes) DeleteService(space string, app string) (e error) {
 		return errors.New("Unable to delete service, the app is blank.")
 	}
 	resp, err := rt.k8sRequest("delete", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+space+"/services/"+app, nil)
+	if err != nil {
+		return err
+	}
+	var response Statusspec
+	err = json.Unmarshal(resp.Body, &response)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// Used for beta feature -- "container-ports"
+// Deletes a ClusterIP service "appname-cp"
+func (rt Kubernetes) DeleteInternalService(space string, app string) (e error) {
+	if space == "" {
+		return errors.New("Unable to delete service, space is blank.")
+	}
+	if app == "" {
+		return errors.New("Unable to delete service, the app is blank.")
+	}
+	resp, err := rt.k8sRequest("delete", "/api/"+rt.defaultApiServerVersion+"/namespaces/"+space+"/services/"+app+"-cp", nil)
 	if err != nil {
 		return err
 	}

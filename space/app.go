@@ -3,14 +3,15 @@ package space
 import (
 	"database/sql"
 	"fmt"
-	"github.com/go-martini/martini"
-	"github.com/martini-contrib/binding"
-	"github.com/martini-contrib/render"
 	"log"
 	"net/http"
 	runtime "region-api/runtime"
 	structs "region-api/structs"
 	utils "region-api/utils"
+
+	"github.com/go-martini/martini"
+	"github.com/martini-contrib/binding"
+	"github.com/martini-contrib/render"
 )
 
 func AddApp(db *sql.DB, params martini.Params, spaceapp structs.Spaceappspec, berr binding.Errors, r render.Render) {
@@ -100,6 +101,11 @@ func DeleteApp(db *sql.DB, params martini.Params, r render.Render) {
 	if err != nil {
 		utils.ReportError(err, r)
 		return
+	}
+	// This might be present if the container-ports feature was enabled
+	err = rt.DeleteInternalService(space, appname)
+	if err != nil {
+		utils.ReportError(err, r)
 	}
 	err = rt.DeleteDeployment(space, appname)
 	if err != nil {
