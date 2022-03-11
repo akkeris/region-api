@@ -1532,7 +1532,7 @@ func (rt Kubernetes) CreateInternalService(space string, app string, ports []int
 	var service Service
 	service.Kind = "Service"
 	service.Metadata.Name = app + "-cp"
-	service.Metadata.Labels = map[string]string{"app": app, "name": app + "-cp"}
+	service.Metadata.Labels = map[string]string{"app": app, "name": app + "-cp", "akkeris.io/container-ports": "true"}
 	service.Spec.Selector.Name = app
 	service.Spec.Type = "ClusterIP"
 
