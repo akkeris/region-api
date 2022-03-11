@@ -327,6 +327,47 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 		utils.ReportError(err, r)
 		return
 	}
+	internalServiceExists, err := rt.InternalServiceExists(space, appname)
+	if err != nil {
+		utils.ReportError(err, r)
+		return
+	}
+
+	// Akkeris Beta Feature -- "container-ports"
+	//   Users can specify a config var "CONTAINER_PORTS" consisting of
+	//     comma seperated integers to add as additional exposed ports.
+	//   These ports will only be accessible to other apps, not exposed
+	//     through ingress
+	//   Eventually will make this a fully integrated config based option,
+	//	    this is an opt in feature while use cases are evaluated
+	//	 Ports must be valid integers > 1024 && < 65535 and not the same as the service port
+	if deploy1.Features.ContainerPorts {
+		// Helper function to detect duplicates
+		contains := func(arr []int, i int) bool {
+			for _, el := range arr {
+				if el == i {
+					return true
+				}
+			}
+			return false
+		}
+
+		for _, cv := range deployment.ConfigVars {
+			// Find config var CONTAINER_PORTS
+			if cv.Name == "CONTAINER_PORTS" && cv.Value != "" {
+				var containerPorts []int
+				for _, sp := range strings.Split(cv.Value, ",") {
+					port, err := strconv.Atoi(sp)
+					if err != nil || port == deployment.Port || port < 1024 || port > 65535 || contains(containerPorts, port) {
+						continue
+					}
+					containerPorts = append(containerPorts, port)
+				}
+				deployment.ContainerPorts = containerPorts
+				break
+			}
+		}
+	}
 
 	// Do not write to cluster above this line, everything below should apply changes,
 	// everything above should do sanity checks, this helps prevent "half" deployments
@@ -535,6 +576,40 @@ func Deployment(db *sql.DB, deploy1 structs.Deployspec, berr binding.Errors, r r
 		if !foundJwtFilter {
 			if err := appIngress.DeleteJWTAuthFilter(appname, space, appFQDN, int64(finalport)); err != nil {
 				fmt.Printf("WARNING: There was an error removing the JWT auth filter: %s\n", err.Error())
+			}
+		}
+	}
+
+	// Create/update/delete internal service (if container-ports feature enabled)
+	if deploy1.Features.ContainerPorts {
+		if len(deployment.ContainerPorts) > 0 {
+			// There should be an internal Service because there are container ports. Create or update one
+			if !internalServiceExists {
+				if err := rt.CreateInternalService(space, appname, deployment.ContainerPorts); err != nil {
+					utils.ReportError(err, r)
+					return
+				}
+			} else {
+				if err := rt.UpdateInternalService(space, appname, deployment.ContainerPorts); err != nil {
+					utils.ReportError(err, r)
+					return
+				}
+			}
+		} else {
+			// There should NOT be an internal Service if there are NO container ports. Delete one if exists
+			if internalServiceExists {
+				if err := rt.DeleteInternalService(space, appname); err != nil {
+					utils.ReportError(err, r)
+					return
+				}
+			}
+		}
+	} else {
+		// There should NOT be an internal Service if the feature is disabled. Delete one if exists
+		if internalServiceExists {
+			if err := rt.DeleteInternalService(space, appname); err != nil {
+				utils.ReportError(err, r)
+				return
 			}
 		}
 	}
