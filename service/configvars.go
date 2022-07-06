@@ -47,7 +47,7 @@ func GetServiceConfigVars(db *sql.DB, appname string, space string, appbindings 
 			// if nothing else matches see if we match an
 			// open service broker that dynamically registered.
 		} else if IsOSBService(servicetype) {
-			vars, err := GetOSBBindingCredentials(servicetype, servicename, appname+"-"+space)
+			vars, err := GetOSBBindingCredentials(servicetype, servicename, servicename)
 			if err != nil {
 				return err, elist
 			}
