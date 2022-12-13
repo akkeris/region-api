@@ -83,6 +83,7 @@ This uses jetstack's cert-manager (if installed) to issue certificates. By defau
 * `LOGSESSION_SERVICE_HOST`, `LOGSESSION_SERVICE_PORT` - where to find the logsession
 * `DOMAIN_BLACKLIST` - a comma delimited list of domains or regular expressions that should NOT be in the control of akkeris (region-api), this can be the provider id or domain name (provider id in aws is the hosted zone)
 * `PUBLIC_DNS_RESOLVER` - Used to see if DNS records are already set, this is used incase region api is in a VPN/VPC network. Defaults to 8.8.8.8
+* `LOGTRAIN_SERVICE_HOST`,`LOGTRAIN_SERVICE_PORT` - Where to find the logtrain, defaults to `logtrain.akkeris-system.svc.cluster.local`
 
 **Debugging Environment Variables:**
 

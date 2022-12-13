@@ -78,8 +78,16 @@ func Proxy(uri string, message string) *httputil.ReverseProxy {
 }
 
 func ProxyToLogTrain(res http.ResponseWriter, req *http.Request) {
-	logs_url := "http://" + os.Getenv("LOGTRAIN_SERVICE_HOST") + ":" + os.Getenv("LOGTRAIN_SERVICE_PORT")
-	rp := Proxy(logs_url, "logtrain")
+	var logs_url string
+	if os.Getenv("LOGTRAIN_SERVICE_HOST") == "" {
+		logs_url = "logtrain.akkeris-system.svc.cluster.local"
+	} else {
+		logs_url = os.Getenv("LOGTRAIN_SERVICE_HOST")
+	}
+	if os.Getenv("LOGTRAIN_SERVICE_PORT") != "" {
+		logs_url += ":" + os.Getenv("LOGTRAIN_SERVICE_PORT")
+	}
+	rp := Proxy("http://"+logs_url, "logtrain")
 	if rp == nil {
 		return
 	}
@@ -336,6 +344,7 @@ func Server(db *sql.DB) *martini.ClassicMartini {
 	// proxy to logtrain
 	if os.Getenv("LOGTRAIN_SERVICE_HOST") != "" && os.Getenv("LOGTRAIN_SERVICE_PORT") != "" {
 		m.Post("/events", ProxyToLogTrain)
+		m.Get("/logs/:id", ProxyToLogTrain)
 	}
 	// proxy to logtail
 	if os.Getenv("LOGTAIL_SERVICE_HOST") != "" && os.Getenv("LOGTAIL_SERVICE_PORT") != "" {
